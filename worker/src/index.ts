@@ -217,7 +217,7 @@ async function fetchInstagram(env: Env, limit: number): Promise<FeedItem[]> {
   const token = clean(env.IG_ACCESS_TOKEN);
   if (!userId || !token) return [];
 
-  const query = `fields=id,caption,media_type,permalink,timestamp,media_url&limit=${Math.min(limit, 12)}&access_token=${encodeURIComponent(
+  const query = `fields=id,caption,media_type,permalink,timestamp,media_url&limit=${Math.min(limit, 100)}&access_token=${encodeURIComponent(
     token
   )}`;
 
@@ -331,7 +331,7 @@ async function fetchX(env: Env, limit: number): Promise<FeedItem[]> {
   const tweetsData: any = await fetchJson(
     `https://api.twitter.com/2/users/${encodeURIComponent(
       userId
-    )}/tweets?exclude=retweets,replies&max_results=${Math.min(limit, 10)}&tweet.fields=created_at`,
+    )}/tweets?exclude=retweets,replies&max_results=${Math.min(limit, 100)}&tweet.fields=created_at`,
     { headers }
   );
 
@@ -352,7 +352,7 @@ async function fetchYouTube(env: Env, limit: number): Promise<FeedItem[]> {
   const data: any = await fetchJson(
     `https://www.googleapis.com/youtube/v3/search?key=${encodeURIComponent(apiKey)}&channelId=${encodeURIComponent(
       channelId
-    )}&part=snippet,id&order=date&maxResults=${Math.min(limit, 10)}`
+    )}&part=snippet,id&order=date&maxResults=${Math.min(limit, 50)}`
   );
 
   const rows = Array.isArray(data?.items) ? data.items : [];
@@ -515,15 +515,15 @@ export default {
     }
 
     if (url.pathname === "/api/feed") {
-      const limit = Math.max(1, Math.min(40, Number(url.searchParams.get("limit")) || 24));
+      const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get("limit")) || 24));
 
       const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
-        ["github", () => fetchGitHub(env, Math.min(limit, 8))],
-        ["bandcamp", () => fetchBandcamp(env, Math.min(limit, 8))],
-        ["instagram", () => fetchInstagram(env, Math.min(limit, 6))],
+        ["github", () => fetchGitHub(env, limit)],
+        ["bandcamp", () => fetchBandcamp(env, limit)],
+        ["instagram", () => fetchInstagram(env, limit)],
         ["spotify", () => fetchSpotify(env)],
-        ["x", () => fetchX(env, Math.min(limit, 6))],
-        ["youtube", () => fetchYouTube(env, Math.min(limit, 6))],
+        ["x", () => fetchX(env, limit)],
+        ["youtube", () => fetchYouTube(env, limit)],
       ];
 
       const results = await Promise.allSettled(tasks.map((task) => task[1]()));
@@ -613,9 +613,12 @@ export default {
     if (url.pathname === "/api/guestbook") {
       if (request.method === "GET") {
         try {
-          const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 40));
+          const rawLimit = Number(url.searchParams.get("limit"));
+          const hasLimit = Number.isFinite(rawLimit) && rawLimit > 0;
+          const limit = hasLimit ? Math.max(1, Math.min(5000, Math.floor(rawLimit))) : null;
           const entries = await readGuestbookEntries(env);
-          return new Response(JSON.stringify({ entries: entries.slice(0, limit), at: new Date().toISOString() }), {
+          const selected = limit ? entries.slice(0, limit) : entries;
+          return new Response(JSON.stringify({ entries: selected, at: new Date().toISOString() }), {
             status: 200,
             headers: jsonHeaders(allowOrigin),
           });
@@ -644,10 +647,10 @@ export default {
           }
 
           const entries = await readGuestbookEntries(env);
-          const next: GuestbookEntry[] = [{ name, message, at: new Date().toISOString() }, ...entries].slice(0, 100);
+          const next: GuestbookEntry[] = [{ name, message, at: new Date().toISOString() }, ...entries];
           await writeGuestbookEntries(env, next);
 
-          return new Response(JSON.stringify({ ok: true, entries: next.slice(0, 40), at: new Date().toISOString() }), {
+          return new Response(JSON.stringify({ ok: true, entries: next, at: new Date().toISOString() }), {
             status: 200,
             headers: jsonHeaders(allowOrigin),
           });

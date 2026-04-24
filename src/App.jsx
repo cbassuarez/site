@@ -13,6 +13,19 @@ const SOCIAL_LINKS = [
   { label: 'email', url: 'mailto:hello@cbassuarez.com' }
 ];
 
+const WEBSAFE_LINK_COLORS = [
+  '#0000CC',
+  '#0033CC',
+  '#006699',
+  '#008080',
+  '#009933',
+  '#6633CC',
+  '#990099',
+  '#993300',
+  '#CC0033',
+  '#CC3300'
+];
+
 const OBLIQUE_STRATEGIES = [
   'Use an old idea.',
   'Honor thy error as a hidden intention.',
@@ -46,15 +59,21 @@ function parseDateOrNow(value) {
   return parsed.getTime();
 }
 
-function mergeAndSortFeed(items) {
-  return [...items]
+function mergeAndSortFeed(items, maxItems = 16) {
+  const sorted = [...items]
     .filter((item) => item && item.text)
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 16);
+    .sort((a, b) => b.at - a.at);
+
+  if (typeof maxItems === 'number' && Number.isFinite(maxItems) && maxItems > 0) {
+    return sorted.slice(0, maxItems);
+  }
+
+  return sorted;
 }
 
-async function fetchCombinedSebFeed() {
-  const endpoint = `${FEED_API_BASE}/api/feed?limit=24`;
+async function fetchCombinedSebFeed({ limit = 24, maxItems = 16 } = {}) {
+  const safeLimit = Math.max(1, Math.floor(Number(limit) || 24));
+  const endpoint = `${FEED_API_BASE}/api/feed?limit=${safeLimit}`;
   const response = await fetch(endpoint);
 
   if (!response.ok) {
@@ -79,7 +98,7 @@ async function fetchCombinedSebFeed() {
   const failedCount = Object.values(sources).filter((status) => status?.status !== 'ok').length;
 
   return {
-    items: mergeAndSortFeed(successful),
+    items: mergeAndSortFeed(successful, maxItems),
     failedCount,
     sources
   };
@@ -115,8 +134,12 @@ function useTruthfulHitCounter() {
   return hits;
 }
 
-async function fetchGuestbookEntries() {
-  const response = await fetch(`${FEED_API_BASE}/api/guestbook?limit=40`);
+async function fetchGuestbookEntries(limit) {
+  const hasLimit = typeof limit === 'number' && Number.isFinite(limit) && limit > 0;
+  const endpoint = hasLimit
+    ? `${FEED_API_BASE}/api/guestbook?limit=${Math.floor(limit)}`
+    : `${FEED_API_BASE}/api/guestbook`;
+  const response = await fetch(endpoint);
   if (!response.ok) {
     throw new Error(`guestbook api failed (${response.status})`);
   }
@@ -130,8 +153,7 @@ async function fetchGuestbookEntries() {
       message: String(entry?.message || '').trim(),
       at: parseDateOrNow(entry?.at)
     }))
-    .filter((entry) => entry.message.length > 0)
-    .slice(0, 40);
+    .filter((entry) => entry.message.length > 0);
 }
 
 async function createGuestbookEntry({ name, message }) {
@@ -154,8 +176,7 @@ async function createGuestbookEntry({ name, message }) {
       message: String(entry?.message || '').trim(),
       at: parseDateOrNow(entry?.at)
     }))
-    .filter((entry) => entry.message.length > 0)
-    .slice(0, 40);
+    .filter((entry) => entry.message.length > 0);
 }
 
 function spotifyTrackIdFromItem(item) {
@@ -180,7 +201,7 @@ function formatMs(ms) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-function useSebFeed() {
+function useSebFeed({ apiLimit = 24, maxItems = 16 } = {}) {
   const [feedItems, setFeedItems] = useState([]);
   const [feedMeta, setFeedMeta] = useState('syncing');
   const [feedSources, setFeedSources] = useState({});
@@ -193,7 +214,7 @@ function useSebFeed() {
       setFeedMeta('syncing');
 
       try {
-        const result = await fetchCombinedSebFeed();
+        const result = await fetchCombinedSebFeed({ limit: apiLimit, maxItems });
 
         if (!active) {
           return;
@@ -230,7 +251,7 @@ function useSebFeed() {
       active = false;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [apiLimit, maxItems]);
 
   return {
     feedItems,
@@ -335,6 +356,7 @@ function WorksPage() {
 }
 
 function HomePage() {
+  const HOME_GUESTBOOK_LIMIT = 40;
   const hits = useTruthfulHitCounter();
   const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed();
   const [name, setName] = useState('');
@@ -354,7 +376,7 @@ function HomePage() {
       setGuestbookStatus('loading');
 
       try {
-        const entries = await fetchGuestbookEntries();
+        const entries = await fetchGuestbookEntries(HOME_GUESTBOOK_LIMIT);
         if (!active) return;
         setGuestbook(entries);
         setGuestbookStatus('ready');
@@ -435,7 +457,8 @@ function HomePage() {
 
     try {
       setGuestbookStatus('saving');
-      const entries = await createGuestbookEntry({ name: cleanName, message: cleanMessage });
+      await createGuestbookEntry({ name: cleanName, message: cleanMessage });
+      const entries = await fetchGuestbookEntries(HOME_GUESTBOOK_LIMIT);
       setGuestbook(entries);
       setName('');
       setMessage('');
@@ -480,7 +503,7 @@ function HomePage() {
                   <a href="/feed">seb feed</a>
                 </li>
                 <li>
-                  <a href="#guestbook">guestbook</a>
+                  <a href="/guestbook">guestbook</a>
                 </li>
                 <li>
                   <a href="/works">works</a>
@@ -518,59 +541,63 @@ function HomePage() {
               </p>
 
               <h2>what is seb doing // live feed</h2>
-              {isBooting ? (
-                <p>
-                  <i>syncing feed{bootDots}</i>
-                </p>
-              ) : (
-                <ul>
-                  {feedItems.slice(0, 12).map((item, index) => (
-                    <li key={`${item.source}-${item.at}-${index}`}>
-                      {item.url ? (
-                        <a href={item.url} target="_blank" rel="noreferrer">
-                          [{stamp(item.at)}] {item.source}
-                        </a>
-                      ) : (
-                        <span>[{stamp(item.at)}] {item.source}</span>
-                      )}{' '}
-                      - {item.text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {spotifyNow && spotifyTrackId ? (
-                <>
-                  <h3>listen with seb</h3>
+              <div style={{ minHeight: '21em' }}>
+                {isBooting ? (
                   <p>
-                    <small>{spotifyNow.text}</small>
+                    <i>syncing feed{bootDots}</i>
                   </p>
-                  <p>
-                    <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
-                      open in spotify
-                    </a>
-                  </p>
-                  {Number(spotifyNow?.durationMs) > 0 ? (
+                ) : (
+                  <ul>
+                    {feedItems.slice(0, 12).map((item, index) => (
+                      <li key={`${item.source}-${item.at}-${index}`}>
+                        {item.url ? (
+                          <a href={item.url} target="_blank" rel="noreferrer">
+                            [{stamp(item.at)}] {item.source}
+                          </a>
+                        ) : (
+                          <span>[{stamp(item.at)}] {item.source}</span>
+                        )}{' '}
+                        - {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {spotifyNow && spotifyTrackId ? (
+                  <>
+                    <h3>listen with seb</h3>
                     <p>
                       <small>
-                        playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
-                        {spotifyNow?.isPlaying ? '' : ' (paused)'}
+                        {spotifyNow.text}
                       </small>
                     </p>
-                  ) : null}
-                </>
-              ) : null}
-              <p>
-                <small>
-                  feed sync: {feedMeta}
-                  <br />
-                  sources:{' '}
-                  {Object.keys(feedSources).length > 0
-                    ? Object.entries(feedSources)
-                        .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
-                        .join(' | ')
-                    : 'worker feed (pending)'}
-                </small>
-              </p>
+                    <p>
+                      <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
+                        open in spotify
+                      </a>
+                    </p>
+                    {Number(spotifyNow?.durationMs) > 0 ? (
+                      <p>
+                        <small>
+                          playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
+                          {spotifyNow?.isPlaying ? '' : ' (paused)'}
+                        </small>
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+                <p>
+                  <small>
+                    feed sync: {feedMeta}
+                    <br />
+                    sources:{' '}
+                    {Object.keys(feedSources).length > 0
+                      ? Object.entries(feedSources)
+                          .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
+                          .join(' | ')
+                      : 'worker feed (pending)'}
+                  </small>
+                </p>
+              </div>
 
               <a id="guestbook" />
               <h2>guestbook.exe</h2>
@@ -636,7 +663,7 @@ function HomePage() {
               ]
             </span>
           ))}{' '}
-          [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
+          [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
         </small>
       </center>
     </>
@@ -644,7 +671,7 @@ function HomePage() {
 }
 
 function FeedPage() {
-  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed();
+  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed({ apiLimit: 5000, maxItems: null });
   const [bootDotCount, setBootDotCount] = useState(1);
 
   useEffect(() => {
@@ -667,7 +694,7 @@ function FeedPage() {
           <i>what is seb doing // live feed</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
         </p>
       </center>
 
@@ -714,6 +741,107 @@ function FeedPage() {
   );
 }
 
+function GuestbookPage() {
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [guestbook, setGuestbook] = useState([]);
+  const [guestbookStatus, setGuestbookStatus] = useState('loading');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadGuestbook = async () => {
+      setGuestbookStatus('loading');
+      try {
+        const entries = await fetchGuestbookEntries();
+        if (!active) return;
+        setGuestbook(entries);
+        setGuestbookStatus('ready');
+      } catch (error) {
+        if (!active) return;
+        setGuestbook([]);
+        setGuestbookStatus('offline');
+      }
+    };
+
+    loadGuestbook();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const submitGuestbook = async (event) => {
+    event.preventDefault();
+    const cleanName = name.trim() || 'anonymous';
+    const cleanMessage = message.trim();
+    if (!cleanMessage) return;
+
+    try {
+      setGuestbookStatus('saving');
+      await createGuestbookEntry({ name: cleanName, message: cleanMessage });
+      const entries = await fetchGuestbookEntries();
+      setGuestbook(entries);
+      setName('');
+      setMessage('');
+      setGuestbookStatus('ready');
+    } catch (error) {
+      setGuestbookStatus('offline');
+    }
+  };
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>guestbook.exe // full history</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/guestbook">guestbook</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <form onSubmit={submitGuestbook}>
+        <p>
+          name:{' '}
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} size="24" />
+        </p>
+        <p>
+          message:{' '}
+          <input type="text" value={message} onChange={(event) => setMessage(event.target.value)} size="60" />
+        </p>
+        <p>
+          <button type="submit">sign guestbook</button>
+        </p>
+      </form>
+
+      <table border="1" cellPadding="6" width="100%">
+        <tbody>
+          {guestbook.length === 0 ? (
+            <tr>
+              <td width="24%">system</td>
+              <td>
+                {guestbookStatus === 'loading' || guestbookStatus === 'saving'
+                  ? 'loading entries...'
+                  : 'no entries yet'}
+              </td>
+            </tr>
+          ) : null}
+          {guestbook.map((entry, index) => (
+            <tr key={`${entry.name}-${entry.message}-${index}`}>
+              <td width="24%">{entry.name}</td>
+              <td>{entry.message}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 function LegacyWorksRedirect() {
   useEffect(() => {
     window.location.replace('/works');
@@ -739,33 +867,39 @@ function LegacyFeedHashRedirect() {
 }
 
 export default function App() {
+  const linkColor = useMemo(() => {
+    const index = Math.floor(Math.random() * WEBSAFE_LINK_COLORS.length);
+    return WEBSAFE_LINK_COLORS[index] || '#0000CC';
+  }, []);
+
   const pathname = window.location.pathname;
   const hash = window.location.hash;
   const isWorksPage = window.location.pathname.startsWith('/works');
   const isAboutPage = window.location.pathname.startsWith('/about');
   const isFeedPage = window.location.pathname.startsWith('/feed');
+  const isGuestbookPage = window.location.pathname.startsWith('/guestbook');
   const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
+  let page = <HomePage />;
   if (isLegacyWorksPage) {
-    return <LegacyWorksRedirect />;
+    page = <LegacyWorksRedirect />;
+  } else if (isLegacyFeedHash) {
+    page = <LegacyFeedHashRedirect />;
+  } else if (isAboutPage) {
+    page = <AboutPage />;
+  } else if (isWorksPage) {
+    page = <WorksPage />;
+  } else if (isFeedPage) {
+    page = <FeedPage />;
+  } else if (isGuestbookPage) {
+    page = <GuestbookPage />;
   }
 
-  if (isLegacyFeedHash) {
-    return <LegacyFeedHashRedirect />;
-  }
-
-  if (isAboutPage) {
-    return <AboutPage />;
-  }
-
-  if (isWorksPage) {
-    return <WorksPage />;
-  }
-
-  if (isFeedPage) {
-    return <FeedPage />;
-  }
-
-  return <HomePage />;
+  return (
+    <>
+      <style>{`a, a:visited { color: ${linkColor}; }`}</style>
+      {page}
+    </>
+  );
 }
