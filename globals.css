@@ -1,0 +1,266 @@
+/* existing rule—just add the flex bits */
+#colorPickerContainer{
+  width: 200px;          /* or your current width */
+  margin: 0 auto 1em;    /* keeps block-level centering */
+  display: flex;         /* NEW */
+  justify-content: center;/* NEW */
+}
+
+#lifx-controller section p {
+  margin: 0.2em 0;
+  line-height: .8;
+  font-size: .7em;
+}
+
+/* Tighten up the main title */
+#lifx-controller h1 {
+  margin: 0.2em 0;
+  line-height: 1;
+  font-size: 1.5em;
+
+}
+
+/* Tighten up section headers */
+#lifx-controller h2 {
+  margin: 0.2em 0;
+  line-height: 1;
+    font-size: 1.2em;
+}
+
+//smooth scroll//
+html {
+  scroll-behavior: smooth;
+}
+//rounded image corners//
+.image-block-outer-wrapper :is(img, .image-overlay) {    
+  border-radius: 8px !important;
+}
+//accordion margins full-width//
+.accordion-item__description {
+max-width: 95% !important;
+}
+//mathilde's checkboxes//
+@media screen and (min-width:768px) {
+div#block-d959dcf6ad0ec25f8428 .checkbox .option {
+    float: left !important;
+    width: 15% !important;
+}
+}
+@media screen and (min-width:768px) {
+div#block-980ff33816d9c94ffd65 .checkbox .option {
+    float: left !important;
+    width: 15% !important;
+}
+}
+
+@media screen and (min-width:768px) {
+div#block-8244c1ae41a2410cd704 .checkbox .option {
+    float: left !important;
+    width: 15% !important;
+}
+}
+@media screen and (min-width:768px) {
+div#block-2d4da57cd19276a228f9 .checkbox .option {
+    float: left !important;
+    width: 15% !important;
+}
+}
+@media screen and (min-width:768px) {
+div#block-e9182e2c5db21d07e941 .checkbox .option {
+    float: left !important;
+    width: 15% !important;
+}
+}
+// Frosted Blur Button Block //
+
+.sqs-block-button-element--medium {
+   background-color: rgba(0,0,0,.1) !important;
+   backdrop-filter: blur(6px);
+   -webkit-backdrop-filter: blur(6px);
+}
+//home page background color correction
+[data-section-id="636588bf92d1a271a72610f5"] .section-background {
+	background: #05060f !important;
+}
+[data-section-id="6365b14ac15b512f29f1cb07"] .section-background {
+	background: #05060f !important;
+}
+//cursors
+body {
+margin: 0;
+height: 100vh;
+cursor: url(), auto;
+ 
+  a:hover{
+cursor: url(), auto;
+}
+
+}
+//redirect
+.sqs-block-product a {
+
+  pointer-events : none;
+  
+  }
+
+@media only screen and (min-width: 297px) {
+ .header-title-logo img {
+   max-height: 150px;
+ }
+}
+
+#block-yui_3_17_2_1_1667440412195_13615 {border: 3px solid black;
+
+background: white;}
+
+section[data-section-id="63627aa6dc00aefb5d338c2d"] {// Accordion title description
+  .accordion-item__description * {
+    opacity: 0.7;
+}
+  
+// Removing the default divider  
+.accordion-divider {
+  display: none;
+}
+
+.accordion-item  {
+  border: solid 1px black;
+  border-bottom: 0;
+}
+  
+.accordion-item:last-child {
+  border-bottom: solid 1px black;
+}
+
+.accordion-item__dropdown--open {
+  padding-top: 20px;
+  border-top: solid 1px black;
+}
+  
+//More weight to the title
+ span.accordion-item__title {
+    font-weight: 400 !important;
+}
+  
+//Add more padding to item description
+  .accordion-item__description {
+    padding-left: 20px !important;}
+  
+// Accordion title padding
+  .accordion-item__title-wrapper {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+}
+  
+}
+/*Make split navigation*/
+.header-nav {
+    position: absolute;
+    top: 15px;
+    bottom: ;
+    margin-top: 0!important;
+    margin-left: -5px!important;
+}
+
+.header-nav-item:nth-of-type(2) {
+  margin-right: 15px!important;
+}
+
+.header-title-logo img {
+	height: 3.2rem;
+  margin-top:-50px!important;
+}
+.header-display-desktop {
+    display: block!important;
+  margin-top: 50px!important;
+}
+@media screen and (max-width:500px) {
+	.header-display-desktop {
+    display: flex!important;
+      }
+  .header-display-mobile {
+    display: none;
+     
+}
+}
+.header-nav .header-nav-item--folder .header-nav-folder-content {
+  transform:rotate(90deg)!important;
+}
+.header-nav .header-nav-item--folder .header-nav-folder-item {transform: translateX(10px)!important;
+  margin-bottom:8px;
+}
+
+//Type
+//@font-face {
+//font-family: Typefesse;
+//src: //url(https://static1.squarespace.com/static/60aabe6ed5abe22cec5ba1d2/t/6367e1903491af7341aaf682/1667752336078/LeMurmure-Regular.woff);}
+//  h4 {
+//font-family: 'Typefesse';
+//}
+//@font-face {
+//font-family: Sporting;
+//src: url(https://static1.squarespace.com/static/60aabe6ed5abe22cec5ba1d2/t/63648ad4a351d015c49d75de/1667533524981/Sporting_Grotesque-Regular_web.ttf);}
+//  h3 {
+//font-family: 'Sporting';
+//}
+//h2 {
+//font-family: 'Sporting';
+//}
+//h1 {
+//font-family: 'Sporting';
+//}
+//.sqsrte-large {
+//font-family: 'Sporting';
+//}
+//p {
+//font-family: 'Sporting';
+//}
+//.sqsrte-small {
+//font-family: 'Sporting';
+//}
+// Site Title //
+//.header-title-text a {
+ // font-family: Sporting !important;
+//}
+
+// Site Navigation //
+//.header-nav-item a {
+//  font-family: Sporting !important;
+//}
+
+// Button //
+//.header-actions-action .btn {
+//  font-family: Sporting !important;
+//}
+//.sqs-block-button-element--medium, .sqs-button-element--primary {
+//  font-family: Sporting !important;
+//}
+// Announcement Bar //
+//.sqs-announcement-bar-url a {
+//  font-family: Sporting !important;
+//}
+//visual works page video block aspect ratio
+#block-yui_3_17_2_1_1668206131898_80724 {
+  width: 100%;  
+  /*padding-top: 56.25%; */
+  aspect-ratio: 4 / 3;
+}
+//form button submit formatting/
+.form-wrapper input[type="submit"] {
+ display: block;
+  background: #FF1910!important;
+ color: white!important;
+ border: none;
+ padding: 10px 20px;
+ -moz-border-radius: 2px;
+ border-radius: 2px;
+ cursor: pointer;
+}
+.form-wrapper input[type=submit]:hover 
+{ 
+  color: #FF1910!important; 
+background: white!important;
+  outline: solid!important;
+  outline-color: #FF1910;
+  outline-radius: 8px!important;
+}

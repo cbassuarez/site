@@ -288,6 +288,222 @@ function useSebFeed() {
   };
 }
 
+const WORKS_ARCHIVE = [
+  {
+    id: 1,
+    title: 'WORK 1 — String Quartet No. 2 “SOUNDNOISEMUSIC”',
+    oneliner:
+      'A through-composed/indeterminate quartet that alternates fixed score, structured mischief, and noise permissions.',
+    description:
+      'A large-scale quartet that toggles between rigor and chaos. Structured movements, improvisatory noise passages, and deliberate performer subversions are interleaved to question how fixed notation and indeterminate practice can coexist in chamber music.',
+    audio: 'https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/SSS_soundnoisemusic_audio.mp3',
+    score:
+      'https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/STRING%20QUARTET%20NO.%202%20_soundnoisemusic_%20-%20Score-min.pdf'
+  },
+  {
+    id: 2,
+    title: 'WORK 2 — Organum Quadruplum “Lux Nova”',
+    oneliner:
+      'A stained-glass acoustics study: bowed dalle-de-verre slab transduced into a ring of pianos—polyphony by distance rather than shared air.',
+    description:
+      'Organum Quadruplum reframed for glass and transducers. Light-conditioned harmonics from a dalle-de-verre slab are bowed, captured, and redistributed across a circle of pianos so the counterpoint arises from distance rather than shared resonance.',
+    audio: 'https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/luxnova.mp3',
+    score: ''
+  },
+  {
+    id: 3,
+    title: 'WORK 3 — AMPLIFICATIONS I · MARIMBAideefixe',
+    oneliner:
+      'Two prepared pianos as resonators for a 5.0-octave marimba: sympathetic “ghost ensemble” via transduction.',
+    description:
+      'Marimbaideefixe extends the marimba through dual prepared pianos acting as resonant bodies. Transduced sustain, bell resonances, and baroque-inflected improvisations blur solo and ensemble roles into a ghostly amplification ritual.',
+    audio: 'https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/amplifications.mp3',
+    score: 'https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/AMPLIFICATIONS%201.%20MARIMBAideefixe.pdf'
+  }
+];
+
+function AboutPage() {
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>about</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <h1>ABOUT ME: SEB SUAREZ</h1>
+      <p>
+        <strong>Today’s first half (45 min)</strong> introduces who I am, what I make, and the values that
+        shape this class. If you’re skimming, start with the <strong>Agenda</strong> and{' '}
+        <strong>Three Works</strong>.
+      </p>
+
+      <hr />
+
+      <h2>Agenda (45:00)</h2>
+      <ol>
+        <li>Welcome &amp; what to expect (2)</li>
+        <li>Origin story &amp; positioning (6)</li>
+        <li>Three works (12)</li>
+        <li>Method: materials · systems · people (8)</li>
+        <li>Live peek: /sounds (8)</li>
+        <li>Why this class: culture &amp; expectations (9)</li>
+      </ol>
+      <p>
+        Links we’ll reference: <a href="https://cbassuarez.com/#about">/about</a> ·{' '}
+        <a href="https://cbassuarez.com/#ls/works">/works</a> ·{' '}
+        <a href="https://cbassuarez.com/#ls/sounds">/sounds</a>
+      </p>
+
+      <hr />
+
+      <h2>Welcome &amp; what to expect</h2>
+      <p>
+        Hi, I’m <strong>Sebastian Suárez-Solís</strong> — composer-performer and doctoral candidate at
+        CalArts. My practice lives at the intersection of <strong>sound, light, and space</strong>. This
+        course runs most weeks in <strong>two halves</strong>:
+      </p>
+      <ul>
+        <li>Presentation: practice, process, critique</li>
+        <li>Lecture: concepts, live demos, small exercises</li>
+      </ul>
+      <p>
+        Today mirrors that structure: this page (About &amp; Practice) → then a Creative Coding
+        Micro-Lecture.
+      </p>
+
+      <hr />
+
+      <h2>Origin story &amp; positioning</h2>
+      <ul>
+        <li>
+          I came to music through percussion and site-responsive sound, then expanded into lighting as
+          instrument, browser-based tools, and public-facing libraries.
+        </li>
+        <li>
+          I’m interested in monochromatic light for how it collapses color into shadows and textures,
+          and in systems that audiences can read while they’re happening.
+        </li>
+        <li>
+          I value clarity, generosity, specificity: we make the interaction legible, the stakes visible,
+          and the critique useful.
+        </li>
+      </ul>
+      <p>
+        Thought to keep in mind: <em>How does light change how you hear a space?</em>
+      </p>
+
+      <hr />
+
+      <h2>Three works (maps to course themes)</h2>
+      <h3>1) CONSTRUCTIONS — light-and-sound as instrument</h3>
+      <p>
+        <strong>What:</strong> Oversized light sculptures (e.g., low-pressure sodium, ST64 incandescent),
+        custom bases, and live manipulation.
+      </p>
+      <p>
+        <strong>Why it matters here:</strong> Treats lighting as a time-based performance object; asks
+        how city infrastructure can become chamber music.
+      </p>
+      <p>
+        <strong>See:</strong> <a href="https://cbassuarez.com/#w/constructions">/works → Constructions</a>
+      </p>
+      <p>
+        <strong>Themes:</strong> performance systems · audience agency · choreographing attention
+      </p>
+
+      <h3>2) Dex Digital Sample Library (DexDSL) — open access, CC-BY</h3>
+      <p>
+        <strong>What:</strong> A nonprofit sample library of beds, textures, instruments, plus residencies
+        and education outreach.
+      </p>
+      <p>
+        <strong>Why it matters here:</strong> Models public tooling, clean licensing, and sustainable open
+        culture.
+      </p>
+      <p>
+        <strong>See:</strong> <a href="https://dexdsl.com">/works → DexDSL</a>
+      </p>
+      <p>
+        <strong>Themes:</strong> authorship · distribution · community infrastructure
+      </p>
+
+      <h3>3) Optics &amp; Photonics Music System — mapping sound ↔ light</h3>
+      <p>
+        <strong>What:</strong> A three-part system: (1) pitches mapped to visible wavelengths, (2)
+        actuators controlling mirrors/filters, (3) a physical optics track.
+      </p>
+      <p>
+        <strong>Why it matters here:</strong> Reframes orchestration as beam routing and spatial
+        composition.
+      </p>
+      <p>
+        <strong>Themes:</strong> mapping · embodiment · readable complexity
+      </p>
+
+      <hr />
+
+      <h2>Method: materials · systems · people</h2>
+      <p>
+        <strong>Materials:</strong> streetlights, mirrors, acrylic prisms, carbon fiber, wood;
+        microphones &amp; room acoustics; and the browser as instrument.
+      </p>
+      <p>
+        <strong>Systems:</strong> minimal, audience-legible pipelines (signal flow you can point to);
+        small, repeatable gestures; constraints that generate form.
+      </p>
+      <p>
+        <strong>People:</strong> collaborators, guest artists, and you — students as co-designers.
+      </p>
+      <p>
+        <strong>Anti-patterns we’ll avoid:</strong> invisible interactions, over-engineering, unclear
+        goals.
+      </p>
+
+      <hr />
+
+      <h2>Live peek: /sounds (what you’ll see/hear)</h2>
+      <ul>
+        <li>One short gesture: start → a single parameter sweep → stop (≈60–90 seconds).</li>
+        <li>Point out what changes (e.g., filter cutoff) and where in the chain it lives.</li>
+        <li>Goal: show how a web page can be a performance surface and a lab notebook.</li>
+      </ul>
+      <p>
+        You’ll do your own small “gesture studies” later — not about being flashy, about being clear.
+      </p>
+
+      <hr />
+
+      <h2>Why this class: culture &amp; expectations</h2>
+      <ul>
+        <li>Two halves, every week. Present (show process, invite critique) → Learn (concepts, demos).</li>
+        <li>
+          What I expect: show small, evolving work; give &amp; receive concrete feedback; write down what
+          changed because of critique.
+        </li>
+        <li>
+          How we talk: we name what is working, what is confusing, and one specific next step.
+        </li>
+        <li>
+          What you can expect of me: direct feedback, practical tools, and time for your questions.
+        </li>
+      </ul>
+      <p>
+        <strong>
+          You belong here if you’re curious about sound, light, systems, or simply like building things
+          that others can feel in space.
+        </strong>
+      </p>
+    </>
+  );
+}
+
 function WorksPage() {
   return (
     <>
@@ -297,17 +513,39 @@ function WorksPage() {
           <i>works</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ]
         </p>
       </center>
 
       <hr />
 
-      <iframe
-        title="Praetorius Works"
-        src="/works-console/index.html"
-        style={{ width: '100%', height: '78vh', border: 0, display: 'block' }}
-      />
+      <h2>Praetorius Shell // Works Archive</h2>
+      <p>
+        This is a styleless static mirror of the `website-blog` works list, presented inside the new
+        shell.
+      </p>
+
+      {WORKS_ARCHIVE.map((work) => (
+        <article key={work.id}>
+          <h3>{work.title}</h3>
+          <p>{work.oneliner}</p>
+          <p>{work.description}</p>
+          <ul>
+            <li>
+              <a href={work.audio} target="_blank" rel="noreferrer">
+                Audio
+              </a>
+            </li>
+            {work.score ? (
+              <li>
+                <a href={work.score} target="_blank" rel="noreferrer">
+                  Score (PDF)
+                </a>
+              </li>
+            ) : null}
+          </ul>
+        </article>
+      ))}
     </>
   );
 }
@@ -373,6 +611,9 @@ function HomePage() {
               <ul>
                 <li>
                   <a href="#about">about</a>
+                </li>
+                <li>
+                  <a href="/about">about (full page)</a>
                 </li>
                 <li>
                   <a href="#seb-feed">seb feed</a>
@@ -499,7 +740,7 @@ function HomePage() {
               ]
             </span>
           ))}{' '}
-          [ <a href="/works">works</a> ] [ under construction ]
+          [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
         </small>
       </center>
     </>
@@ -521,10 +762,15 @@ function LegacyWorksRedirect() {
 export default function App() {
   const pathname = window.location.pathname;
   const isWorksPage = window.location.pathname.startsWith('/works');
+  const isAboutPage = window.location.pathname.startsWith('/about');
   const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
 
   if (isLegacyWorksPage) {
     return <LegacyWorksRedirect />;
+  }
+
+  if (isAboutPage) {
+    return <AboutPage />;
   }
 
   if (isWorksPage) {
