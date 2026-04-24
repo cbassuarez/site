@@ -91,6 +91,91 @@ const short = (value: unknown, max = 120) => {
 };
 
 const sourceBase = (source: unknown) => clean(source).toLowerCase().split(":")[0] || "feed";
+const parseFeedTimeMs = (value: unknown) => {
+  const ms = new Date(clean(value)).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+};
+
+function parseSpotifyEvent(text: string): { action: string; label: string } {
+  const cleaned = clean(text);
+  const match = cleaned.match(/^(now playing|last played|resumed|paused):\s*(.+)$/i);
+  if (!match) {
+    return { action: "other", label: cleaned.toLowerCase() };
+  }
+  return { action: clean(match[1]).toLowerCase(), label: clean(match[2]).toLowerCase() };
+}
+
+function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
+  const oldestFirst = [...items].sort((a, b) => parseFeedTimeMs(a.at) - parseFeedTimeMs(b.at));
+  const kept: FeedItem[] = [];
+
+  const seenSessionKeys = new Set<string>();
+  const seenEventKeys = new Set<string>();
+  const recentByTrackAction = new Map<string, number>();
+
+  for (const item of oldestFirst) {
+    if (sourceBase(item.source) !== "spotify") {
+      kept.push(item);
+      continue;
+    }
+
+    const atMs = parseFeedTimeMs(item.at);
+    const { action, label } = parseSpotifyEvent(item.text);
+    const trackKey = clean(item.media || item.url || label);
+
+    if (!trackKey) {
+      kept.push(item);
+      continue;
+    }
+
+    if (action === "now playing") {
+      if (item.isPlaying === false) {
+        continue;
+      }
+      const progress = toNonNegativeInt(item.progressMs);
+      if (progress !== null && atMs > 0) {
+        const startedAtMs = Math.max(0, atMs - progress);
+        const sessionBucket = Math.round(startedAtMs / 30000);
+        const sessionKey = `play:${trackKey}:${sessionBucket}`;
+        if (seenSessionKeys.has(sessionKey)) continue;
+        seenSessionKeys.add(sessionKey);
+      } else {
+        const burstKey = `${trackKey}|${action}`;
+        const lastAt = recentByTrackAction.get(burstKey) || 0;
+        if (atMs - lastAt < 120000) continue;
+        recentByTrackAction.set(burstKey, atMs);
+      }
+      kept.push(item);
+      continue;
+    }
+
+    if (action === "resumed" || action === "paused") {
+      const burstKey = `${trackKey}|${action}`;
+      const lastAt = recentByTrackAction.get(burstKey) || 0;
+      if (atMs - lastAt < 90000) continue;
+      recentByTrackAction.set(burstKey, atMs);
+      kept.push(item);
+      continue;
+    }
+
+    if (action === "last played") {
+      const burstKey = `${trackKey}|${action}`;
+      const lastAt = recentByTrackAction.get(burstKey) || 0;
+      if (atMs - lastAt < 90000) continue;
+      recentByTrackAction.set(burstKey, atMs);
+
+      const eventKey = `last:${trackKey}:${clean(item.at)}`;
+      if (seenEventKeys.has(eventKey)) continue;
+      seenEventKeys.add(eventKey);
+      kept.push(item);
+      continue;
+    }
+
+    kept.push(item);
+  }
+
+  return kept.sort((a, b) => parseFeedTimeMs(b.at) - parseFeedTimeMs(a.at));
+}
 
 function formatAgeLabel(msAgo: number): string {
   if (!Number.isFinite(msAgo) || msAgo < 0) return "just now";
@@ -806,7 +891,7 @@ export default {
           }) === index;
         });
 
-      const persisted = merged.slice(0, 5000);
+      const persisted = sanitizeSpotifyTimeline(merged).slice(0, 5000);
       await writeFeedTimeline(env, persisted);
 
       return new Response(
