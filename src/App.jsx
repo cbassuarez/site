@@ -454,7 +454,9 @@ function HomePage() {
         </p>
         <p>
           <small>
-            oblique strategy: "<q>{obliqueLine}</q>" — {OBLIQUE_ATTRIBUTION}
+            <q>{obliqueLine}</q>
+            <br />
+            <i>{OBLIQUE_ATTRIBUTION}</i>
           </small>
         </p>
       </center>
