@@ -92,7 +92,7 @@ async function fetchGitHub(env: Env, limit: number): Promise<FeedItem[]> {
   let match: RegExpExecArray | null;
   while ((match = entryRegex.exec(xml)) && items.length < limit) {
     const block = match[1];
-    const title = short(decodeHtml(clean((block.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "")), 108);
+    const title = short(decodeHtml(clean((block.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "")), 108);
     const link = clean((block.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || "");
     const updated = clean((block.match(/<updated>([\s\S]*?)<\/updated>/i) || [])[1] || "");
     if (!title) continue;
@@ -270,6 +270,8 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
   const headers = { authorization: `Bearer ${accessToken}` };
   const current = await fetch("https://api.spotify.com/v1/me/player/currently-playing", { headers });
 
+  const items: FeedItem[] = [];
+
   if (current.status === 200) {
     const payload: any = await current.json();
     const track = payload?.item;
@@ -279,29 +281,27 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
     const name = clean(track?.name);
     const url = clean(track?.external_urls?.spotify || "");
     const uri = clean(track?.uri || "");
-    return [
-      {
-        source: "spotify",
-        text: `now playing: ${artists}${artists && name ? " — " : ""}${name}`,
-        at: new Date().toISOString(),
-        url: url || undefined,
-        media: uri || undefined,
-        progressMs: Number.isFinite(payload?.progress_ms) ? payload.progress_ms : 0,
-        durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
-        isPlaying: Boolean(payload?.is_playing),
-      },
-    ];
+    items.push({
+      source: "spotify",
+      text: `now playing: ${artists}${artists && name ? " — " : ""}${name}`,
+      at: new Date().toISOString(),
+      url: url || undefined,
+      media: uri || undefined,
+      progressMs: Number.isFinite(payload?.progress_ms) ? payload.progress_ms : 0,
+      durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
+      isPlaying: Boolean(payload?.is_playing),
+    });
   }
 
-  const recentData: any = await fetchJson("https://api.spotify.com/v1/me/player/recently-played?limit=1", { headers });
-  const recent = recentData?.items?.[0];
-  const track = recent?.track;
-  if (!track) return [];
-  const artists = Array.isArray(track?.artists)
-    ? track.artists.map((artist: any) => clean(artist?.name)).filter(Boolean).join(", ")
-    : "";
-  return [
-    {
+  const recentData: any = await fetchJson("https://api.spotify.com/v1/me/player/recently-played?limit=50", { headers });
+  const recents = Array.isArray(recentData?.items) ? recentData.items : [];
+  for (const recent of recents) {
+    const track = recent?.track;
+    if (!track) continue;
+    const artists = Array.isArray(track?.artists)
+      ? track.artists.map((artist: any) => clean(artist?.name)).filter(Boolean).join(", ")
+      : "";
+    items.push({
       source: "spotify",
       text: `last played: ${artists}${artists && track?.name ? " — " : ""}${clean(track?.name)}`,
       at: recent?.played_at || new Date().toISOString(),
@@ -310,8 +310,10 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
       progressMs: 0,
       durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
       isPlaying: false,
-    },
-  ];
+    });
+  }
+
+  return items;
 }
 
 async function fetchX(env: Env, limit: number): Promise<FeedItem[]> {
@@ -505,6 +507,39 @@ async function writeGuestbookEntries(env: Env, entries: GuestbookEntry[]): Promi
   await kv.put("guestbook:entries-v1", JSON.stringify(entries));
 }
 
+async function readFeedTimeline(env: Env): Promise<FeedItem[]> {
+  const kv = env.HITS_KV;
+  if (!kv) return [];
+
+  const raw = await kv.get("feed:timeline-v1");
+  if (!raw) return [];
+
+  try {
+    const parsed: any = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item: any) => ({
+        source: clean(item?.source || "feed"),
+        text: clean(item?.text || ""),
+        at: clean(item?.at || ""),
+        url: clean(item?.url || ""),
+        media: clean(item?.media || ""),
+        progressMs: Number.isFinite(item?.progressMs) ? item.progressMs : 0,
+        durationMs: Number.isFinite(item?.durationMs) ? item.durationMs : 0,
+        isPlaying: Boolean(item?.isPlaying),
+      }))
+      .filter((item: FeedItem) => item.text.length > 0 && item.at.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+async function writeFeedTimeline(env: Env, items: FeedItem[]): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  await kv.put("feed:timeline-v1", JSON.stringify(items));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -516,14 +551,15 @@ export default {
 
     if (url.pathname === "/api/feed") {
       const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get("limit")) || 24));
+      const sourceWindow = Math.min(limit, 120);
 
       const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
-        ["github", () => fetchGitHub(env, limit)],
-        ["bandcamp", () => fetchBandcamp(env, limit)],
-        ["instagram", () => fetchInstagram(env, limit)],
+        ["github", () => fetchGitHub(env, sourceWindow)],
+        ["bandcamp", () => fetchBandcamp(env, sourceWindow)],
+        ["instagram", () => fetchInstagram(env, sourceWindow)],
         ["spotify", () => fetchSpotify(env)],
-        ["x", () => fetchX(env, limit)],
-        ["youtube", () => fetchYouTube(env, limit)],
+        ["x", () => fetchX(env, sourceWindow)],
+        ["youtube", () => fetchYouTube(env, sourceWindow)],
       ];
 
       const results = await Promise.allSettled(tasks.map((task) => task[1]()));
@@ -573,15 +609,25 @@ export default {
         };
       });
 
-      const merged = items
+      const historical = await readFeedTimeline(env);
+      const merged = [...items, ...historical]
         .filter((item) => item && item.text)
         .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-        .slice(0, limit);
+        .filter((item, index, array) => {
+          const key = `${item.source}|${item.at}|${item.url || ""}|${item.text}`;
+          return array.findIndex((candidate) => {
+            const candidateKey = `${candidate.source}|${candidate.at}|${candidate.url || ""}|${candidate.text}`;
+            return candidateKey === key;
+          }) === index;
+        });
+
+      const persisted = merged.slice(0, 5000);
+      await writeFeedTimeline(env, persisted);
 
       return new Response(
         JSON.stringify(
           {
-            items: merged,
+            items: persisted.slice(0, limit),
             sources,
             generatedAt: new Date().toISOString(),
           },

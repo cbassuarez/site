@@ -71,6 +71,32 @@ function mergeAndSortFeed(items, maxItems = 16) {
   return sorted;
 }
 
+function pickSourceDiverseItems(items, { total = 12, perSourceCap = 4 } = {}) {
+  const selected = [];
+  const perSourceCounts = new Map();
+
+  for (const item of items) {
+    if (selected.length >= total) break;
+    const source = String(item?.source || 'feed');
+    const current = perSourceCounts.get(source) || 0;
+    if (current >= perSourceCap) continue;
+    selected.push(item);
+    perSourceCounts.set(source, current + 1);
+  }
+
+  if (selected.length >= total) {
+    return selected;
+  }
+
+  for (const item of items) {
+    if (selected.length >= total) break;
+    if (selected.includes(item)) continue;
+    selected.push(item);
+  }
+
+  return selected;
+}
+
 async function fetchCombinedSebFeed({ limit = 24, maxItems = 16 } = {}) {
   const safeLimit = Math.max(1, Math.floor(Number(limit) || 24));
   const endpoint = `${FEED_API_BASE}/api/feed?limit=${safeLimit}`;
@@ -411,7 +437,9 @@ function HomePage() {
       return `boot: syncing seb feed${bootDots} /// boot: fetching sources${bootDots} /// boot: compiling timeline${bootDots}`;
     }
 
-    const pieces = feedItems.slice(0, 6).map((item) => `${item.source}: ${item.text}`);
+    const pieces = pickSourceDiverseItems(feedItems, { total: 6, perSourceCap: 2 }).map(
+      (item) => `${item.source}: ${item.text}`
+    );
 
     if (pieces.length === 0) {
       return 'waiting for seb feed...';
@@ -426,6 +454,10 @@ function HomePage() {
   );
   const spotifyTrackId = spotifyTrackIdFromItem(spotifyNow);
   const [spotifyLocalProgressMs, setSpotifyLocalProgressMs] = useState(0);
+  const homeFeedPreview = useMemo(
+    () => pickSourceDiverseItems(feedItems, { total: 12, perSourceCap: 3 }),
+    [feedItems]
+  );
 
   useEffect(() => {
     setSpotifyLocalProgressMs(Number(spotifyNow?.progressMs) || 0);
@@ -548,7 +580,7 @@ function HomePage() {
                   </p>
                 ) : (
                   <ul>
-                    {feedItems.slice(0, 12).map((item, index) => (
+                    {homeFeedPreview.map((item, index) => (
                       <li key={`${item.source}-${item.at}-${index}`}>
                         {item.url ? (
                           <a href={item.url} target="_blank" rel="noreferrer">
