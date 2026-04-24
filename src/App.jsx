@@ -60,7 +60,8 @@ async function fetchCombinedSebFeed() {
     source: item.source || 'feed',
     text: item.text || '',
     at: parseDateOrNow(item.at),
-    url: item.url || ''
+    url: item.url || '',
+    media: item.media || ''
   }));
 
   const failedCount = Object.values(sources).filter((status) => status?.status !== 'ok').length;
@@ -76,32 +77,23 @@ function useTruthfulHitCounter() {
   const [hits, setHits] = useState('loading...');
 
   useEffect(() => {
-    const localKey = 'cbassuarez-local-hit-counter-fallback';
-
-    const applyLocalFallback = () => {
-      const current = Number(window.localStorage.getItem(localKey));
-      const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-      window.localStorage.setItem(localKey, String(next));
-      setHits(`${next} (local fallback)`);
-    };
-
     const updateGlobalHits = async () => {
       try {
-        const response = await fetch('https://api.countapi.xyz/hit/cbassuarez.com/landing-v1');
+        const response = await fetch(`${FEED_API_BASE}/api/hit`);
 
         if (!response.ok) {
-          throw new Error('countapi request failed');
+          throw new Error('hit endpoint failed');
         }
 
         const data = await response.json();
 
         if (!Number.isFinite(data.value)) {
-          throw new Error('invalid countapi payload');
+          throw new Error('invalid hit payload');
         }
 
         setHits(String(data.value));
       } catch (error) {
-        applyLocalFallback();
+        setHits('unavailable');
       }
     };
 
@@ -109,6 +101,21 @@ function useTruthfulHitCounter() {
   }, []);
 
   return hits;
+}
+
+function spotifyTrackIdFromItem(item) {
+  if (!item) {
+    return '';
+  }
+
+  const media = String(item.media || '');
+  if (media.startsWith('spotify:track:')) {
+    return media.split(':').pop() || '';
+  }
+
+  const url = String(item.url || '');
+  const match = url.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : '';
 }
 
 function useSebFeed() {
@@ -284,6 +291,12 @@ function HomePage() {
     return pieces.join(' /// ');
   }, [feedItems]);
 
+  const spotifyNow = useMemo(
+    () => feedItems.find((item) => String(item.source || '').toLowerCase() === 'spotify') || null,
+    [feedItems]
+  );
+  const spotifyTrackId = spotifyTrackIdFromItem(spotifyNow);
+
   const submitGuestbook = (event) => {
     event.preventDefault();
 
@@ -366,18 +379,8 @@ function HomePage() {
 
               <a id="seb-feed" />
               <h2>what is seb doing // live feed</h2>
-              <pre>
-                {feedItems
-                  .slice(0, 12)
-                  .map((item) => `[${stamp(item.at)}] ${item.source} -> ${item.text}`)
-                  .join('\n')}
-              </pre>
-              <p>
-                <small>feed sync: {feedMeta}</small>
-              </p>
-              <h3>latest links</h3>
               <ul>
-                {feedItems.slice(0, 8).map((item, index) => (
+                {feedItems.slice(0, 12).map((item, index) => (
                   <li key={`${item.source}-${item.at}-${index}`}>
                     {item.url ? (
                       <a href={item.url} target="_blank" rel="noreferrer">
@@ -390,8 +393,27 @@ function HomePage() {
                   </li>
                 ))}
               </ul>
+              {spotifyNow && spotifyTrackId ? (
+                <>
+                  <h3>listen with seb</h3>
+                  <p>
+                    <small>{spotifyNow.text}</small>
+                  </p>
+                  <iframe
+                    title="Spotify Now Playing"
+                    src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator`}
+                    width="100%"
+                    height="152"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                  />
+                </>
+              ) : null}
               <p>
                 <small>
+                  feed sync: {feedMeta}
+                  <br />
                   sources:{' '}
                   {Object.keys(feedSources).length > 0
                     ? Object.entries(feedSources)

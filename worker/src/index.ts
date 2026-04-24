@@ -14,6 +14,7 @@ type SourceStatus = {
 
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
+  HITS_KV?: KVNamespace;
   GITHUB_USERNAME?: string;
   GITHUB_TOKEN?: string;
   BANDCAMP_DOMAIN?: string;
@@ -289,6 +290,20 @@ async function fetchYouTube(env: Env, limit: number): Promise<FeedItem[]> {
     }));
 }
 
+async function incrementHitCount(env: Env): Promise<number> {
+  const kv = env.HITS_KV;
+  if (!kv) {
+    throw new Error("hits kv missing");
+  }
+
+  const key = "hits:landing-v1";
+  const currentRaw = await kv.get(key);
+  const current = Number(currentRaw);
+  const next = Number.isFinite(current) && current >= 0 ? current + 1 : 1;
+  await kv.put(key, String(next));
+  return next;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -374,6 +389,24 @@ export default {
         ),
         { status: 200, headers: jsonHeaders(allowOrigin) }
       );
+    }
+
+    if (url.pathname === "/api/hit") {
+      try {
+        const value = await incrementHitCount(env);
+        return new Response(JSON.stringify({ value, at: new Date().toISOString() }), {
+          status: 200,
+          headers: jsonHeaders(allowOrigin),
+        });
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({ error: clean(error?.message || "hit_count_failed"), at: new Date().toISOString() }),
+          {
+            status: 502,
+            headers: jsonHeaders(allowOrigin),
+          }
+        );
+      }
     }
 
     if (url.pathname === "/api/health") {
