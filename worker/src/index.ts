@@ -30,6 +30,18 @@ type GuestbookEntry = {
   at: string;
 };
 
+type SpotifyPlaybackState = {
+  trackKey: string;
+  trackName: string;
+  trackUrl?: string;
+  trackUri?: string;
+  isPlaying: boolean;
+  progressMs: number;
+  durationMs: number;
+  sessionStartedAt?: string;
+  observedAt: string;
+};
+
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   HITS_KV?: KVNamespace;
@@ -118,8 +130,8 @@ function selectCurrentActivity(items: FeedItem[], nowMs = Date.now()): CurrentAc
     };
   };
 
-  const spotifyLive = ordered.find((item) => sourceBase(item.source) === "spotify" && Boolean(item.isPlaying));
-  if (spotifyLive) return build(spotifyLive, true);
+  const latestSpotify = ordered.find((item) => sourceBase(item.source) === "spotify");
+  if (latestSpotify && Boolean(latestSpotify.isPlaying)) return build(latestSpotify, true);
 
   const instagramLive = ordered.find((item) => sourceBase(item.source) === "instagram" && isRecent(item));
   if (instagramLive) return build(instagramLive, true);
@@ -302,6 +314,41 @@ async function fetchInstagram(env: Env, limit: number): Promise<FeedItem[]> {
   }));
 }
 
+async function readSpotifyPlaybackState(env: Env): Promise<SpotifyPlaybackState | null> {
+  const kv = env.HITS_KV;
+  if (!kv) return null;
+
+  const raw = await kv.get("feed:spotify-state-v1");
+  if (!raw) return null;
+
+  try {
+    const parsed: any = JSON.parse(raw);
+    const observedAt = clean(parsed?.observedAt);
+    const trackKey = clean(parsed?.trackKey);
+    if (!observedAt && !trackKey) return null;
+
+    return {
+      trackKey,
+      trackName: clean(parsed?.trackName),
+      trackUrl: clean(parsed?.trackUrl) || undefined,
+      trackUri: clean(parsed?.trackUri) || undefined,
+      isPlaying: Boolean(parsed?.isPlaying),
+      progressMs: Number.isFinite(parsed?.progressMs) ? parsed.progressMs : 0,
+      durationMs: Number.isFinite(parsed?.durationMs) ? parsed.durationMs : 0,
+      sessionStartedAt: clean(parsed?.sessionStartedAt) || undefined,
+      observedAt: observedAt || new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeSpotifyPlaybackState(env: Env, state: SpotifyPlaybackState): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  await kv.put("feed:spotify-state-v1", JSON.stringify(state));
+}
+
 async function fetchSpotify(env: Env): Promise<FeedItem[]> {
   const clientId = clean(env.SPOTIFY_CLIENT_ID);
   const clientSecret = clean(env.SPOTIFY_CLIENT_SECRET);
@@ -333,28 +380,102 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
 
   const headers = { authorization: `Bearer ${accessToken}` };
   const current = await fetch("https://api.spotify.com/v1/me/player/currently-playing", { headers });
+  const previousState = await readSpotifyPlaybackState(env);
 
   const items: FeedItem[] = [];
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
 
   if (current.status === 200) {
     const payload: any = await current.json();
     const track = payload?.item;
-    const artists = Array.isArray(track?.artists)
-      ? track.artists.map((artist: any) => clean(artist?.name)).filter(Boolean).join(", ")
-      : "";
-    const name = clean(track?.name);
-    const url = clean(track?.external_urls?.spotify || "");
-    const uri = clean(track?.uri || "");
-    items.push({
-      source: "spotify",
-      text: `now playing: ${artists}${artists && name ? " — " : ""}${name}`,
-      at: new Date().toISOString(),
-      url: url || undefined,
-      media: uri || undefined,
-      progressMs: Number.isFinite(payload?.progress_ms) ? payload.progress_ms : 0,
-      durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
-      isPlaying: Boolean(payload?.is_playing),
-    });
+    if (track) {
+      const artists = Array.isArray(track?.artists)
+        ? track.artists.map((artist: any) => clean(artist?.name)).filter(Boolean).join(", ")
+        : "";
+      const name = clean(track?.name);
+      const url = clean(track?.external_urls?.spotify || "");
+      const uri = clean(track?.uri || "");
+      const trackLabel = `${artists}${artists && name ? " — " : ""}${name}`;
+      const trackKey = clean(uri || url || trackLabel);
+      const isPlaying = Boolean(payload?.is_playing);
+      const progressMs = Number.isFinite(payload?.progress_ms) ? payload.progress_ms : 0;
+      const durationMs = Number.isFinite(track?.duration_ms) ? track.duration_ms : 0;
+      const startedAtMs = Math.max(0, nowMs - Math.max(0, progressMs));
+      const startedAtIso = new Date(startedAtMs).toISOString();
+      const sameTrack = previousState?.trackKey === trackKey && trackKey.length > 0;
+
+      let eventTextPrefix = "";
+      let eventAt = nowIso;
+      let sessionStartedAt = startedAtIso;
+
+      if (isPlaying) {
+        if (sameTrack && previousState?.isPlaying) {
+          sessionStartedAt = clean(previousState?.sessionStartedAt) || startedAtIso;
+        } else if (sameTrack && !previousState?.isPlaying) {
+          eventTextPrefix = "resumed";
+          sessionStartedAt = startedAtIso;
+        } else {
+          eventTextPrefix = "now playing";
+          sessionStartedAt = startedAtIso;
+        }
+
+        if (eventTextPrefix === "now playing") {
+          eventAt = sessionStartedAt;
+        } else {
+          eventAt = nowIso;
+        }
+      } else {
+        if (sameTrack && previousState?.isPlaying) {
+          eventTextPrefix = "paused";
+        }
+        sessionStartedAt = clean(previousState?.sessionStartedAt) || startedAtIso;
+        eventAt = nowIso;
+      }
+
+      if (eventTextPrefix) {
+        items.push({
+          source: "spotify",
+          text: `${eventTextPrefix}: ${trackLabel}`,
+          at: eventAt,
+          url: url || undefined,
+          media: uri || undefined,
+          progressMs,
+          durationMs,
+          isPlaying,
+        });
+      }
+
+      await writeSpotifyPlaybackState(env, {
+        trackKey,
+        trackName: trackLabel,
+        trackUrl: url || undefined,
+        trackUri: uri || undefined,
+        isPlaying,
+        progressMs,
+        durationMs,
+        sessionStartedAt,
+        observedAt: nowIso,
+      });
+    }
+  } else if (current.status === 204) {
+    if (previousState?.trackName && previousState.isPlaying) {
+      items.push({
+        source: "spotify",
+        text: `paused: ${previousState.trackName}`,
+        at: nowIso,
+        url: previousState.trackUrl,
+        media: previousState.trackUri,
+        progressMs: previousState.progressMs || 0,
+        durationMs: previousState.durationMs || 0,
+        isPlaying: false,
+      });
+      await writeSpotifyPlaybackState(env, {
+        ...previousState,
+        isPlaying: false,
+        observedAt: nowIso,
+      });
+    }
   }
 
   const recentData: any = await fetchJson("https://api.spotify.com/v1/me/player/recently-played?limit=50", { headers });

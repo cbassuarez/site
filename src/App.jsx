@@ -74,8 +74,8 @@ function selectCurrentActivityClient(feedItems, nowMs = Date.now()) {
     ageLabel: isLive ? 'live now' : formatAgeLabel(nowMs - Number(item.at || nowMs))
   });
 
-  const spotifyLive = ordered.find((item) => sourceBase(item.source) === 'spotify' && item.isPlaying);
-  if (spotifyLive) return build(spotifyLive, true);
+  const latestSpotify = ordered.find((item) => sourceBase(item.source) === 'spotify');
+  if (latestSpotify?.isPlaying) return build(latestSpotify, true);
 
   const instagramLive = ordered.find((item) => sourceBase(item.source) === 'instagram' && isRecent(item));
   if (instagramLive) return build(instagramLive, true);
