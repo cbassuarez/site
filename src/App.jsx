@@ -289,21 +289,26 @@ function useSebFeed() {
 }
 
 function WorksPage() {
-  useEffect(() => {
-    const previousBodyMargin = document.body.style.margin;
-    document.body.style.margin = '0';
-
-    return () => {
-      document.body.style.margin = previousBodyMargin;
-    };
-  }, []);
-
   return (
-    <iframe
-      title="Praetorius Works"
-      src="/works-console/index.html"
-      style={{ width: '100vw', height: '100vh', border: 0, display: 'block' }}
-    />
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>works</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <iframe
+        title="Praetorius Works"
+        src="/works-console/index.html"
+        style={{ width: '100%', height: '78vh', border: 0, display: 'block' }}
+      />
+    </>
   );
 }
 
