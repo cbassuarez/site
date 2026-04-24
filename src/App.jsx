@@ -492,7 +492,7 @@ function HomePage() {
                 <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="180" />
               </p>
               <p>{OPERATOR_NAME}</p>
-              <p>hits: {hits}</p>
+              <p>page views (last 52 weeks): {hits}</p>
 
               <h3>social</h3>
               <ul>

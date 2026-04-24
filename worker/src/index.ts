@@ -403,9 +403,9 @@ async function incrementHitCount(env: Env): Promise<number> {
     }
 
     const query =
-      "query($zoneTag: string, $since: Date, $until: Date){ viewer { zones(filter: { zoneTag: $zoneTag }) { httpRequests1dGroups(filter: { date_geq: $since, date_leq: $until }, limit: 400) { sum { requests } } } } }";
+      "query($zoneTag: string, $since: Date, $until: Date){ viewer { zones(filter: { zoneTag: $zoneTag }) { httpRequests1dGroups(filter: { date_geq: $since, date_leq: $until }, limit: 400) { sum { pageViews } } } } }";
 
-    let totalRequests = 0;
+    let totalPageViews = 0;
     while (cursor.getTime() <= todayUtc.getTime()) {
       const chunkEnd = addDaysUtc(cursor, 363);
       const until = chunkEnd.getTime() > todayUtc.getTime() ? todayUtc : chunkEnd;
@@ -441,15 +441,15 @@ async function incrementHitCount(env: Env): Promise<number> {
       const groups = payload?.data?.viewer?.zones?.[0]?.httpRequests1dGroups;
       if (Array.isArray(groups)) {
         for (const group of groups) {
-          const requests = toNonNegativeInt(group?.sum?.requests) ?? 0;
-          totalRequests += requests;
+          const pageViews = toNonNegativeInt(group?.sum?.pageViews) ?? 0;
+          totalPageViews += pageViews;
         }
       }
 
       cursor = addDaysUtc(until, 1);
     }
 
-    return totalRequests;
+    return totalPageViews;
   };
 
   let baseline = toNonNegativeInt(env.HITS_BASELINE);

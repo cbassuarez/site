@@ -37,7 +37,7 @@ echo "2026-04-24" | npx wrangler secret put CF_ANALYTICS_SINCE
 echo "<BASELINE_NUMBER>" | npx wrangler secret put HITS_BASELINE
 ```
 
-Note: Cloudflare GraphQL zone analytics only exposes about the most recent 52 weeks. If you need all-time history older than that, set `HITS_BASELINE` manually.
+Note: The hit baseline uses Cloudflare `pageViews` (not total requests). Cloudflare GraphQL zone analytics only exposes about the most recent 52 weeks. If you need all-time history older than that, set `HITS_BASELINE` manually.
 
 GitHub:
 
