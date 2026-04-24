@@ -40,6 +40,62 @@ const OBLIQUE_STRATEGIES = [
 ];
 const OBLIQUE_ATTRIBUTION = 'Brian Eno + Peter Schmidt, Oblique Strategies';
 
+function sourceBase(source) {
+  return String(source || 'feed').toLowerCase().split(':')[0] || 'feed';
+}
+
+function formatAgeLabel(msAgo) {
+  const age = Number(msAgo);
+  if (!Number.isFinite(age) || age < 0) return 'just now';
+  const minutes = Math.floor(age / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function selectCurrentActivityClient(feedItems, nowMs = Date.now()) {
+  const ordered = [...feedItems]
+    .filter((item) => item && item.text)
+    .sort((a, b) => b.at - a.at);
+
+  if (ordered.length === 0) return null;
+
+  const isRecent = (item, windowMs = 10 * 60 * 1000) => Number.isFinite(item?.at) && nowMs - item.at <= windowMs;
+  const build = (item, isLive) => ({
+    source: item.source || 'feed',
+    text: item.text || '',
+    at: item.at || nowMs,
+    url: item.url || '',
+    isLive,
+    ageLabel: isLive ? 'live now' : formatAgeLabel(nowMs - Number(item.at || nowMs))
+  });
+
+  const spotifyLive = ordered.find((item) => sourceBase(item.source) === 'spotify' && item.isPlaying);
+  if (spotifyLive) return build(spotifyLive, true);
+
+  const instagramLive = ordered.find((item) => sourceBase(item.source) === 'instagram' && isRecent(item));
+  if (instagramLive) return build(instagramLive, true);
+
+  const githubLive = ordered.find((item) => sourceBase(item.source) === 'github' && isRecent(item));
+  if (githubLive) return build(githubLive, true);
+
+  const bandcampLive = ordered.find((item) => sourceBase(item.source) === 'bandcamp' && isRecent(item));
+  if (bandcampLive) return build(bandcampLive, true);
+
+  return build(ordered[0], false);
+}
+
+function composeCurrentActivityLine(activity) {
+  if (!activity?.text) return 'waiting for seb feed...';
+  const prefix = activity.isLive ? 'now' : 'recent';
+  const source = String(activity.source || 'feed');
+  const ageSuffix = activity.isLive ? '' : ` (${activity.ageLabel || 'recent'})`;
+  return `${prefix}: ${source} - ${activity.text}${ageSuffix}`;
+}
+
 function stamp(dateInput = Date.now()) {
   const now = new Date(dateInput);
   const hh = String(now.getHours()).padStart(2, '0');
@@ -109,6 +165,9 @@ async function fetchCombinedSebFeed({ limit = 24, maxItems = 16 } = {}) {
   const payload = await response.json();
   const rawItems = Array.isArray(payload?.items) ? payload.items : [];
   const sources = payload?.sources && typeof payload.sources === 'object' ? payload.sources : {};
+  const rawCurrentActivity = payload?.currentActivity && typeof payload.currentActivity === 'object'
+    ? payload.currentActivity
+    : null;
 
   const successful = rawItems.map((item) => ({
     source: item.source || 'feed',
@@ -122,11 +181,22 @@ async function fetchCombinedSebFeed({ limit = 24, maxItems = 16 } = {}) {
   }));
 
   const failedCount = Object.values(sources).filter((status) => status?.status !== 'ok').length;
+  const currentActivity = rawCurrentActivity
+    ? {
+        source: rawCurrentActivity.source || 'feed',
+        text: rawCurrentActivity.text || '',
+        at: parseDateOrNow(rawCurrentActivity.at),
+        url: rawCurrentActivity.url || '',
+        isLive: Boolean(rawCurrentActivity.isLive),
+        ageLabel: rawCurrentActivity.ageLabel || ''
+      }
+    : null;
 
   return {
     items: mergeAndSortFeed(successful, maxItems),
     failedCount,
-    sources
+    sources,
+    currentActivity
   };
 }
 
@@ -158,6 +228,35 @@ function useTruthfulHitCounter() {
   }, []);
 
   return hits;
+}
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const media = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const onChange = (event) => setIsMobile(event.matches);
+
+    setIsMobile(media.matches);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    }
+
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, [breakpoint]);
+
+  return isMobile;
 }
 
 async function fetchGuestbookEntries(limit) {
@@ -232,6 +331,7 @@ function useSebFeed({ apiLimit = 24, maxItems = 16 } = {}) {
   const [feedMeta, setFeedMeta] = useState('syncing');
   const [feedSources, setFeedSources] = useState({});
   const [isBooting, setIsBooting] = useState(true);
+  const [currentActivity, setCurrentActivity] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -254,6 +354,7 @@ function useSebFeed({ apiLimit = 24, maxItems = 16 } = {}) {
 
         setFeedItems(result.items);
         setFeedSources(result.sources || {});
+        setCurrentActivity(result.currentActivity || null);
         setIsBooting(false);
 
         if (result.failedCount > 0) {
@@ -283,7 +384,8 @@ function useSebFeed({ apiLimit = 24, maxItems = 16 } = {}) {
     feedItems,
     feedMeta,
     feedSources,
-    isBooting
+    isBooting,
+    currentActivity
   };
 }
 
@@ -358,6 +460,8 @@ function AboutPage() {
 }
 
 function WorksPage() {
+  const isMobile = useIsMobile();
+
   return (
     <>
       <center>
@@ -375,16 +479,24 @@ function WorksPage() {
       <iframe
         title="Praetorius Works"
         src="/works-console/index.html"
-        style={{ width: '100%', height: '78vh', border: 0, display: 'block' }}
+        style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
       />
+      {isMobile ? (
+        <p>
+          <small>
+            mobile fallback: [ <a href="/works-console/index.html">open works console directly</a> ]
+          </small>
+        </p>
+      ) : null}
     </>
   );
 }
 
 function HomePage() {
   const HOME_GUESTBOOK_LIMIT = 40;
+  const isMobile = useIsMobile();
   const hits = useTruthfulHitCounter();
-  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed();
+  const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [guestbook, setGuestbook] = useState([]);
@@ -431,22 +543,31 @@ function HomePage() {
   }, [isBooting]);
 
   const bootDots = '.'.repeat(bootDotCount);
+  const [marqueeStableText, setMarqueeStableText] = useState('waiting for seb feed...');
+  const [marqueeStableKey, setMarqueeStableKey] = useState('');
+  const mobileStatusText = isBooting ? `syncing feed${bootDots}` : marqueeStableText;
 
   const marqueeText = useMemo(() => {
     if (isBooting) {
       return `boot: syncing seb feed${bootDots} /// boot: fetching sources${bootDots} /// boot: compiling timeline${bootDots}`;
     }
+    return marqueeStableText;
+  }, [isBooting, bootDots, marqueeStableText]);
 
-    const pieces = pickSourceDiverseItems(feedItems, { total: 6, perSourceCap: 2 }).map(
-      (item) => `${item.source}: ${item.text}`
-    );
+  useEffect(() => {
+    if (isBooting) return;
 
-    if (pieces.length === 0) {
-      return 'waiting for seb feed...';
+    const fallbackActivity = selectCurrentActivityClient(feedItems, Date.now());
+    const activity = currentActivity || fallbackActivity;
+    const activityKey = activity
+      ? `${activity.source || 'feed'}|${activity.text || ''}|${activity.at || ''}`
+      : 'none';
+
+    if (activityKey !== marqueeStableKey) {
+      setMarqueeStableKey(activityKey);
+      setMarqueeStableText(composeCurrentActivityLine(activity));
     }
-
-    return pieces.join(' /// ');
-  }, [feedItems, isBooting, bootDots]);
+  }, [isBooting, currentActivity, feedItems, marqueeStableKey]);
 
   const spotifyNow = useMemo(
     () => feedItems.find((item) => String(item.source || '').toLowerCase() === 'spotify') || null,
@@ -518,169 +639,284 @@ function HomePage() {
 
       <hr />
 
-      <marquee behavior="alternate" scrollAmount="4">
-        {marqueeText}
-      </marquee>
+      {isMobile ? (
+        <p>
+          <small>{mobileStatusText}</small>
+        </p>
+      ) : (
+        <marquee behavior="alternate" scrollAmount="4">
+          {marqueeText}
+        </marquee>
+      )}
 
-      <table border="1" cellPadding="8" width="100%">
-        <tbody>
-          <tr>
-            <td width="30%" valign="top">
-              <h3>navigation</h3>
-              <ul>
-                <li>
-                  <a href="/about">about</a>
-                </li>
-                <li>
-                  <a href="/feed">seb feed</a>
-                </li>
-                <li>
-                  <a href="/guestbook">guestbook</a>
-                </li>
-                <li>
-                  <a href="/works">works</a>
-                </li>
-              </ul>
+      {isMobile ? (
+        <>
+          <h3>navigation</h3>
+          <p>
+            [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ]
+          </p>
 
-              <h3>operator</h3>
-              <p>
-                <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="180" />
-              </p>
-              <p>{OPERATOR_NAME}</p>
-              <p>page views (last 52 weeks): {hits}</p>
+          <h3>operator</h3>
+          <p>
+            <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="140" />
+          </p>
+          <p>{OPERATOR_NAME}</p>
+          <p>page views (last 52 weeks): {hits}</p>
 
-              <h3>social</h3>
-              <ul>
-                {SOCIAL_LINKS.map((link) => (
-                  <li key={link.label}>
-                    <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-                      {link.label}
+          <h3>about</h3>
+          <p>
+            I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real time.
+          </p>
+          <p>
+            this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
+          </p>
+
+          <h3>what is seb doing // live feed</h3>
+          {isBooting ? (
+            <p>
+              <i>syncing feed{bootDots}</i>
+            </p>
+          ) : (
+            <ul>
+              {homeFeedPreview.slice(0, 8).map((item, index) => (
+                <li key={`${item.source}-${item.at}-${index}`}>
+                  {item.url ? (
+                    <a href={item.url} target="_blank" rel="noreferrer">
+                      [{stamp(item.at)}] {item.source}
                     </a>
+                  ) : (
+                    <span>[{stamp(item.at)}] {item.source}</span>
+                  )}{' '}
+                  - {item.text}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p>
+            [ <a href="/feed">open full seb feed</a> ]
+          </p>
+
+          <h3>guestbook.exe</h3>
+          <form onSubmit={submitGuestbook}>
+            <p>
+              name:{' '}
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                size="16"
+              />
+            </p>
+            <p>
+              message:{' '}
+              <input
+                type="text"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                size="28"
+              />
+            </p>
+            <p>
+              <button type="submit">sign guestbook</button>
+            </p>
+          </form>
+
+          <table border="1" cellPadding="6" width="100%">
+            <tbody>
+              {guestbook.length === 0 ? (
+                <tr>
+                  <td>system</td>
+                  <td>
+                    {guestbookStatus === 'loading' || guestbookStatus === 'saving'
+                      ? 'loading entries...'
+                      : 'no entries yet'}
+                  </td>
+                </tr>
+              ) : null}
+              {guestbook.slice(0, 8).map((entry, index) => (
+                <tr key={`${entry.name}-${entry.message}-${index}`}>
+                  <td>{entry.name}</td>
+                  <td>{entry.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p>
+            [ <a href="/guestbook">open full guestbook</a> ]
+          </p>
+
+          <h3>social</h3>
+          <ul>
+            {SOCIAL_LINKS.map((link) => (
+              <li key={link.label}>
+                <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <table border="1" cellPadding="8" width="100%">
+          <tbody>
+            <tr>
+              <td width="30%" valign="top">
+                <h3>navigation</h3>
+                <ul>
+                  <li>
+                    <a href="/about">about</a>
                   </li>
-                ))}
-              </ul>
-            </td>
+                  <li>
+                    <a href="/feed">seb feed</a>
+                  </li>
+                  <li>
+                    <a href="/guestbook">guestbook</a>
+                  </li>
+                  <li>
+                    <a href="/works">works</a>
+                  </li>
+                </ul>
 
-            <td valign="top">
-              <a id="about" />
-              <h2>about</h2>
-              <p>
-                I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real
-                time.
-              </p>
-              <p>
-                this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
-              </p>
+                <h3>operator</h3>
+                <p>
+                  <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="180" />
+                </p>
+                <p>{OPERATOR_NAME}</p>
+                <p>page views (last 52 weeks): {hits}</p>
 
-              <h2>what is seb doing // live feed</h2>
-              <div style={{ minHeight: '21em' }}>
-                {isBooting ? (
-                  <p>
-                    <i>syncing feed{bootDots}</i>
-                  </p>
-                ) : (
-                  <ul>
-                    {homeFeedPreview.map((item, index) => (
-                      <li key={`${item.source}-${item.at}-${index}`}>
-                        {item.url ? (
-                          <a href={item.url} target="_blank" rel="noreferrer">
-                            [{stamp(item.at)}] {item.source}
-                          </a>
-                        ) : (
-                          <span>[{stamp(item.at)}] {item.source}</span>
-                        )}{' '}
-                        - {item.text}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {spotifyNow && spotifyTrackId ? (
-                  <>
-                    <h3>listen with seb</h3>
-                    <p>
-                      <small>
-                        {spotifyNow.text}
-                      </small>
-                    </p>
-                    <p>
-                      <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
-                        open in spotify
+                <h3>social</h3>
+                <ul>
+                  {SOCIAL_LINKS.map((link) => (
+                    <li key={link.label}>
+                      <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                        {link.label}
                       </a>
+                    </li>
+                  ))}
+                </ul>
+              </td>
+
+              <td valign="top">
+                <a id="about" />
+                <h2>about</h2>
+                <p>
+                  I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real
+                  time.
+                </p>
+                <p>
+                  this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
+                </p>
+
+                <h2>what is seb doing // live feed</h2>
+                <div style={{ minHeight: '21em' }}>
+                  {isBooting ? (
+                    <p>
+                      <i>syncing feed{bootDots}</i>
                     </p>
-                    {Number(spotifyNow?.durationMs) > 0 ? (
+                  ) : (
+                    <ul>
+                      {homeFeedPreview.map((item, index) => (
+                        <li key={`${item.source}-${item.at}-${index}`}>
+                          {item.url ? (
+                            <a href={item.url} target="_blank" rel="noreferrer">
+                              [{stamp(item.at)}] {item.source}
+                            </a>
+                          ) : (
+                            <span>[{stamp(item.at)}] {item.source}</span>
+                          )}{' '}
+                          - {item.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {spotifyNow && spotifyTrackId ? (
+                    <>
+                      <h3>listen with seb</h3>
                       <p>
                         <small>
-                          playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
-                          {spotifyNow?.isPlaying ? '' : ' (paused)'}
+                          {spotifyNow.text}
                         </small>
                       </p>
-                    ) : null}
-                  </>
-                ) : null}
-                <p>
-                  <small>
-                    feed sync: {feedMeta}
-                    <br />
-                    sources:{' '}
-                    {Object.keys(feedSources).length > 0
-                      ? Object.entries(feedSources)
-                          .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
-                          .join(' | ')
-                      : 'worker feed (pending)'}
-                  </small>
-                </p>
-              </div>
-
-              <a id="guestbook" />
-              <h2>guestbook.exe</h2>
-              <form onSubmit={submitGuestbook}>
-                <p>
-                  name:{' '}
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    size="24"
-                  />
-                </p>
-                <p>
-                  message:{' '}
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    size="48"
-                  />
-                </p>
-                <p>
-                  <button type="submit">sign guestbook</button>
-                </p>
-              </form>
-
-              <table border="1" cellPadding="6" width="100%">
-                <tbody>
-                  {guestbook.length === 0 ? (
-                    <tr>
-                      <td width="24%">system</td>
-                      <td>
-                        {guestbookStatus === 'loading' || guestbookStatus === 'saving'
-                          ? 'loading entries...'
-                          : 'no entries yet'}
-                      </td>
-                    </tr>
+                      <p>
+                        <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
+                          open in spotify
+                        </a>
+                      </p>
+                      {Number(spotifyNow?.durationMs) > 0 ? (
+                        <p>
+                          <small>
+                            playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
+                            {spotifyNow?.isPlaying ? '' : ' (paused)'}
+                          </small>
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
-                  {guestbook.map((entry, index) => (
-                    <tr key={`${entry.name}-${entry.message}-${index}`}>
-                      <td width="24%">{entry.name}</td>
-                      <td>{entry.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                  <p>
+                    <small>
+                      feed sync: {feedMeta}
+                      <br />
+                      sources:{' '}
+                      {Object.keys(feedSources).length > 0
+                        ? Object.entries(feedSources)
+                            .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
+                            .join(' | ')
+                        : 'worker feed (pending)'}
+                    </small>
+                  </p>
+                </div>
+
+                <a id="guestbook" />
+                <h2>guestbook.exe</h2>
+                <form onSubmit={submitGuestbook}>
+                  <p>
+                    name:{' '}
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      size="24"
+                    />
+                  </p>
+                  <p>
+                    message:{' '}
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      size="48"
+                    />
+                  </p>
+                  <p>
+                    <button type="submit">sign guestbook</button>
+                  </p>
+                </form>
+
+                <table border="1" cellPadding="6" width="100%">
+                  <tbody>
+                    {guestbook.length === 0 ? (
+                      <tr>
+                        <td width="24%">system</td>
+                        <td>
+                          {guestbookStatus === 'loading' || guestbookStatus === 'saving'
+                            ? 'loading entries...'
+                            : 'no entries yet'}
+                        </td>
+                      </tr>
+                    ) : null}
+                    {guestbook.map((entry, index) => (
+                      <tr key={`${entry.name}-${entry.message}-${index}`}>
+                        <td width="24%">{entry.name}</td>
+                        <td>{entry.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
 
       <hr />
 
@@ -703,7 +939,8 @@ function HomePage() {
 }
 
 function FeedPage() {
-  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed({ apiLimit: 5000, maxItems: null });
+  const isMobile = useIsMobile();
+  const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed({ apiLimit: 5000, maxItems: null });
   const [bootDotCount, setBootDotCount] = useState(1);
 
   useEffect(() => {
@@ -717,6 +954,11 @@ function FeedPage() {
   }, [isBooting]);
 
   const bootDots = '.'.repeat(bootDotCount);
+  const feedStatusLine = useMemo(() => {
+    if (isBooting) return `syncing feed${bootDots}`;
+    const fallbackActivity = selectCurrentActivityClient(feedItems, Date.now());
+    return composeCurrentActivityLine(currentActivity || fallbackActivity);
+  }, [isBooting, bootDots, currentActivity, feedItems]);
 
   return (
     <>
@@ -726,11 +968,21 @@ function FeedPage() {
           <i>what is seb doing // live feed</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
+          {isMobile ? (
+            <>[ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
+          ) : (
+            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
+          )}
         </p>
       </center>
 
       <hr />
+
+      {isMobile ? (
+        <p>
+          <small>{feedStatusLine}</small>
+        </p>
+      ) : null}
 
       <p>
         <b>live timeline</b> (newest first)
@@ -774,6 +1026,7 @@ function FeedPage() {
 }
 
 function GuestbookPage() {
+  const isMobile = useIsMobile();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [guestbook, setGuestbook] = useState([]);
@@ -839,11 +1092,11 @@ function GuestbookPage() {
       <form onSubmit={submitGuestbook}>
         <p>
           name:{' '}
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} size="24" />
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} size={isMobile ? '16' : '24'} />
         </p>
         <p>
           message:{' '}
-          <input type="text" value={message} onChange={(event) => setMessage(event.target.value)} size="60" />
+          <input type="text" value={message} onChange={(event) => setMessage(event.target.value)} size={isMobile ? '30' : '60'} />
         </p>
         <p>
           <button type="submit">sign guestbook</button>
@@ -854,7 +1107,7 @@ function GuestbookPage() {
         <tbody>
           {guestbook.length === 0 ? (
             <tr>
-              <td width="24%">system</td>
+              <td width={isMobile ? undefined : '24%'}>system</td>
               <td>
                 {guestbookStatus === 'loading' || guestbookStatus === 'saving'
                   ? 'loading entries...'
@@ -864,7 +1117,7 @@ function GuestbookPage() {
           ) : null}
           {guestbook.map((entry, index) => (
             <tr key={`${entry.name}-${entry.message}-${index}`}>
-              <td width="24%">{entry.name}</td>
+              <td width={isMobile ? undefined : '24%'}>{entry.name}</td>
               <td>{entry.message}</td>
             </tr>
           ))}

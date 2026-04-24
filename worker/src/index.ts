@@ -9,6 +9,15 @@ type FeedItem = {
   isPlaying?: boolean;
 };
 
+type CurrentActivity = {
+  source: string;
+  text: string;
+  at: string;
+  url?: string;
+  isLive: boolean;
+  ageLabel: string;
+};
+
 type SourceStatus = {
   status: "ok" | "missing_config" | "error";
   count: number;
@@ -68,6 +77,61 @@ const short = (value: unknown, max = 120) => {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 };
+
+const sourceBase = (source: unknown) => clean(source).toLowerCase().split(":")[0] || "feed";
+
+function formatAgeLabel(msAgo: number): string {
+  if (!Number.isFinite(msAgo) || msAgo < 0) return "just now";
+  const minutes = Math.floor(msAgo / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function selectCurrentActivity(items: FeedItem[], nowMs = Date.now()): CurrentActivity | null {
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  const ordered = items
+    .filter((item) => clean(item?.text).length > 0)
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  if (ordered.length === 0) return null;
+
+  const isRecent = (item: FeedItem, windowMs = 10 * 60 * 1000) => {
+    const atMs = new Date(item.at).getTime();
+    return Number.isFinite(atMs) && nowMs - atMs <= windowMs;
+  };
+
+  const build = (item: FeedItem, isLive: boolean): CurrentActivity => {
+    const atMs = new Date(item.at).getTime();
+    const ageLabel = isLive ? "live now" : formatAgeLabel(nowMs - atMs);
+    return {
+      source: clean(item.source || "feed"),
+      text: clean(item.text),
+      at: clean(item.at || new Date(nowMs).toISOString()),
+      url: clean(item.url || "") || undefined,
+      isLive,
+      ageLabel,
+    };
+  };
+
+  const spotifyLive = ordered.find((item) => sourceBase(item.source) === "spotify" && Boolean(item.isPlaying));
+  if (spotifyLive) return build(spotifyLive, true);
+
+  const instagramLive = ordered.find((item) => sourceBase(item.source) === "instagram" && isRecent(item));
+  if (instagramLive) return build(instagramLive, true);
+
+  const githubLive = ordered.find((item) => sourceBase(item.source) === "github" && isRecent(item));
+  if (githubLive) return build(githubLive, true);
+
+  const bandcampLive = ordered.find((item) => sourceBase(item.source) === "bandcamp" && isRecent(item));
+  if (bandcampLive) return build(bandcampLive, true);
+
+  return build(ordered[0], false);
+}
 
 async function fetchJson(url: string, init?: RequestInit) {
   const response = await fetch(url, init);
@@ -629,6 +693,7 @@ export default {
           {
             items: persisted.slice(0, limit),
             sources,
+            currentActivity: selectCurrentActivity(persisted),
             generatedAt: new Date().toISOString(),
           },
           null,
