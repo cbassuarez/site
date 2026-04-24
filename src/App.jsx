@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
@@ -252,7 +252,7 @@ function useSpotifyIFramePlayer(spotifyTrackId) {
 
         const options = {
           width: '100%',
-          height: 80,
+          height: 152,
           uri
         };
 
@@ -303,32 +303,7 @@ function useSpotifyIFramePlayer(spotifyTrackId) {
     };
   }, [spotifyTrackId]);
 
-  const togglePlay = useCallback(() => {
-    if (controllerRef.current && typeof controllerRef.current.togglePlay === 'function') {
-      controllerRef.current.togglePlay();
-    }
-  }, []);
-
-  const seekBySeconds = useCallback((deltaSeconds) => {
-    if (!controllerRef.current || typeof controllerRef.current.seek !== 'function') {
-      return;
-    }
-
-    const nextSeconds = Math.max(0, Math.floor((positionMs + deltaSeconds * 1000) / 1000));
-    controllerRef.current.seek(nextSeconds);
-  }, [positionMs]);
-
-  const seekToRatio = useCallback((ratio) => {
-    if (!controllerRef.current || typeof controllerRef.current.seek !== 'function') {
-      return;
-    }
-
-    const capped = Math.max(0, Math.min(1, Number(ratio) || 0));
-    const targetSeconds = Math.floor(((durationMs || 0) * capped) / 1000);
-    controllerRef.current.seek(targetSeconds);
-  }, [durationMs]);
-
-  return { containerRef, status, positionMs, durationMs, isPaused, togglePlay, seekBySeconds, seekToRatio };
+  return { containerRef, status, positionMs, durationMs, isPaused };
 }
 
 function useSebFeed() {
@@ -648,26 +623,7 @@ function HomePage() {
                       open in spotify
                     </a>
                   </p>
-                  <p>
-                    <button type="button" onClick={() => spotifyPlayer.seekBySeconds(-10)}>{'<<'} 10s</button>{' '}
-                    <button type="button" onClick={spotifyPlayer.togglePlay}>
-                      {spotifyPlayer.isPaused ? 'play' : 'pause'}
-                    </button>{' '}
-                    <button type="button" onClick={() => spotifyPlayer.seekBySeconds(10)}>10s {'>>'}</button>
-                  </p>
-                  <p>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1000"
-                      value={
-                        spotifyPlayer.durationMs > 0
-                          ? Math.min(1000, Math.max(0, Math.floor((spotifyPlayer.positionMs / spotifyPlayer.durationMs) * 1000)))
-                          : 0
-                      }
-                      onChange={(event) => spotifyPlayer.seekToRatio(Number(event.target.value) / 1000)}
-                    />
-                  </p>
+                  <div ref={spotifyPlayer.containerRef} />
                   {spotifyPlayer.durationMs > 0 ? (
                     <p>
                       <small>
@@ -680,11 +636,6 @@ function HomePage() {
                   {spotifyPlayer.status === 'timeout' || spotifyPlayer.status === 'error' ? (
                     <p><small>spotify player unavailable right now; use open in spotify above.</small></p>
                   ) : null}
-                  <div
-                    ref={spotifyPlayer.containerRef}
-                    aria-hidden="true"
-                    style={{ height: 0, width: 0, overflow: 'hidden' }}
-                  />
                 </>
               ) : null}
               <p>
