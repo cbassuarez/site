@@ -103,6 +103,49 @@ function useTruthfulHitCounter() {
   return hits;
 }
 
+async function fetchGuestbookEntries() {
+  const response = await fetch(`${FEED_API_BASE}/api/guestbook?limit=40`);
+  if (!response.ok) {
+    throw new Error(`guestbook api failed (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const rows = Array.isArray(payload?.entries) ? payload.entries : [];
+
+  return rows
+    .map((entry) => ({
+      name: String(entry?.name || 'anonymous').trim() || 'anonymous',
+      message: String(entry?.message || '').trim(),
+      at: parseDateOrNow(entry?.at)
+    }))
+    .filter((entry) => entry.message.length > 0)
+    .slice(0, 40);
+}
+
+async function createGuestbookEntry({ name, message }) {
+  const response = await fetch(`${FEED_API_BASE}/api/guestbook`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, message })
+  });
+
+  if (!response.ok) {
+    throw new Error(`guestbook write failed (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const rows = Array.isArray(payload?.entries) ? payload.entries : [];
+
+  return rows
+    .map((entry) => ({
+      name: String(entry?.name || 'anonymous').trim() || 'anonymous',
+      message: String(entry?.message || '').trim(),
+      at: parseDateOrNow(entry?.at)
+    }))
+    .filter((entry) => entry.message.length > 0)
+    .slice(0, 40);
+}
+
 function spotifyTrackIdFromItem(item) {
   if (!item) {
     return '';
@@ -276,10 +319,33 @@ function HomePage() {
   const { feedItems, feedMeta, feedSources } = useSebFeed();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
-  const [guestbook, setGuestbook] = useState(() => [
-    { name: 'anonymous', message: 'cybernetic vibes' },
-    { name: 'operator', message: 'connected rituals online' }
-  ]);
+  const [guestbook, setGuestbook] = useState([]);
+  const [guestbookStatus, setGuestbookStatus] = useState('loading');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadGuestbook = async () => {
+      setGuestbookStatus('loading');
+
+      try {
+        const entries = await fetchGuestbookEntries();
+        if (!active) return;
+        setGuestbook(entries);
+        setGuestbookStatus('ready');
+      } catch (error) {
+        if (!active) return;
+        setGuestbook([]);
+        setGuestbookStatus('offline');
+      }
+    };
+
+    loadGuestbook();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const marqueeText = useMemo(() => {
     const pieces = feedItems.slice(0, 6).map((item) => `${item.source}: ${item.text}`);
@@ -296,8 +362,13 @@ function HomePage() {
     [feedItems]
   );
   const spotifyTrackId = spotifyTrackIdFromItem(spotifyNow);
+  const [spotifyEmbedFailed, setSpotifyEmbedFailed] = useState(false);
 
-  const submitGuestbook = (event) => {
+  useEffect(() => {
+    setSpotifyEmbedFailed(false);
+  }, [spotifyTrackId]);
+
+  const submitGuestbook = async (event) => {
     event.preventDefault();
 
     const cleanName = name.trim() || 'anonymous';
@@ -307,9 +378,16 @@ function HomePage() {
       return;
     }
 
-    setGuestbook((current) => [{ name: cleanName, message: cleanMessage }, ...current].slice(0, 8));
-    setName('');
-    setMessage('');
+    try {
+      setGuestbookStatus('saving');
+      const entries = await createGuestbookEntry({ name: cleanName, message: cleanMessage });
+      setGuestbook(entries);
+      setName('');
+      setMessage('');
+      setGuestbookStatus('ready');
+    } catch (error) {
+      setGuestbookStatus('offline');
+    }
   };
 
   return (
@@ -399,15 +477,29 @@ function HomePage() {
                   <p>
                     <small>{spotifyNow.text}</small>
                   </p>
-                  <iframe
-                    title="Spotify Now Playing"
-                    src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator`}
-                    width="100%"
-                    height="152"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                  />
+                  <p>
+                    <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
+                      open in spotify
+                    </a>
+                  </p>
+                  {!spotifyEmbedFailed ? (
+                    <iframe
+                      key={spotifyTrackId}
+                      title="Spotify Now Playing"
+                      src={`https://open.spotify.com/embed?uri=spotify:track:${spotifyTrackId}`}
+                      width="100%"
+                      height="152"
+                      frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      onError={() => setSpotifyEmbedFailed(true)}
+                    />
+                  ) : null}
+                  {spotifyEmbedFailed ? (
+                    <p>
+                      <small>spotify embed unavailable right now; open in spotify above.</small>
+                    </p>
+                  ) : null}
                 </>
               ) : null}
               <p>
@@ -451,6 +543,16 @@ function HomePage() {
 
               <table border="1" cellPadding="6" width="100%">
                 <tbody>
+                  {guestbook.length === 0 ? (
+                    <tr>
+                      <td width="24%">system</td>
+                      <td>
+                        {guestbookStatus === 'loading' || guestbookStatus === 'saving'
+                          ? 'loading entries...'
+                          : 'no entries yet'}
+                      </td>
+                    </tr>
+                  ) : null}
                   {guestbook.map((entry, index) => (
                     <tr key={`${entry.name}-${entry.message}-${index}`}>
                       <td width="24%">{entry.name}</td>

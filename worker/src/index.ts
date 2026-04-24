@@ -12,6 +12,12 @@ type SourceStatus = {
   message?: string;
 };
 
+type GuestbookEntry = {
+  name: string;
+  message: string;
+  at: string;
+};
+
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   HITS_KV?: KVNamespace;
@@ -31,7 +37,7 @@ type Env = {
 
 const jsonHeaders = (origin: string) => ({
   "access-control-allow-origin": origin,
-  "access-control-allow-methods": "GET,OPTIONS",
+  "access-control-allow-methods": "GET,POST,OPTIONS",
   "access-control-allow-headers": "content-type,authorization",
   "cache-control": "no-store",
   "content-type": "application/json; charset=utf-8",
@@ -119,23 +125,75 @@ async function fetchBandcamp(env: Env, limit: number): Promise<FeedItem[]> {
     /<li[^>]*class="[^"]*music-grid-item[^"]*"[\s\S]*?<a href="([^"]+)"[\s\S]*?<p class="title">\s*([\s\S]*?)\s*<\/p>/gi;
 
   let match: RegExpExecArray | null;
-  let index = 0;
-  while ((match = itemRegex.exec(html)) && items.length < limit) {
+  const releases: Array<{ title: string; url: string }> = [];
+  while ((match = itemRegex.exec(html)) && releases.length < limit) {
     const href = clean(match[1]);
     const title = short(stripTags(decodeHtml(clean(match[2]))), 96);
     if (!href || !title) continue;
-
-    // Bandcamp /music listing does not expose reliable timestamps per item.
-    // Preserve list ordering with stable synthetic times.
-    const at = new Date(Date.now() - index * 60_000).toISOString();
-    index += 1;
-
-    items.push({
-      source: "bandcamp",
-      text: `release: ${title}`,
-      at,
+    releases.push({
+      title,
       url: href.startsWith("http") ? href : `https://${domain}${href}`,
     });
+  }
+
+  async function fetchBandcampPublishedAt(url: string): Promise<string | null> {
+    const parseDateFromHtml = (releaseHtml: string): string | null => {
+      const datePublishedRaw = clean((releaseHtml.match(/"datePublished"\s*:\s*"([^"]+)"/i) || [])[1] || "");
+      if (datePublishedRaw) {
+        const ts = Date.parse(datePublishedRaw);
+        if (Number.isFinite(ts)) return new Date(ts).toISOString();
+      }
+
+      const pubDateMeta = clean(
+        (releaseHtml.match(/<meta[^>]+property="og:pubdate"[^>]+content="([^"]+)"/i) || [])[1] || ""
+      );
+      if (pubDateMeta) {
+        const ts = Date.parse(pubDateMeta);
+        if (Number.isFinite(ts)) return new Date(ts).toISOString();
+      }
+
+      const descriptionMeta = clean((releaseHtml.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i) || [])[1] || "");
+      const releasedInDescription = clean((descriptionMeta.match(/\breleased\s+(\d{1,2}\s+\w+\s+\d{4})/i) || [])[1] || "");
+      if (releasedInDescription) {
+        const ts = Date.parse(releasedInDescription);
+        if (Number.isFinite(ts)) return new Date(ts).toISOString();
+      }
+
+      return null;
+    };
+
+    const candidates = [`${url}?output=1`, url];
+    for (const target of candidates) {
+      const releaseResponse = await fetch(target, {
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
+          accept: "text/html,application/xhtml+xml",
+        },
+      });
+      if (!releaseResponse.ok) continue;
+      const parsed = parseDateFromHtml(await releaseResponse.text());
+      if (parsed) return parsed;
+    }
+
+    return null;
+  }
+
+  const detailed = await Promise.all(
+    releases.map(async (release) => {
+      const at = await fetchBandcampPublishedAt(release.url);
+      if (!at) return null;
+      return {
+        source: "bandcamp",
+        text: `release: ${release.title}`,
+        at,
+        url: release.url,
+      } as FeedItem;
+    })
+  );
+
+  for (const row of detailed) {
+    if (row) items.push(row);
   }
 
   return items;
@@ -304,6 +362,42 @@ async function incrementHitCount(env: Env): Promise<number> {
   return next;
 }
 
+async function readGuestbookEntries(env: Env): Promise<GuestbookEntry[]> {
+  const kv = env.HITS_KV;
+  if (!kv) {
+    throw new Error("guestbook kv missing");
+  }
+
+  const raw = await kv.get("guestbook:entries-v1");
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+  const rows = parsed
+    .map((item: any) => ({
+      name: clean(item?.name).slice(0, 48),
+      message: clean(item?.message).slice(0, 280),
+      at: clean(item?.at) || new Date().toISOString(),
+    }))
+    .filter((item: GuestbookEntry) => item.message.length > 0);
+
+  return rows;
+}
+
+async function writeGuestbookEntries(env: Env, entries: GuestbookEntry[]): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) {
+    throw new Error("guestbook kv missing");
+  }
+  await kv.put("guestbook:entries-v1", JSON.stringify(entries));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -407,6 +501,64 @@ export default {
           }
         );
       }
+    }
+
+    if (url.pathname === "/api/guestbook") {
+      if (request.method === "GET") {
+        try {
+          const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit")) || 40));
+          const entries = await readGuestbookEntries(env);
+          return new Response(JSON.stringify({ entries: entries.slice(0, limit), at: new Date().toISOString() }), {
+            status: 200,
+            headers: jsonHeaders(allowOrigin),
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({ error: clean(error?.message || "guestbook_read_failed"), at: new Date().toISOString() }),
+            {
+              status: 502,
+              headers: jsonHeaders(allowOrigin),
+            }
+          );
+        }
+      }
+
+      if (request.method === "POST") {
+        try {
+          const body: any = await request.json();
+          const name = clean(body?.name || "anonymous").slice(0, 48) || "anonymous";
+          const message = clean(body?.message || "").slice(0, 280);
+
+          if (!message) {
+            return new Response(JSON.stringify({ error: "message_required", at: new Date().toISOString() }), {
+              status: 400,
+              headers: jsonHeaders(allowOrigin),
+            });
+          }
+
+          const entries = await readGuestbookEntries(env);
+          const next: GuestbookEntry[] = [{ name, message, at: new Date().toISOString() }, ...entries].slice(0, 100);
+          await writeGuestbookEntries(env, next);
+
+          return new Response(JSON.stringify({ ok: true, entries: next.slice(0, 40), at: new Date().toISOString() }), {
+            status: 200,
+            headers: jsonHeaders(allowOrigin),
+          });
+        } catch (error: any) {
+          return new Response(
+            JSON.stringify({ error: clean(error?.message || "guestbook_write_failed"), at: new Date().toISOString() }),
+            {
+              status: 502,
+              headers: jsonHeaders(allowOrigin),
+            }
+          );
+        }
+      }
+
+      return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+        status: 405,
+        headers: jsonHeaders(allowOrigin),
+      });
     }
 
     if (url.pathname === "/api/health") {
