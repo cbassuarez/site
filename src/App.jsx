@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
 const OPERATOR_IMAGE = '/seb-portrait.jpg';
 const FEED_API_BASE = import.meta.env.VITE_FEED_API_BASE || 'https://seb-feed.cbassuarez.workers.dev';
+const UI_FONT_STACK = '"Times New Roman", Times, serif';
+const MONO_FONT_STACK = '"Courier New", Courier, monospace';
 
 const SOCIAL_LINKS = [
   { label: 'github', url: 'https://github.com/cbassuarez' },
@@ -470,7 +472,7 @@ function WorksPage() {
           <i>works</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
         </p>
       </center>
 
@@ -494,6 +496,8 @@ function WorksPage() {
 
 function HomePage() {
   const HOME_GUESTBOOK_LIMIT = 40;
+  const footerRef = useRef(null);
+  const [footerSpacerPx, setFooterSpacerPx] = useState(64);
   const isMobile = useIsMobile();
   const hits = useTruthfulHitCounter();
   const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed();
@@ -621,6 +625,29 @@ function HomePage() {
     }
   };
 
+  useEffect(() => {
+    const measure = () => {
+      const next = footerRef.current?.offsetHeight;
+      if (Number.isFinite(next) && next > 0) {
+        setFooterSpacerPx(next);
+      }
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+
+    let observer;
+    if (typeof ResizeObserver !== 'undefined' && footerRef.current) {
+      observer = new ResizeObserver(() => measure());
+      observer.observe(footerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', measure);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
   return (
     <>
       <center>
@@ -641,10 +668,10 @@ function HomePage() {
 
       {isMobile ? (
         <p>
-          <small>{mobileStatusText}</small>
+          <small style={{ fontFamily: MONO_FONT_STACK }}>{mobileStatusText}</small>
         </p>
       ) : (
-        <marquee behavior="scroll" direction="left" scrollAmount="2" scrollDelay="30">
+        <marquee behavior="scroll" direction="left" scrollAmount="2" scrollDelay="30" style={{ fontFamily: MONO_FONT_STACK }}>
           {marqueeText}
         </marquee>
       )}
@@ -672,26 +699,28 @@ function HomePage() {
           </p>
 
           <h3>what is seb doing // live feed</h3>
-          {isBooting ? (
-            <p>
-              <i>syncing feed{bootDots}</i>
-            </p>
-          ) : (
-            <ul>
-              {homeFeedPreview.slice(0, 8).map((item, index) => (
-                <li key={`${item.source}-${item.at}-${index}`}>
-                  {item.url ? (
-                    <a href={item.url} target="_blank" rel="noreferrer">
-                      [{stamp(item.at)}] {item.source}
-                    </a>
-                  ) : (
-                    <span>[{stamp(item.at)}] {item.source}</span>
-                  )}{' '}
-                  - {item.text}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div style={{ fontFamily: MONO_FONT_STACK }}>
+            {isBooting ? (
+              <p>
+                <i>syncing feed{bootDots}</i>
+              </p>
+            ) : (
+              <ul>
+                {homeFeedPreview.slice(0, 8).map((item, index) => (
+                  <li key={`${item.source}-${item.at}-${index}`}>
+                    {item.url ? (
+                      <a href={item.url} target="_blank" rel="noreferrer">
+                        [{stamp(item.at)}] {item.source}
+                      </a>
+                    ) : (
+                      <span>[{stamp(item.at)}] {item.source}</span>
+                    )}{' '}
+                    - {item.text}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <p>
             [ <a href="/feed">open full seb feed</a> ]
           </p>
@@ -721,7 +750,7 @@ function HomePage() {
             </p>
           </form>
 
-          <table border="1" cellPadding="6" width="100%">
+          <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
             <tbody>
               {guestbook.length === 0 ? (
                 <tr>
@@ -762,13 +791,19 @@ function HomePage() {
             <tr>
               <td width="30%" valign="top">
                 <h3>navigation</h3>
-                <ul>
-                  <li>
-                    <a href="/about">about</a>
-                  </li>
-                  <li>
-                    <a href="/feed">seb feed</a>
-                  </li>
+              <ul>
+                <li>
+                  <a href="/about">about</a>
+                </li>
+                <li>
+                  <a href="/contact">contact</a>
+                </li>
+                <li>
+                  <a href="/colophon">colophon</a>
+                </li>
+                <li>
+                  <a href="/feed">seb feed</a>
+                </li>
                   <li>
                     <a href="/guestbook">guestbook</a>
                   </li>
@@ -808,7 +843,7 @@ function HomePage() {
                 </p>
 
                 <h2>what is seb doing // live feed</h2>
-                <div style={{ minHeight: '21em' }}>
+                <div style={{ minHeight: '21em', fontFamily: MONO_FONT_STACK }}>
                   {isBooting ? (
                     <p>
                       <i>syncing feed{bootDots}</i>
@@ -892,7 +927,7 @@ function HomePage() {
                   </p>
                 </form>
 
-                <table border="1" cellPadding="6" width="100%">
+                <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
                   <tbody>
                     {guestbook.length === 0 ? (
                       <tr>
@@ -918,22 +953,24 @@ function HomePage() {
         </table>
       )}
 
-      <hr />
-
-      <center>
-        <small>
-          {SOCIAL_LINKS.map((link, index) => (
-            <span key={link.label}>
-              {index > 0 ? ' [ ' : '[ '}
-              <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-                {link.label}
-              </a>{' '}
-              ]
-            </span>
-          ))}{' '}
-          [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
-        </small>
-      </center>
+      <div aria-hidden="true" style={{ height: `${footerSpacerPx}px` }} />
+      <div ref={footerRef} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: '#fff' }}>
+        <hr />
+        <center>
+          <small>
+            {SOCIAL_LINKS.map((link, index) => (
+              <span key={link.label}>
+                {index > 0 ? ' [ ' : '[ '}
+                <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                  {link.label}
+                </a>{' '}
+                ]
+              </span>
+            ))}{' '}
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ under construction ]
+          </small>
+        </center>
+      </div>
     </>
   );
 }
@@ -971,7 +1008,7 @@ function FeedPage() {
           {isMobile ? (
             <>[ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
           ) : (
-            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
+            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
           )}
         </p>
       </center>
@@ -979,7 +1016,7 @@ function FeedPage() {
       <hr />
 
       {isMobile ? (
-        <p>
+        <p style={{ fontFamily: MONO_FONT_STACK }}>
           <small>{feedStatusLine}</small>
         </p>
       ) : null}
@@ -988,26 +1025,28 @@ function FeedPage() {
         <b>live timeline</b> (newest first)
       </p>
 
-      {isBooting ? (
-        <p>
-          <i>syncing feed{bootDots}</i>
-        </p>
-      ) : (
-        <ul>
-          {feedItems.map((item, index) => (
-            <li key={`${item.source}-${item.at}-${index}`}>
-              {item.url ? (
-                <a href={item.url} target="_blank" rel="noreferrer">
-                  [{stamp(item.at)}] {item.source}
-                </a>
-              ) : (
-                <span>[{stamp(item.at)}] {item.source}</span>
-              )}{' '}
-              - {item.text}
-            </li>
-          ))}
-        </ul>
-      )}
+      <div style={{ fontFamily: MONO_FONT_STACK }}>
+        {isBooting ? (
+          <p>
+            <i>syncing feed{bootDots}</i>
+          </p>
+        ) : (
+          <ul>
+            {feedItems.map((item, index) => (
+              <li key={`${item.source}-${item.at}-${index}`}>
+                {item.url ? (
+                  <a href={item.url} target="_blank" rel="noreferrer">
+                    [{stamp(item.at)}] {item.source}
+                  </a>
+                ) : (
+                  <span>[{stamp(item.at)}] {item.source}</span>
+                )}{' '}
+                - {item.text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <p>
         <small>
@@ -1083,7 +1122,7 @@ function GuestbookPage() {
           <i>guestbook.exe [NEW] // full history</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/guestbook">guestbook</a> ]
+          [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/guestbook">guestbook</a> ]
         </p>
       </center>
 
@@ -1103,7 +1142,7 @@ function GuestbookPage() {
         </p>
       </form>
 
-      <table border="1" cellPadding="6" width="100%">
+      <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
         <tbody>
           {guestbook.length === 0 ? (
             <tr>
@@ -1123,6 +1162,99 @@ function GuestbookPage() {
           ))}
         </tbody>
       </table>
+    </>
+  );
+}
+
+function ContactPage() {
+  const sent = new URLSearchParams(window.location.search).get('sent') === '1';
+  const nextUrl = useMemo(() => `${window.location.origin}/contact?sent=1`, []);
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>contact</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      {sent ? (
+        <p>
+          message sent. thank you.
+          <br />
+          [ <a href="/">return home</a> ]
+        </p>
+      ) : (
+        <form action="https://formspree.io/f/mjkepaeo" method="POST">
+          <input type="hidden" name="_next" value={nextUrl} />
+          <p>
+            name:{' '}
+            <input type="text" name="name" size="24" required />
+          </p>
+          <p>
+            email:{' '}
+            <input type="email" name="email" size="28" required />
+          </p>
+          <p>
+            message:
+            <br />
+            <textarea name="message" rows="8" cols="56" required />
+          </p>
+          <p>
+            <button type="submit">send message</button>
+          </p>
+        </form>
+      )}
+    </>
+  );
+}
+
+function ColophonPage() {
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>colophon</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <p>1995/no-stylesheet concept with browser-default rendering.</p>
+      <p>live data sources: spotify, instagram, github, bandcamp.</p>
+      <p>feed API: <a href="https://seb-feed.cbassuarez.workers.dev/api/feed?limit=20" target="_blank" rel="noreferrer">seb-feed.cbassuarez.workers.dev</a></p>
+      <p>works shell: Praetorius embed at <code>/works-console</code>.</p>
+      <p>hosting: static site + cloudflare worker endpoints.</p>
+    </>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>404 // not found</i>
+        </p>
+      </center>
+
+      <hr />
+
+      <p>the page you asked for does not exist.</p>
+      <p>
+        [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+      </p>
     </>
   );
 }
@@ -1163,10 +1295,12 @@ export default function App() {
   const isAboutPage = window.location.pathname.startsWith('/about');
   const isFeedPage = window.location.pathname.startsWith('/feed');
   const isGuestbookPage = window.location.pathname.startsWith('/guestbook');
+  const isContactPage = window.location.pathname.startsWith('/contact');
+  const isColophonPage = window.location.pathname.startsWith('/colophon');
   const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
-  let page = <HomePage />;
+  let page = pathname === '/' ? <HomePage /> : <NotFoundPage />;
   if (isLegacyWorksPage) {
     page = <LegacyWorksRedirect />;
   } else if (isLegacyFeedHash) {
@@ -1179,12 +1313,18 @@ export default function App() {
     page = <FeedPage />;
   } else if (isGuestbookPage) {
     page = <GuestbookPage />;
+  } else if (isContactPage) {
+    page = <ContactPage />;
+  } else if (isColophonPage) {
+    page = <ColophonPage />;
   }
 
   return (
     <>
       <style>{`a, a:visited { color: ${linkColor}; }`}</style>
-      {page}
+      <div style={{ fontFamily: UI_FONT_STACK }}>
+        {page}
+      </div>
     </>
   );
 }
