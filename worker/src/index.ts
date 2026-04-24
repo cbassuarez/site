@@ -4,6 +4,9 @@ type FeedItem = {
   at: string;
   url?: string;
   media?: string;
+  progressMs?: number;
+  durationMs?: number;
+  isPlaying?: boolean;
 };
 
 type SourceStatus = {
@@ -273,6 +276,9 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
         at: new Date().toISOString(),
         url: url || undefined,
         media: uri || undefined,
+        progressMs: Number.isFinite(payload?.progress_ms) ? payload.progress_ms : 0,
+        durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
+        isPlaying: Boolean(payload?.is_playing),
       },
     ];
   }
@@ -291,6 +297,9 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
       at: recent?.played_at || new Date().toISOString(),
       url: clean(track?.external_urls?.spotify || ""),
       media: clean(track?.uri || ""),
+      progressMs: 0,
+      durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
+      isPlaying: false,
     },
   ];
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
@@ -61,7 +61,10 @@ async function fetchCombinedSebFeed() {
     text: item.text || '',
     at: parseDateOrNow(item.at),
     url: item.url || '',
-    media: item.media || ''
+    media: item.media || '',
+    progressMs: Number.isFinite(item.progressMs) ? item.progressMs : 0,
+    durationMs: Number.isFinite(item.durationMs) ? item.durationMs : 0,
+    isPlaying: Boolean(item.isPlaying)
   }));
 
   const failedCount = Object.values(sources).filter((status) => status?.status !== 'ok').length;
@@ -166,144 +169,6 @@ function formatMs(ms) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-function useSpotifyIFramePlayer(spotifyTrackId) {
-  const containerRef = useRef(null);
-  const controllerRef = useRef(null);
-  const [status, setStatus] = useState('idle');
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
-  const [isPaused, setIsPaused] = useState(true);
-
-  useEffect(() => {
-    if (!spotifyTrackId) {
-      setStatus('idle');
-      setPositionMs(0);
-      setDurationMs(0);
-      setIsPaused(true);
-      return;
-    }
-
-    let cancelled = false;
-    let timeoutId = 0;
-    const uri = `spotify:track:${spotifyTrackId}`;
-
-    const destroyController = () => {
-      if (controllerRef.current && typeof controllerRef.current.destroy === 'function') {
-        try {
-          controllerRef.current.destroy();
-        } catch (error) {
-          // Ignore teardown failures from third-party iframe API.
-        }
-      }
-      controllerRef.current = null;
-    };
-
-    const ensureSpotifyIFrameApi = () => {
-      if (window.__spotifyIframeApiObject) {
-        return Promise.resolve(window.__spotifyIframeApiObject);
-      }
-
-      if (window.__spotifyIframeApiPromise) {
-        return window.__spotifyIframeApiPromise;
-      }
-
-      window.__spotifyIframeApiPromise = new Promise((resolve, reject) => {
-        window.onSpotifyIframeApiReady = (api) => {
-          window.__spotifyIframeApiObject = api;
-          resolve(api);
-        };
-
-        const existing = document.querySelector('script[data-spotify-iframe-api="1"]');
-        if (existing) {
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://open.spotify.com/embed/iframe-api/v1';
-        script.async = true;
-        script.dataset.spotifyIframeApi = '1';
-        script.onerror = () => reject(new Error('spotify_iframe_api_load_failed'));
-        document.body.appendChild(script);
-      });
-
-      return window.__spotifyIframeApiPromise;
-    };
-
-    setStatus('loading');
-    setPositionMs(0);
-    setDurationMs(0);
-    setIsPaused(true);
-    destroyController();
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-    }
-
-    timeoutId = window.setTimeout(() => {
-      if (!cancelled) {
-        setStatus('timeout');
-      }
-    }, 12000);
-
-    ensureSpotifyIFrameApi()
-      .then((api) => {
-        if (cancelled || !containerRef.current) return;
-
-        const options = {
-          width: '100%',
-          height: 152,
-          uri
-        };
-
-        api.createController(containerRef.current, options, (controller) => {
-          if (cancelled) {
-            if (controller && typeof controller.destroy === 'function') {
-              controller.destroy();
-            }
-            return;
-          }
-
-          controllerRef.current = controller;
-
-          controller.addListener('ready', () => {
-            if (cancelled) return;
-            window.clearTimeout(timeoutId);
-            setStatus('ready');
-          });
-
-          controller.addListener('playback_update', (event) => {
-            if (cancelled) return;
-            const data = event?.data || {};
-            if (Number.isFinite(data.position)) setPositionMs(data.position);
-            if (Number.isFinite(data.duration)) setDurationMs(data.duration);
-            setIsPaused(Boolean(data.isPaused));
-          });
-
-          controller.addListener('playback_started', () => {
-            if (cancelled) return;
-            window.clearTimeout(timeoutId);
-            setStatus('playing');
-          });
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        window.clearTimeout(timeoutId);
-        setStatus('error');
-      });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-      destroyController();
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-    };
-  }, [spotifyTrackId]);
-
-  return { containerRef, status, positionMs, durationMs, isPaused };
 }
 
 function useSebFeed() {
@@ -507,7 +372,25 @@ function HomePage() {
     [feedItems]
   );
   const spotifyTrackId = spotifyTrackIdFromItem(spotifyNow);
-  const spotifyPlayer = useSpotifyIFramePlayer(spotifyTrackId);
+  const [spotifyLocalProgressMs, setSpotifyLocalProgressMs] = useState(0);
+
+  useEffect(() => {
+    setSpotifyLocalProgressMs(Number(spotifyNow?.progressMs) || 0);
+  }, [spotifyNow?.url, spotifyNow?.at, spotifyNow?.progressMs]);
+
+  useEffect(() => {
+    if (!spotifyNow?.isPlaying) return;
+
+    const intervalId = window.setInterval(() => {
+      setSpotifyLocalProgressMs((current) => {
+        const next = current + 1000;
+        const max = Number(spotifyNow?.durationMs) || 0;
+        return max > 0 ? Math.min(next, max) : next;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [spotifyNow?.isPlaying, spotifyNow?.durationMs, spotifyNow?.url, spotifyNow?.at]);
 
   const submitGuestbook = async (event) => {
     event.preventDefault();
@@ -623,18 +506,13 @@ function HomePage() {
                       open in spotify
                     </a>
                   </p>
-                  <div ref={spotifyPlayer.containerRef} />
-                  {spotifyPlayer.durationMs > 0 ? (
+                  {Number(spotifyNow?.durationMs) > 0 ? (
                     <p>
                       <small>
-                        playhead: {formatMs(spotifyPlayer.positionMs)} / {formatMs(spotifyPlayer.durationMs)}
-                        {spotifyPlayer.isPaused ? ' (paused)' : ''}
+                        playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
+                        {spotifyNow?.isPlaying ? '' : ' (paused)'}
                       </small>
                     </p>
-                  ) : null}
-                  {spotifyPlayer.status === 'loading' ? <p><small>loading spotify player...</small></p> : null}
-                  {spotifyPlayer.status === 'timeout' || spotifyPlayer.status === 'error' ? (
-                    <p><small>spotify player unavailable right now; use open in spotify above.</small></p>
                   ) : null}
                 </>
               ) : null}
