@@ -1,0 +1,6 @@
+name = "seb-feed"
+main = "src/index.ts"
+compatibility_date = "2026-04-24"
+
+[observability]
+enabled = true
