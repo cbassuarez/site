@@ -98,7 +98,7 @@ const parseFeedTimeMs = (value: unknown) => {
 
 function parseSpotifyEvent(text: string): { action: string; label: string } {
   const cleaned = clean(text);
-  const match = cleaned.match(/^(now playing|last played|resumed|paused):\s*(.+)$/i);
+  const match = cleaned.match(/^(now playing|played|last played|resumed|paused):\s*(.+)$/i);
   if (!match) {
     return { action: "other", label: cleaned.toLowerCase() };
   }
@@ -106,14 +106,13 @@ function parseSpotifyEvent(text: string): { action: string; label: string } {
 }
 
 function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
-  const oldestFirst = [...items].sort((a, b) => parseFeedTimeMs(a.at) - parseFeedTimeMs(b.at));
+  const newestFirst = [...items].sort((a, b) => parseFeedTimeMs(b.at) - parseFeedTimeMs(a.at));
   const kept: FeedItem[] = [];
 
   const seenSessionKeys = new Set<string>();
-  const seenEventKeys = new Set<string>();
-  const recentByTrackAction = new Map<string, number>();
+  const seenBurstKeys = new Set<string>();
 
-  for (const item of oldestFirst) {
+  for (const item of newestFirst) {
     if (sourceBase(item.source) !== "spotify") {
       kept.push(item);
       continue;
@@ -128,45 +127,21 @@ function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
       continue;
     }
 
-    if (action === "now playing") {
-      if (item.isPlaying === false) {
-        continue;
-      }
-      const progress = toNonNegativeInt(item.progressMs);
-      if (progress !== null && atMs > 0) {
-        const startedAtMs = Math.max(0, atMs - progress);
-        const sessionBucket = Math.round(startedAtMs / 30000);
-        const sessionKey = `play:${trackKey}:${sessionBucket}`;
-        if (seenSessionKeys.has(sessionKey)) continue;
-        seenSessionKeys.add(sessionKey);
-      } else {
-        const burstKey = `${trackKey}|${action}`;
-        const lastAt = recentByTrackAction.get(burstKey) || 0;
-        if (atMs - lastAt < 120000) continue;
-        recentByTrackAction.set(burstKey, atMs);
-      }
-      kept.push(item);
+    if (action === "last played" || action === "played") {
       continue;
     }
 
-    if (action === "resumed" || action === "paused") {
-      const burstKey = `${trackKey}|${action}`;
-      const lastAt = recentByTrackAction.get(burstKey) || 0;
-      if (atMs - lastAt < 90000) continue;
-      recentByTrackAction.set(burstKey, atMs);
-      kept.push(item);
-      continue;
-    }
+    if (action === "now playing" || action === "resumed" || action === "paused") {
+      if (action === "now playing" && item.isPlaying === false) continue;
+      const progressBucket = Math.round((toNonNegativeInt(item.progressMs) || 0) / 3000);
+      const timeBucket = Math.round(atMs / 90000);
+      const burstKey = `burst:${trackKey}:${action}:${progressBucket}:${timeBucket}`;
+      if (seenBurstKeys.has(burstKey)) continue;
+      seenBurstKeys.add(burstKey);
 
-    if (action === "last played") {
-      const burstKey = `${trackKey}|${action}`;
-      const lastAt = recentByTrackAction.get(burstKey) || 0;
-      if (atMs - lastAt < 90000) continue;
-      recentByTrackAction.set(burstKey, atMs);
-
-      const eventKey = `last:${trackKey}:${clean(item.at)}`;
-      if (seenEventKeys.has(eventKey)) continue;
-      seenEventKeys.add(eventKey);
+      const sessionKey = `play:${trackKey}:${clean(item.at)}`;
+      if (seenSessionKeys.has(sessionKey)) continue;
+      seenSessionKeys.add(sessionKey);
       kept.push(item);
       continue;
     }
@@ -175,6 +150,17 @@ function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
   }
 
   return kept.sort((a, b) => parseFeedTimeMs(b.at) - parseFeedTimeMs(a.at));
+}
+
+function timelineIdentity(item: FeedItem): string {
+  if (sourceBase(item.source) !== "spotify") {
+    return `${item.source}|${item.at}|${item.url || ""}|${item.text}`;
+  }
+
+  const { label } = parseSpotifyEvent(item.text);
+  const trackKey = clean(item.media || item.url || label);
+  const atKey = clean(item.at);
+  return `spotify|${trackKey}|${atKey}`;
 }
 
 function formatAgeLabel(msAgo: number): string {
@@ -489,47 +475,21 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
       const startedAtMs = Math.max(0, nowMs - Math.max(0, progressMs));
       const startedAtIso = new Date(startedAtMs).toISOString();
       const sameTrack = previousState?.trackKey === trackKey && trackKey.length > 0;
+      const sessionStartedAt = sameTrack
+        ? clean(previousState?.sessionStartedAt) || startedAtIso
+        : startedAtIso;
+      const statusPrefix = isPlaying ? "now playing" : "paused";
 
-      let eventTextPrefix = "";
-      let eventAt = nowIso;
-      let sessionStartedAt = startedAtIso;
-
-      if (isPlaying) {
-        if (sameTrack && previousState?.isPlaying) {
-          sessionStartedAt = clean(previousState?.sessionStartedAt) || startedAtIso;
-        } else if (sameTrack && !previousState?.isPlaying) {
-          eventTextPrefix = "resumed";
-          sessionStartedAt = startedAtIso;
-        } else {
-          eventTextPrefix = "now playing";
-          sessionStartedAt = startedAtIso;
-        }
-
-        if (eventTextPrefix === "now playing") {
-          eventAt = sessionStartedAt;
-        } else {
-          eventAt = nowIso;
-        }
-      } else {
-        if (sameTrack && previousState?.isPlaying) {
-          eventTextPrefix = "paused";
-        }
-        sessionStartedAt = clean(previousState?.sessionStartedAt) || startedAtIso;
-        eventAt = nowIso;
-      }
-
-      if (eventTextPrefix) {
-        items.push({
-          source: "spotify",
-          text: `${eventTextPrefix}: ${trackLabel}`,
-          at: eventAt,
-          url: url || undefined,
-          media: uri || undefined,
-          progressMs,
-          durationMs,
-          isPlaying,
-        });
-      }
+      items.push({
+        source: "spotify",
+        text: `${statusPrefix}: ${trackLabel}`,
+        at: sessionStartedAt,
+        url: url || undefined,
+        media: uri || undefined,
+        progressMs,
+        durationMs,
+        isPlaying,
+      });
 
       await writeSpotifyPlaybackState(env, {
         trackKey,
@@ -544,11 +504,11 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
       });
     }
   } else if (current.status === 204) {
-    if (previousState?.trackName && previousState.isPlaying) {
+    if (previousState?.trackName && previousState?.sessionStartedAt) {
       items.push({
         source: "spotify",
         text: `paused: ${previousState.trackName}`,
-        at: nowIso,
+        at: previousState.sessionStartedAt,
         url: previousState.trackUrl,
         media: previousState.trackUri,
         progressMs: previousState.progressMs || 0,
@@ -561,26 +521,6 @@ async function fetchSpotify(env: Env): Promise<FeedItem[]> {
         observedAt: nowIso,
       });
     }
-  }
-
-  const recentData: any = await fetchJson("https://api.spotify.com/v1/me/player/recently-played?limit=50", { headers });
-  const recents = Array.isArray(recentData?.items) ? recentData.items : [];
-  for (const recent of recents) {
-    const track = recent?.track;
-    if (!track) continue;
-    const artists = Array.isArray(track?.artists)
-      ? track.artists.map((artist: any) => clean(artist?.name)).filter(Boolean).join(", ")
-      : "";
-    items.push({
-      source: "spotify",
-      text: `last played: ${artists}${artists && track?.name ? " — " : ""}${clean(track?.name)}`,
-      at: recent?.played_at || new Date().toISOString(),
-      url: clean(track?.external_urls?.spotify || ""),
-      media: clean(track?.uri || ""),
-      progressMs: 0,
-      durationMs: Number.isFinite(track?.duration_ms) ? track.duration_ms : 0,
-      isPlaying: false,
-    });
   }
 
   return items;
@@ -884,11 +824,8 @@ export default {
         .filter((item) => item && item.text)
         .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
         .filter((item, index, array) => {
-          const key = `${item.source}|${item.at}|${item.url || ""}|${item.text}`;
-          return array.findIndex((candidate) => {
-            const candidateKey = `${candidate.source}|${candidate.at}|${candidate.url || ""}|${candidate.text}`;
-            return candidateKey === key;
-          }) === index;
+          const key = timelineIdentity(item);
+          return array.findIndex((candidate) => timelineIdentity(candidate) === key) === index;
         });
 
       const persisted = sanitizeSpotifyTimeline(merged).slice(0, 5000);
