@@ -21,12 +21,11 @@ const WEBSAFE_LINK_COLORS = [
   '#006699',
   '#008080',
   '#009933',
-  '#6633CC',
-  '#990099',
   '#993300',
   '#CC0033',
   '#CC3300'
 ];
+const VISITED_LINK_COLOR = '#551A8B';
 
 const OBLIQUE_STRATEGIES = [
   'Use an old idea.',
@@ -472,7 +471,7 @@ function WorksPage() {
           <i>works</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
@@ -695,7 +694,7 @@ function HomePage() {
             I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real time.
           </p>
           <p>
-            this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
+            currently building live cybernetic works. visit <a href="/works">works</a> to explore pieces, or <a href="/contact">contact</a> for commissions, performances, and collaborations.
           </p>
 
           <h3>what is seb doing // live feed</h3>
@@ -799,9 +798,6 @@ function HomePage() {
                   <a href="/contact">contact</a>
                 </li>
                 <li>
-                  <a href="/colophon">colophon</a>
-                </li>
-                <li>
                   <a href="/feed">seb feed</a>
                 </li>
                   <li>
@@ -839,7 +835,7 @@ function HomePage() {
                   time.
                 </p>
                 <p>
-                  this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
+                  currently building live cybernetic works. visit <a href="/works">works</a> to explore pieces, or <a href="/contact">contact</a> for commissions, performances, and collaborations.
                 </p>
 
                 <h2>what is seb doing // live feed</h2>
@@ -967,7 +963,7 @@ function HomePage() {
                 ]
               </span>
             ))}{' '}
-            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ under construction ]
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
           </small>
         </center>
       </div>
@@ -1008,7 +1004,7 @@ function FeedPage() {
           {isMobile ? (
             <>[ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
           ) : (
-            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
+            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
           )}
         </p>
       </center>
@@ -1122,7 +1118,7 @@ function GuestbookPage() {
           <i>guestbook.exe [NEW] // full history</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/guestbook">guestbook</a> ]
+          [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/guestbook">guestbook</a> ]
         </p>
       </center>
 
@@ -1169,48 +1165,101 @@ function GuestbookPage() {
 function ContactPage() {
   const sent = new URLSearchParams(window.location.search).get('sent') === '1';
   const nextUrl = useMemo(() => `${window.location.origin}/contact?sent=1`, []);
+  const localSystemTime = useMemo(
+    () => new Date().toLocaleTimeString('en-US', { hour12: false, timeZoneName: 'short' }),
+    []
+  );
+  const humanCheck = useMemo(() => {
+    const a = Math.floor(Math.random() * 8) + 1;
+    const b = Math.floor(Math.random() * 8) + 1;
+    return { a, b, answer: a + b };
+  }, []);
 
   return (
     <>
       <center>
         <h1>{SITE_DOMAIN}</h1>
         <p>
-          <i>contact</i>
+          <i>contact seb</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
       <hr />
 
       {sent ? (
-        <p>
-          message sent. thank you.
-          <br />
-          [ <a href="/">return home</a> ]
-        </p>
+        <>
+          <p>
+            <b>message received. signal locked.</b>
+          </p>
+          <p>
+            [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/feed">seb feed</a> ]
+          </p>
+        </>
       ) : (
-        <form action="https://formspree.io/f/mjkepaeo" method="POST">
-          <input type="hidden" name="_next" value={nextUrl} />
-          <p>
-            name:{' '}
-            <input type="text" name="name" size="24" required />
-          </p>
-          <p>
-            email:{' '}
-            <input type="email" name="email" size="28" required />
-          </p>
-          <p>
-            message:
-            <br />
-            <textarea name="message" rows="8" cols="56" required />
-          </p>
-          <p>
-            <button type="submit">send message</button>
-          </p>
-        </form>
+        <>
+          <p>writes back within 24-72 hours.</p>
+          <form action="https://formspree.io/f/mjkepaeo" method="POST">
+            <input type="hidden" name="_next" value={nextUrl} />
+            <input type="text" name="_gotcha" tabIndex="-1" autoComplete="off" style={{ display: 'none' }} />
+            <p>
+              name:{' '}
+              <input type="text" name="name" size="24" required />
+            </p>
+            <p>
+              email:{' '}
+              <input type="email" name="email" size="28" required />
+            </p>
+            <p>
+              subject:{' '}
+              <input type="text" name="subject" size="36" required />
+            </p>
+            <p>
+              topic:{' '}
+              <select name="topic" defaultValue="commission">
+                <option value="commission">commission</option>
+                <option value="performance">performance</option>
+                <option value="collab">collab</option>
+                <option value="press">press</option>
+                <option value="other">other</option>
+              </select>
+            </p>
+            <p>
+              <label>
+                <input type="checkbox" name="time_sensitive" value="yes" /> this is time-sensitive
+              </label>
+            </p>
+            <p>
+              message:
+              <br />
+              <textarea name="message" rows="8" cols="56" required />
+            </p>
+            <p>
+              human check ({humanCheck.a} + {humanCheck.b} = ?):{' '}
+              <input
+                type="text"
+                name="human_check"
+                size="4"
+                inputMode="numeric"
+                pattern={`^${humanCheck.answer}$`}
+                title={`please enter ${humanCheck.answer}`}
+                required
+              />
+            </p>
+            <p>
+              <button type="submit">send transmission</button>
+            </p>
+          </form>
+        </>
       )}
+
+      <hr />
+
+      <p>
+        <small>local system time: {localSystemTime}</small>
+      </p>
     </>
   );
 }
@@ -1224,7 +1273,7 @@ function ColophonPage() {
           <i>colophon</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
@@ -1253,7 +1302,7 @@ function NotFoundPage() {
 
       <p>the page you asked for does not exist.</p>
       <p>
-        [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+        [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
       </p>
     </>
   );
@@ -1321,7 +1370,7 @@ export default function App() {
 
   return (
     <>
-      <style>{`a, a:visited { color: ${linkColor}; }`}</style>
+      <style>{`a:link { color: ${linkColor}; } a:visited { color: ${VISITED_LINK_COLOR}; }`}</style>
       <div style={{ fontFamily: UI_FONT_STACK }}>
         {page}
       </div>
