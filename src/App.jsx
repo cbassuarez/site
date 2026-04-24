@@ -518,15 +518,13 @@ function HomePage() {
               </p>
 
               <h2>what is seb doing // live feed</h2>
-              <ul>
-                {isBooting ? (
-                  <>
-                    <li>[--:--:--] boot - syncing feed{bootDots}</li>
-                    <li>[--:--:--] boot - checking spotify / instagram / bandcamp{bootDots}</li>
-                    <li>[--:--:--] boot - sorting chronologically{bootDots}</li>
-                  </>
-                ) : (
-                  feedItems.slice(0, 12).map((item, index) => (
+              {isBooting ? (
+                <p>
+                  <i>syncing feed{bootDots}</i>
+                </p>
+              ) : (
+                <ul>
+                  {feedItems.slice(0, 12).map((item, index) => (
                     <li key={`${item.source}-${item.at}-${index}`}>
                       {item.url ? (
                         <a href={item.url} target="_blank" rel="noreferrer">
@@ -537,9 +535,9 @@ function HomePage() {
                       )}{' '}
                       - {item.text}
                     </li>
-                  ))
-                )}
-              </ul>
+                  ))}
+                </ul>
+              )}
               {spotifyNow && spotifyTrackId ? (
                 <>
                   <h3>listen with seb</h3>
@@ -679,15 +677,13 @@ function FeedPage() {
         <b>live timeline</b> (newest first)
       </p>
 
-      <ul>
-        {isBooting ? (
-          <>
-            <li>[--:--:--] boot - syncing feed{bootDots}</li>
-            <li>[--:--:--] boot - checking spotify / instagram / bandcamp{bootDots}</li>
-            <li>[--:--:--] boot - sorting chronologically{bootDots}</li>
-          </>
-        ) : (
-          feedItems.map((item, index) => (
+      {isBooting ? (
+        <p>
+          <i>syncing feed{bootDots}</i>
+        </p>
+      ) : (
+        <ul>
+          {feedItems.map((item, index) => (
             <li key={`${item.source}-${item.at}-${index}`}>
               {item.url ? (
                 <a href={item.url} target="_blank" rel="noreferrer">
@@ -698,9 +694,9 @@ function FeedPage() {
               )}{' '}
               - {item.text}
             </li>
-          ))
-        )}
-      </ul>
+          ))}
+        </ul>
+      )}
 
       <p>
         <small>

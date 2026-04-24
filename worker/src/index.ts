@@ -24,6 +24,7 @@ type GuestbookEntry = {
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   HITS_KV?: KVNamespace;
+  HITS_BASELINE?: string;
   GITHUB_USERNAME?: string;
   GITHUB_TOKEN?: string;
   BANDCAMP_DOMAIN?: string;
@@ -36,6 +37,9 @@ type Env = {
   X_BEARER_TOKEN?: string;
   YT_CHANNEL_ID?: string;
   YT_API_KEY?: string;
+  CF_ZONE_ID?: string;
+  CF_API_TOKEN?: string;
+  CF_ANALYTICS_SINCE?: string;
 };
 
 const jsonHeaders = (origin: string) => ({
@@ -52,6 +56,12 @@ const clean = (value: unknown) =>
     .trim();
 
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
+const toNonNegativeInt = (value: unknown) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.floor(parsed);
+  return rounded >= 0 ? rounded : null;
+};
 
 const short = (value: unknown, max = 120) => {
   const text = clean(value);
@@ -363,12 +373,100 @@ async function incrementHitCount(env: Env): Promise<number> {
     throw new Error("hits kv missing");
   }
 
-  const key = "hits:landing-v1";
-  const currentRaw = await kv.get(key);
-  const current = Number(currentRaw);
-  const next = Number.isFinite(current) && current >= 0 ? current + 1 : 1;
-  await kv.put(key, String(next));
-  return next;
+  const deltaKey = "hits:delta-v2";
+  const legacyKey = "hits:landing-v1";
+
+  const resolveCloudflareBaseline = async () => {
+    const zoneId = clean(env.CF_ZONE_ID);
+    const token = clean(env.CF_API_TOKEN);
+    if (!zoneId || !token) return null;
+
+    const sinceDay = clean(env.CF_ANALYTICS_SINCE || "");
+    const defaultSince = "2020-01-01";
+    const startDay = /^\d{4}-\d{2}-\d{2}$/.test(sinceDay) ? sinceDay : defaultSince;
+    const toIsoDay = (date: Date) => date.toISOString().slice(0, 10);
+    const addDaysUtc = (date: Date, days: number) => {
+      const next = new Date(date);
+      next.setUTCDate(next.getUTCDate() + days);
+      return next;
+    };
+
+    const today = new Date();
+    const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const earliestAvailable = addDaysUtc(todayUtc, -364);
+    let cursor = new Date(`${startDay}T00:00:00Z`);
+    if (Number.isNaN(cursor.getTime())) {
+      cursor = new Date(`${defaultSince}T00:00:00Z`);
+    }
+    if (cursor.getTime() < earliestAvailable.getTime()) {
+      cursor = earliestAvailable;
+    }
+
+    const query =
+      "query($zoneTag: string, $since: Date, $until: Date){ viewer { zones(filter: { zoneTag: $zoneTag }) { httpRequests1dGroups(filter: { date_geq: $since, date_leq: $until }, limit: 400) { sum { requests } } } } }";
+
+    let totalRequests = 0;
+    while (cursor.getTime() <= todayUtc.getTime()) {
+      const chunkEnd = addDaysUtc(cursor, 363);
+      const until = chunkEnd.getTime() > todayUtc.getTime() ? todayUtc : chunkEnd;
+      const body = JSON.stringify({
+        query,
+        variables: {
+          zoneTag: zoneId,
+          since: toIsoDay(cursor),
+          until: toIsoDay(until),
+        },
+      });
+
+      const response = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`cloudflare graphql ${response.status}`);
+      }
+
+      const payload: any = await response.json();
+      if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+        const firstError = clean(payload.errors[0]?.message || "cloudflare graphql error");
+        throw new Error(firstError);
+      }
+
+      const groups = payload?.data?.viewer?.zones?.[0]?.httpRequests1dGroups;
+      if (Array.isArray(groups)) {
+        for (const group of groups) {
+          const requests = toNonNegativeInt(group?.sum?.requests) ?? 0;
+          totalRequests += requests;
+        }
+      }
+
+      cursor = addDaysUtc(until, 1);
+    }
+
+    return totalRequests;
+  };
+
+  let baseline = toNonNegativeInt(env.HITS_BASELINE);
+  if (baseline === null) {
+    try {
+      baseline = await resolveCloudflareBaseline();
+    } catch {
+      baseline = 0;
+    }
+  }
+  await kv.delete(legacyKey);
+
+  const deltaRaw = await kv.get(deltaKey);
+  const delta = toNonNegativeInt(deltaRaw) ?? 0;
+  const nextDelta = delta + 1;
+  await kv.put(deltaKey, String(nextDelta));
+  return baseline + nextDelta;
 }
 
 async function readGuestbookEntries(env: Env): Promise<GuestbookEntry[]> {

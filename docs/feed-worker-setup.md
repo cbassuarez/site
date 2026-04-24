@@ -25,6 +25,20 @@ Set allow origin (recommended: your main site origin):
 echo "https://cbassuarez.com" | npx wrangler secret put FEED_ALLOW_ORIGIN
 ```
 
+Hit counter baseline (recommended):
+
+```bash
+# Option A: Automatic baseline from Cloudflare Analytics API
+echo "<CLOUDFLARE_ZONE_ID>" | npx wrangler secret put CF_ZONE_ID
+echo "<CLOUDFLARE_API_TOKEN_WITH_ZONE_ANALYTICS_READ>" | npx wrangler secret put CF_API_TOKEN
+echo "2026-04-24" | npx wrangler secret put CF_ANALYTICS_SINCE
+
+# Option B: Manual baseline (copy total hits from Cloudflare dashboard once)
+echo "<BASELINE_NUMBER>" | npx wrangler secret put HITS_BASELINE
+```
+
+Note: Cloudflare GraphQL zone analytics only exposes about the most recent 52 weeks. If you need all-time history older than that, set `HITS_BASELINE` manually.
+
 GitHub:
 
 ```bash
