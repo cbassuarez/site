@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
@@ -159,6 +159,176 @@ function spotifyTrackIdFromItem(item) {
   const url = String(item.url || '');
   const match = url.match(/spotify\.com\/track\/([a-zA-Z0-9]+)/);
   return match ? match[1] : '';
+}
+
+function formatMs(ms) {
+  const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function useSpotifyIFramePlayer(spotifyTrackId) {
+  const containerRef = useRef(null);
+  const controllerRef = useRef(null);
+  const [status, setStatus] = useState('idle');
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [isPaused, setIsPaused] = useState(true);
+
+  useEffect(() => {
+    if (!spotifyTrackId) {
+      setStatus('idle');
+      setPositionMs(0);
+      setDurationMs(0);
+      setIsPaused(true);
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId = 0;
+    const uri = `spotify:track:${spotifyTrackId}`;
+
+    const destroyController = () => {
+      if (controllerRef.current && typeof controllerRef.current.destroy === 'function') {
+        try {
+          controllerRef.current.destroy();
+        } catch (error) {
+          // Ignore teardown failures from third-party iframe API.
+        }
+      }
+      controllerRef.current = null;
+    };
+
+    const ensureSpotifyIFrameApi = () => {
+      if (window.__spotifyIframeApiObject) {
+        return Promise.resolve(window.__spotifyIframeApiObject);
+      }
+
+      if (window.__spotifyIframeApiPromise) {
+        return window.__spotifyIframeApiPromise;
+      }
+
+      window.__spotifyIframeApiPromise = new Promise((resolve, reject) => {
+        window.onSpotifyIframeApiReady = (api) => {
+          window.__spotifyIframeApiObject = api;
+          resolve(api);
+        };
+
+        const existing = document.querySelector('script[data-spotify-iframe-api="1"]');
+        if (existing) {
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://open.spotify.com/embed/iframe-api/v1';
+        script.async = true;
+        script.dataset.spotifyIframeApi = '1';
+        script.onerror = () => reject(new Error('spotify_iframe_api_load_failed'));
+        document.body.appendChild(script);
+      });
+
+      return window.__spotifyIframeApiPromise;
+    };
+
+    setStatus('loading');
+    setPositionMs(0);
+    setDurationMs(0);
+    setIsPaused(true);
+    destroyController();
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+    }
+
+    timeoutId = window.setTimeout(() => {
+      if (!cancelled) {
+        setStatus('timeout');
+      }
+    }, 12000);
+
+    ensureSpotifyIFrameApi()
+      .then((api) => {
+        if (cancelled || !containerRef.current) return;
+
+        const options = {
+          width: '100%',
+          height: 80,
+          uri
+        };
+
+        api.createController(containerRef.current, options, (controller) => {
+          if (cancelled) {
+            if (controller && typeof controller.destroy === 'function') {
+              controller.destroy();
+            }
+            return;
+          }
+
+          controllerRef.current = controller;
+
+          controller.addListener('ready', () => {
+            if (cancelled) return;
+            window.clearTimeout(timeoutId);
+            setStatus('ready');
+          });
+
+          controller.addListener('playback_update', (event) => {
+            if (cancelled) return;
+            const data = event?.data || {};
+            if (Number.isFinite(data.position)) setPositionMs(data.position);
+            if (Number.isFinite(data.duration)) setDurationMs(data.duration);
+            setIsPaused(Boolean(data.isPaused));
+          });
+
+          controller.addListener('playback_started', () => {
+            if (cancelled) return;
+            window.clearTimeout(timeoutId);
+            setStatus('playing');
+          });
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        window.clearTimeout(timeoutId);
+        setStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      destroyController();
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+    };
+  }, [spotifyTrackId]);
+
+  const togglePlay = useCallback(() => {
+    if (controllerRef.current && typeof controllerRef.current.togglePlay === 'function') {
+      controllerRef.current.togglePlay();
+    }
+  }, []);
+
+  const seekBySeconds = useCallback((deltaSeconds) => {
+    if (!controllerRef.current || typeof controllerRef.current.seek !== 'function') {
+      return;
+    }
+
+    const nextSeconds = Math.max(0, Math.floor((positionMs + deltaSeconds * 1000) / 1000));
+    controllerRef.current.seek(nextSeconds);
+  }, [positionMs]);
+
+  const seekToRatio = useCallback((ratio) => {
+    if (!controllerRef.current || typeof controllerRef.current.seek !== 'function') {
+      return;
+    }
+
+    const capped = Math.max(0, Math.min(1, Number(ratio) || 0));
+    const targetSeconds = Math.floor(((durationMs || 0) * capped) / 1000);
+    controllerRef.current.seek(targetSeconds);
+  }, [durationMs]);
+
+  return { containerRef, status, positionMs, durationMs, isPaused, togglePlay, seekBySeconds, seekToRatio };
 }
 
 function useSebFeed() {
@@ -362,11 +532,7 @@ function HomePage() {
     [feedItems]
   );
   const spotifyTrackId = spotifyTrackIdFromItem(spotifyNow);
-  const [spotifyEmbedFailed, setSpotifyEmbedFailed] = useState(false);
-
-  useEffect(() => {
-    setSpotifyEmbedFailed(false);
-  }, [spotifyTrackId]);
+  const spotifyPlayer = useSpotifyIFramePlayer(spotifyTrackId);
 
   const submitGuestbook = async (event) => {
     event.preventDefault();
@@ -482,24 +648,43 @@ function HomePage() {
                       open in spotify
                     </a>
                   </p>
-                  {!spotifyEmbedFailed ? (
-                    <iframe
-                      key={spotifyTrackId}
-                      title="Spotify Now Playing"
-                      src={`https://open.spotify.com/embed?uri=spotify:track:${spotifyTrackId}`}
-                      width="100%"
-                      height="152"
-                      frameBorder="0"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      onError={() => setSpotifyEmbedFailed(true)}
+                  <p>
+                    <button type="button" onClick={() => spotifyPlayer.seekBySeconds(-10)}>{'<<'} 10s</button>{' '}
+                    <button type="button" onClick={spotifyPlayer.togglePlay}>
+                      {spotifyPlayer.isPaused ? 'play' : 'pause'}
+                    </button>{' '}
+                    <button type="button" onClick={() => spotifyPlayer.seekBySeconds(10)}>10s {'>>'}</button>
+                  </p>
+                  <p>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1000"
+                      value={
+                        spotifyPlayer.durationMs > 0
+                          ? Math.min(1000, Math.max(0, Math.floor((spotifyPlayer.positionMs / spotifyPlayer.durationMs) * 1000)))
+                          : 0
+                      }
+                      onChange={(event) => spotifyPlayer.seekToRatio(Number(event.target.value) / 1000)}
                     />
-                  ) : null}
-                  {spotifyEmbedFailed ? (
+                  </p>
+                  {spotifyPlayer.durationMs > 0 ? (
                     <p>
-                      <small>spotify embed unavailable right now; open in spotify above.</small>
+                      <small>
+                        playhead: {formatMs(spotifyPlayer.positionMs)} / {formatMs(spotifyPlayer.durationMs)}
+                        {spotifyPlayer.isPaused ? ' (paused)' : ''}
+                      </small>
                     </p>
                   ) : null}
+                  {spotifyPlayer.status === 'loading' ? <p><small>loading spotify player...</small></p> : null}
+                  {spotifyPlayer.status === 'timeout' || spotifyPlayer.status === 'error' ? (
+                    <p><small>spotify player unavailable right now; use open in spotify above.</small></p>
+                  ) : null}
+                  <div
+                    ref={spotifyPlayer.containerRef}
+                    aria-hidden="true"
+                    style={{ height: 0, width: 0, overflow: 'hidden' }}
+                  />
                 </>
               ) : null}
               <p>
