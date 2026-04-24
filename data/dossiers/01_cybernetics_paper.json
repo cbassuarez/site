@@ -1,0 +1,48 @@
+{
+  "id": "cybernetics_paper",
+  "title": "EMBODIED MANIFESTATIONS of SPACE (CalArts doctoral research)",
+  "chronology_order": 1,
+  "thesis_claim": "Space in this practice is produced through recursive feedback among bodies, architectures, and technological systems rather than treated as a neutral container.",
+  "cybernetic_loop": "Visitor action perturbs the system, system state reorients perception, and human response re-enters the loop as second-order observation.",
+  "material_system": "Dissertation corpus + research context writing + installation documentation functioning as operational theory.",
+  "agency_model": "Reflexive co-observation: artist and machine are mutually observing participants in a shared control ecology.",
+  "evidence_refs": [
+    {
+      "label": "Research Context Draft",
+      "path": "/Users/seb/Desktop/research.md",
+      "excerpt": "I argue that space is produced through feedback between bodies, architectures, and technological systems, not merely a neutral container.",
+      "line_hint": "Research Context"
+    },
+    {
+      "label": "Tub Proposal Research Context",
+      "path": "/Users/seb/tub-proposal/docs/research.md",
+      "excerpt": "Across recent works I have treated technological systems as performers with their own limited but persistent forms of memory, temperament, and refusal.",
+      "line_hint": "Opening paragraph"
+    },
+    {
+      "label": "Primary Dissertation Corpus",
+      "path": "/Users/seb/Documents/concerning_human_understanding.pdf",
+      "excerpt": "Primary theoretical corpus used for the seminar's cybernetics segment and conceptual frame of second-order observation.",
+      "line_hint": "Use page-level citation during talk"
+    }
+  ],
+  "demo_assets": [
+    {
+      "label": "Dissertation PDF",
+      "type": "doc",
+      "path": "/Users/seb/Documents/concerning_human_understanding.pdf",
+      "pane": "media"
+    },
+    {
+      "label": "Research Context Markdown",
+      "type": "doc",
+      "path": "/Users/seb/Desktop/research.md",
+      "pane": "evidence"
+    }
+  ],
+  "risk_notes": [
+    "Theoretical density can outpace audience pacing without concrete project anchoring.",
+    "PDF extraction may fail in constrained runtime; keep markdown side-context available."
+  ],
+  "tags": ["theory", "second-order-cybernetics", "calarts", "dissertation"]
+}

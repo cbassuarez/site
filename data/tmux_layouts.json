@@ -1,0 +1,85 @@
+{
+  "profiles": [
+    {
+      "name": "seminar-default",
+      "description": "Main talk console with rationale, evidence, and media sidecar panes.",
+      "session_name": "soc-talk",
+      "window_name": "stage",
+      "panes": [
+        {
+          "name": "main",
+          "split": "root",
+          "command": "/bin/sh -lc 'cd \"/Users/seb/Documents/New project 2\" && python3 -m soc_console.cli run'",
+          "focus": true
+        },
+        {
+          "name": "rationale",
+          "split": "horizontal",
+          "size": 35,
+          "command": "/bin/sh -lc 'cd \"/Users/seb/Documents/New project 2\" && python3 -m soc_console.cli command \"trace letgo\"; exec zsh'"
+        },
+        {
+          "name": "evidence",
+          "split": "vertical",
+          "size": 35,
+          "command": "/bin/sh -lc 'cd \"/Users/seb/Documents/New project 2\" && python3 -m soc_console.cli command \"cite second order cybernetics\"; exec zsh'"
+        },
+        {
+          "name": "media",
+          "split": "vertical",
+          "size": 35,
+          "command": "/bin/sh -lc 'cd /Users/seb && ls -la letgo show-assets 2>/dev/null || true; exec zsh'"
+        }
+      ],
+      "bindings": {
+        "R": "tmux display-message \"Rationale pane ready\"",
+        "E": "tmux display-message \"Evidence pane ready\"",
+        "M": "tmux display-message \"Media sidecar ready\""
+      },
+      "scene_overrides": {
+        "project_1": "main-vertical",
+        "project_2": "tiled",
+        "project_3": "tiled",
+        "project_4": "even-horizontal",
+        "project_5": "even-horizontal",
+        "cross_project_synthesis": "main-horizontal",
+        "audience_intervention": "main-vertical",
+        "closing_thesis": "tiled"
+      }
+    },
+    {
+      "name": "scene-media-focus",
+      "description": "Media-forward layout for clips and audio proof moments.",
+      "session_name": "soc-talk",
+      "window_name": "stage",
+      "panes": [
+        {
+          "name": "main",
+          "split": "root",
+          "command": "/bin/sh -lc 'cd \"/Users/seb/Documents/New project 2\" && python3 -m soc_console.cli run'",
+          "focus": true
+        },
+        {
+          "name": "media",
+          "split": "horizontal",
+          "size": 60,
+          "command": "/bin/sh -lc 'cd /Users/seb && printf \"media pane staged\\n\"; exec zsh'"
+        },
+        {
+          "name": "evidence",
+          "split": "vertical",
+          "size": 40,
+          "command": "/bin/sh -lc 'cd \"/Users/seb/Documents/New project 2\" && python3 -m soc_console.cli command \"trace the_tub\"; exec zsh'"
+        }
+      ],
+      "bindings": {
+        "S": "tmux display-message \"Scene media focus active\""
+      },
+      "scene_overrides": {
+        "project_2": "main-horizontal",
+        "project_3": "main-horizontal",
+        "audience_intervention": "even-horizontal"
+      }
+    }
+  ]
+}

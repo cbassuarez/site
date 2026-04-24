@@ -1,0 +1,48 @@
+{
+  "id": "the_tub",
+  "title": "THE TUB Harness + Mode Contract",
+  "chronology_order": 3,
+  "thesis_claim": "THE TUB operationalizes machine agency as bounded, audible behavior through locked protocol contracts and mode-specific sonic affordances.",
+  "cybernetic_loop": "Live input features drive model outputs, mode contract clamps unsafe or invalid behavior, and audible outcomes feed back into performer labeling and mode steering.",
+  "material_system": "Swift harness app, mode manifests, model server, replay bundles, and deterministic safety rails.",
+  "agency_model": "Bounded autonomy with strict parameter envelopes and explicit contract fingerprinting.",
+  "evidence_refs": [
+    {
+      "label": "Harness Readme",
+      "path": "/Users/seb/the-tub-harness/README.md",
+      "excerpt": "At startup, the app validates mode-default picks against manifests and falls back deterministically when IDs are missing.",
+      "line_hint": "Manifests"
+    },
+    {
+      "label": "Mode Contract",
+      "path": "/Users/seb/the-tub-harness/docs/mode-contract.md",
+      "excerpt": "Protocol v2 contract fingerprint is locked and mismatches are surfaced as release blockers.",
+      "line_hint": "Locking"
+    },
+    {
+      "label": "Research Context",
+      "path": "/Users/seb/tub-proposal/docs/research.md",
+      "excerpt": "Technological systems are treated as performers with memory, temperament, and refusal.",
+      "line_hint": "Research Context"
+    }
+  ],
+  "demo_assets": [
+    {
+      "label": "Mode Contract Doc",
+      "type": "doc",
+      "path": "/Users/seb/the-tub-harness/docs/mode-contract.md",
+      "pane": "evidence"
+    },
+    {
+      "label": "Harness Project",
+      "type": "repo",
+      "path": "/Users/seb/the-tub-harness/TheTubHarness",
+      "pane": "media"
+    }
+  ],
+  "risk_notes": [
+    "Protocol drift between harness and model can silently invalidate artistic intent if lock checks are ignored.",
+    "Without audible mode verification, parameter correctness may hide perceptual regressions."
+  ],
+  "tags": ["audio-ml", "protocol", "safety", "installation"]
+}

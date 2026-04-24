@@ -1,0 +1,48 @@
+{
+  "id": "letgo",
+  "title": "LetGo / Conductor Film Platform",
+  "chronology_order": 2,
+  "thesis_claim": "LetGo stages a distributed authorship model where timeline authority is centralized but meaning emerges from synchronized multi-device participation.",
+  "cybernetic_loop": "Swift harness emits cues, backend distributes and logs state, phone clients drift-correct and respond, telemetry returns to the conductor for live adaptation.",
+  "material_system": "Swift harness, Fastify/WebSocket backend, React phone client, shared protocol package, rehearsal replay store.",
+  "agency_model": "Constrained collective agency: deterministic spine with dynamic overlays and per-device variant behavior.",
+  "evidence_refs": [
+    {
+      "label": "Runtime Topology",
+      "path": "/Users/seb/letgo/README.md",
+      "excerpt": "A monorepo for a conducted confessional cinema system split across one projector surface and a field of NFC-identified phone participants.",
+      "line_hint": "Runtime Topology"
+    },
+    {
+      "label": "Architecture Notes",
+      "path": "/Users/seb/letgo/docs/ARCHITECTURE.md",
+      "excerpt": "Swift harness emits CueCommand to backend; backend stamps and fan-outs cue stream; phone clients estimate drift and bias playback clock.",
+      "line_hint": "Control Plane"
+    },
+    {
+      "label": "Harness Runtime",
+      "path": "/Users/seb/letgo/harness-swift/README.md",
+      "excerpt": "ShowStateMachine drives deterministic fixed timeline transitions with command/vector dispatch and replay tooling.",
+      "line_hint": "Key Modules"
+    }
+  ],
+  "demo_assets": [
+    {
+      "label": "LetGo Architecture",
+      "type": "doc",
+      "path": "/Users/seb/letgo/docs/ARCHITECTURE.md",
+      "pane": "evidence"
+    },
+    {
+      "label": "LetGo Harness",
+      "type": "repo",
+      "path": "/Users/seb/letgo/harness-swift",
+      "pane": "media"
+    }
+  ],
+  "risk_notes": [
+    "Network instability can break liveness unless replay/fallback pathways are primed.",
+    "Operator cognitive load rises if command surface is not constrained."
+  ],
+  "tags": ["distributed-system", "sync", "performance", "co-agency"]
+}

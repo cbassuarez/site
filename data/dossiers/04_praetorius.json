@@ -1,0 +1,48 @@
+{
+  "id": "praetorius",
+  "title": "Praetorius — Interactive Works Console",
+  "chronology_order": 4,
+  "thesis_claim": "Praetorius reframes online composition portfolios as executable score-time interfaces that preserve primary evidence over ornamental framing.",
+  "cybernetic_loop": "Author maps score pages to media time, listener navigation repositions context, and deep links recirculate interpretation through shareable entry points.",
+  "material_system": "CLI toolchain, works schema, page-follow PDF mapping, skin system, and embed-first deployment model.",
+  "agency_model": "Human-authored mapping with interface-level procedural behavior that stabilizes adjudication and listening.",
+  "evidence_refs": [
+    {
+      "label": "Praetorius README",
+      "path": "/Users/seb/praetorius/README.md",
+      "excerpt": "Praetorius provides score-centric pages with synchronized audio and page-follow PDFs so evaluators do not get lost between time and page.",
+      "line_hint": "Why it exists"
+    },
+    {
+      "label": "Docs Home",
+      "path": "/Users/seb/praetorius/website/docs/index.md",
+      "excerpt": "Skins expose the same data through different surfaces while preserving synchronized score/audio behavior.",
+      "line_hint": "features"
+    },
+    {
+      "label": "Data Model",
+      "path": "/Users/seb/praetorius/README.md",
+      "excerpt": "The `.prae/works.json` schema stores cues and score mapping for deterministic page-follow behavior.",
+      "line_hint": "Data model"
+    }
+  ],
+  "demo_assets": [
+    {
+      "label": "Praetorius README",
+      "type": "doc",
+      "path": "/Users/seb/praetorius/README.md",
+      "pane": "evidence"
+    },
+    {
+      "label": "Praetorius Website Docs",
+      "type": "repo",
+      "path": "/Users/seb/praetorius/website/docs",
+      "pane": "media"
+    }
+  ],
+  "risk_notes": [
+    "Over-custom skin choices can distract from score-time evidence if editorial hierarchy is weak.",
+    "External PDF hosts may break page control unless URL handling is validated."
+  ],
+  "tags": ["tooling", "notation", "portfolio", "interaction"]
+}

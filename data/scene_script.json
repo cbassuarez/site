@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "duration_minutes": 60,
+  "scenes": [
+    {
+      "id": "intro",
+      "title": "Protocol + Co-Presence Framing",
+      "start_minute": 0,
+      "baton_owner": "shared",
+      "fallback_cue": "State thesis and runtime constraints before first jump.",
+      "kind": "intro"
+    },
+    {
+      "id": "project_1",
+      "title": "Cybernetics Dissertation Corpus (Deep)",
+      "start_minute": 6,
+      "baton_owner": "human",
+      "fallback_cue": "Use markdown side-context if PDF retrieval fails.",
+      "kind": "project"
+    },
+    {
+      "id": "project_2",
+      "title": "LetGo Distributed Conductor System (Deep)",
+      "start_minute": 20,
+      "baton_owner": "shared",
+      "fallback_cue": "Shift to architecture citation cards if live backend demo is unstable.",
+      "kind": "project"
+    },
+    {
+      "id": "project_3",
+      "title": "THE TUB Mode Contract + Harness (Deep)",
+      "start_minute": 33,
+      "baton_owner": "shared",
+      "fallback_cue": "Use mode-contract lock fingerprint as evidence spine if audio path is unavailable.",
+      "kind": "project"
+    },
+    {
+      "id": "project_4",
+      "title": "Praetorius Score-Time Interface (Minor)",
+      "start_minute": 45,
+      "baton_owner": "agent",
+      "fallback_cue": "Switch to README-driven page-follow explanation if embed preview is unavailable.",
+      "kind": "project"
+    },
+    {
+      "id": "project_5",
+      "title": "Dex / dexDRONES Infrastructure Loop (Minor)",
+      "start_minute": 51,
+      "baton_owner": "agent",
+      "fallback_cue": "Use about-data and launch-note citations if media pane desyncs.",
+      "kind": "project"
+    },
+    {
+      "id": "cross_project_synthesis",
+      "title": "Cross-Project Synthesis: Second-Order Cybernetics",
+      "start_minute": 56,
+      "baton_owner": "shared",
+      "fallback_cue": "Run synthesize command over all dossiers and read rationale cards.",
+      "kind": "cross_project_synthesis"
+    },
+    {
+      "id": "audience_intervention",
+      "title": "Guided Audience Intervention",
+      "start_minute": 58,
+      "baton_owner": "human",
+      "fallback_cue": "Use pre-authored intervention prompt from command palette.",
+      "kind": "audience_intervention"
+    },
+    {
+      "id": "closing_thesis",
+      "title": "Closing Thesis + Invitation",
+      "start_minute": 59,
+      "baton_owner": "shared",
+      "fallback_cue": "Close with claim/evidence/inference triad from final card.",
+      "kind": "closing_thesis"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "id": "dexdrones",
+  "title": "Dex / dexDRONES Open Cultural Infrastructure",
+  "chronology_order": 5,
+  "thesis_claim": "dexDRONES extends Dex as operational public infrastructure by pairing open licensing with production-grade field capture and metadata discipline.",
+  "cybernetic_loop": "Field capture publishes to commons, reuse metrics and partner demand feed back into commissioning and infrastructure decisions, reshaping future capture cycles.",
+  "material_system": "Dex operations CLI, site/data manifests, press artifacts, and nonprofit governance workflows.",
+  "agency_model": "Institutional cybernetics: public reuse behavior recursively informs organizational production strategy.",
+  "evidence_refs": [
+    {
+      "label": "Dex Manual",
+      "path": "/Users/seb/dexdsl.github.io/README.md",
+      "excerpt": "The Dex operations manual defines canonical command centers for entry, content, and infrastructure workflows.",
+      "line_hint": "Command Taxonomy"
+    },
+    {
+      "label": "About Data",
+      "path": "/Users/seb/dexdsl.github.io/data/about.data.json",
+      "excerpt": "Dex commissions and publishes artist-made audiovisual work for legal reuse under CC BY 4.0 with rights-forward production design.",
+      "line_hint": "hero + model"
+    },
+    {
+      "label": "dexDRONES Launch",
+      "path": "/Users/seb/dexdsl.github.io/content/dexnotes/posts/dexdrones-launch-announcement-2026-03-09.md",
+      "excerpt": "dexDRONES launched as Dex's aerial wing focused on film-quality CC-BY 4.0 assets for public reuse.",
+      "line_hint": "At a glance"
+    }
+  ],
+  "demo_assets": [
+    {
+      "label": "dexDRONES Launch Post",
+      "type": "doc",
+      "path": "/Users/seb/dexdsl.github.io/content/dexnotes/posts/dexdrones-launch-announcement-2026-03-09.md",
+      "pane": "evidence"
+    },
+    {
+      "label": "Dex Site Repo",
+      "type": "repo",
+      "path": "/Users/seb/dexdsl.github.io",
+      "pane": "media"
+    }
+  ],
+  "risk_notes": [
+    "Open-media rhetoric can appear abstract unless paired with concrete workflow and metrics evidence.",
+    "Press-style narration can overshadow cybernetic analysis without explicit feedback-loop framing."
+  ],
+  "tags": ["institutional", "commons", "metadata", "open-license"]
+}
