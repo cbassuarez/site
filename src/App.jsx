@@ -230,35 +230,6 @@ function useTruthfulHitCounter() {
   return hits;
 }
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return false;
-    }
-    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const media = window.matchMedia(`(max-width: ${breakpoint}px)`);
-    const onChange = (event) => setIsMobile(event.matches);
-
-    setIsMobile(media.matches);
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', onChange);
-      return () => media.removeEventListener('change', onChange);
-    }
-
-    media.addListener(onChange);
-    return () => media.removeListener(onChange);
-  }, [breakpoint]);
-
-  return isMobile;
-}
-
 async function fetchGuestbookEntries(limit) {
   const hasLimit = typeof limit === 'number' && Number.isFinite(limit) && limit > 0;
   const endpoint = hasLimit
@@ -460,8 +431,6 @@ function AboutPage() {
 }
 
 function WorksPage() {
-  const isMobile = useIsMobile();
-
   return (
     <>
       <center>
@@ -479,22 +448,19 @@ function WorksPage() {
       <iframe
         title="Praetorius Works"
         src="/works-console/index.html"
-        style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
+        style={{ width: '100%', height: '70vh', border: 0, display: 'block' }}
       />
-      {isMobile ? (
-        <p>
-          <small>
-            mobile fallback: [ <a href="/works-console/index.html">open works console directly</a> ]
-          </small>
-        </p>
-      ) : null}
+      <p>
+        <small>
+          fallback: [ <a href="/works-console/index.html">open works console directly</a> ]
+        </small>
+      </p>
     </>
   );
 }
 
 function HomePage() {
   const HOME_GUESTBOOK_LIMIT = 40;
-  const isMobile = useIsMobile();
   const hits = useTruthfulHitCounter();
   const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed();
   const [name, setName] = useState('');
@@ -545,7 +511,6 @@ function HomePage() {
   const bootDots = '.'.repeat(bootDotCount);
   const [marqueeStableText, setMarqueeStableText] = useState('waiting for seb feed...');
   const [marqueeStableKey, setMarqueeStableKey] = useState('');
-  const mobileStatusText = isBooting ? `syncing feed${bootDots}` : marqueeStableText;
 
   const marqueeText = useMemo(() => {
     if (isBooting) {
@@ -639,284 +604,114 @@ function HomePage() {
 
       <hr />
 
-      {isMobile ? (
+      <marquee behavior="scroll" direction="left" scrollAmount="2" scrollDelay="30">
+        {marqueeText}
+      </marquee>
+
+      <h3>navigation</h3>
+      <p>
+        [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ]
+      </p>
+
+      <h3>operator</h3>
+      <p>
+        <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="140" />
+      </p>
+      <p>{OPERATOR_NAME}</p>
+      <p>page views (last 52 weeks): {hits}</p>
+
+      <h3>about</h3>
+      <p>
+        I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real time.
+      </p>
+      <p>
+        this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
+      </p>
+
+      <h3>what is seb doing // live feed</h3>
+      {isBooting ? (
         <p>
-          <small>{mobileStatusText}</small>
+          <i>syncing feed{bootDots}</i>
         </p>
       ) : (
-        <marquee behavior="alternate" scrollAmount="4">
-          {marqueeText}
-        </marquee>
-      )}
-
-      {isMobile ? (
-        <>
-          <h3>navigation</h3>
-          <p>
-            [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ]
-          </p>
-
-          <h3>operator</h3>
-          <p>
-            <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="140" />
-          </p>
-          <p>{OPERATOR_NAME}</p>
-          <p>page views (last 52 weeks): {hits}</p>
-
-          <h3>about</h3>
-          <p>
-            I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real time.
-          </p>
-          <p>
-            this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
-          </p>
-
-          <h3>what is seb doing // live feed</h3>
-          {isBooting ? (
-            <p>
-              <i>syncing feed{bootDots}</i>
-            </p>
-          ) : (
-            <ul>
-              {homeFeedPreview.slice(0, 8).map((item, index) => (
-                <li key={`${item.source}-${item.at}-${index}`}>
-                  {item.url ? (
-                    <a href={item.url} target="_blank" rel="noreferrer">
-                      [{stamp(item.at)}] {item.source}
-                    </a>
-                  ) : (
-                    <span>[{stamp(item.at)}] {item.source}</span>
-                  )}{' '}
-                  - {item.text}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p>
-            [ <a href="/feed">open full seb feed</a> ]
-          </p>
-
-          <h3>guestbook.exe</h3>
-          <form onSubmit={submitGuestbook}>
-            <p>
-              name:{' '}
-              <input
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                size="16"
-              />
-            </p>
-            <p>
-              message:{' '}
-              <input
-                type="text"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                size="28"
-              />
-            </p>
-            <p>
-              <button type="submit">sign guestbook</button>
-            </p>
-          </form>
-
-          <table border="1" cellPadding="6" width="100%">
-            <tbody>
-              {guestbook.length === 0 ? (
-                <tr>
-                  <td>system</td>
-                  <td>
-                    {guestbookStatus === 'loading' || guestbookStatus === 'saving'
-                      ? 'loading entries...'
-                      : 'no entries yet'}
-                  </td>
-                </tr>
-              ) : null}
-              {guestbook.slice(0, 8).map((entry, index) => (
-                <tr key={`${entry.name}-${entry.message}-${index}`}>
-                  <td>{entry.name}</td>
-                  <td>{entry.message}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p>
-            [ <a href="/guestbook">open full guestbook</a> ]
-          </p>
-
-          <h3>social</h3>
-          <ul>
-            {SOCIAL_LINKS.map((link) => (
-              <li key={link.label}>
-                <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-                  {link.label}
+        <ul>
+          {homeFeedPreview.slice(0, 8).map((item, index) => (
+            <li key={`${item.source}-${item.at}-${index}`}>
+              {item.url ? (
+                <a href={item.url} target="_blank" rel="noreferrer">
+                  [{stamp(item.at)}] {item.source}
                 </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <table border="1" cellPadding="8" width="100%">
-          <tbody>
+              ) : (
+                <span>[{stamp(item.at)}] {item.source}</span>
+              )}{' '}
+              - {item.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p>
+        [ <a href="/feed">open full seb feed</a> ]
+      </p>
+
+      <h3>guestbook.exe [NEW]</h3>
+      <form onSubmit={submitGuestbook}>
+        <p>
+          name:{' '}
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            size="20"
+          />
+        </p>
+        <p>
+          message:{' '}
+          <input
+            type="text"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            size="36"
+          />
+        </p>
+        <p>
+          <button type="submit">sign guestbook</button>
+        </p>
+      </form>
+
+      <table border="1" cellPadding="6" width="100%">
+        <tbody>
+          {guestbook.length === 0 ? (
             <tr>
-              <td width="30%" valign="top">
-                <h3>navigation</h3>
-                <ul>
-                  <li>
-                    <a href="/about">about</a>
-                  </li>
-                  <li>
-                    <a href="/feed">seb feed</a>
-                  </li>
-                  <li>
-                    <a href="/guestbook">guestbook</a>
-                  </li>
-                  <li>
-                    <a href="/works">works</a>
-                  </li>
-                </ul>
-
-                <h3>operator</h3>
-                <p>
-                  <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="180" />
-                </p>
-                <p>{OPERATOR_NAME}</p>
-                <p>page views (last 52 weeks): {hits}</p>
-
-                <h3>social</h3>
-                <ul>
-                  {SOCIAL_LINKS.map((link) => (
-                    <li key={link.label}>
-                      <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-                        {link.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </td>
-
-              <td valign="top">
-                <a id="about" />
-                <h2>about</h2>
-                <p>
-                  I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real
-                  time.
-                </p>
-                <p>
-                  this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
-                </p>
-
-                <h2>what is seb doing // live feed</h2>
-                <div style={{ minHeight: '21em' }}>
-                  {isBooting ? (
-                    <p>
-                      <i>syncing feed{bootDots}</i>
-                    </p>
-                  ) : (
-                    <ul>
-                      {homeFeedPreview.map((item, index) => (
-                        <li key={`${item.source}-${item.at}-${index}`}>
-                          {item.url ? (
-                            <a href={item.url} target="_blank" rel="noreferrer">
-                              [{stamp(item.at)}] {item.source}
-                            </a>
-                          ) : (
-                            <span>[{stamp(item.at)}] {item.source}</span>
-                          )}{' '}
-                          - {item.text}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {spotifyNow && spotifyTrackId ? (
-                    <>
-                      <h3>listen with seb</h3>
-                      <p>
-                        <small>
-                          {spotifyNow.text}
-                        </small>
-                      </p>
-                      <p>
-                        <a href={spotifyNow.url || `https://open.spotify.com/track/${spotifyTrackId}`} target="_blank" rel="noreferrer">
-                          open in spotify
-                        </a>
-                      </p>
-                      {Number(spotifyNow?.durationMs) > 0 ? (
-                        <p>
-                          <small>
-                            playhead: {formatMs(spotifyLocalProgressMs)} / {formatMs(spotifyNow.durationMs)}
-                            {spotifyNow?.isPlaying ? '' : ' (paused)'}
-                          </small>
-                        </p>
-                      ) : null}
-                    </>
-                  ) : null}
-                  <p>
-                    <small>
-                      feed sync: {feedMeta}
-                      <br />
-                      sources:{' '}
-                      {Object.keys(feedSources).length > 0
-                        ? Object.entries(feedSources)
-                            .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
-                            .join(' | ')
-                        : 'worker feed (pending)'}
-                    </small>
-                  </p>
-                </div>
-
-                <a id="guestbook" />
-                <h2>guestbook.exe</h2>
-                <form onSubmit={submitGuestbook}>
-                  <p>
-                    name:{' '}
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      size="24"
-                    />
-                  </p>
-                  <p>
-                    message:{' '}
-                    <input
-                      type="text"
-                      value={message}
-                      onChange={(event) => setMessage(event.target.value)}
-                      size="48"
-                    />
-                  </p>
-                  <p>
-                    <button type="submit">sign guestbook</button>
-                  </p>
-                </form>
-
-                <table border="1" cellPadding="6" width="100%">
-                  <tbody>
-                    {guestbook.length === 0 ? (
-                      <tr>
-                        <td width="24%">system</td>
-                        <td>
-                          {guestbookStatus === 'loading' || guestbookStatus === 'saving'
-                            ? 'loading entries...'
-                            : 'no entries yet'}
-                        </td>
-                      </tr>
-                    ) : null}
-                    {guestbook.map((entry, index) => (
-                      <tr key={`${entry.name}-${entry.message}-${index}`}>
-                        <td width="24%">{entry.name}</td>
-                        <td>{entry.message}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <td>system</td>
+              <td>
+                {guestbookStatus === 'loading' || guestbookStatus === 'saving'
+                  ? 'loading entries...'
+                  : 'new feature: be the first to sign.'}
               </td>
             </tr>
-          </tbody>
-        </table>
-      )}
+          ) : null}
+          {guestbook.slice(0, 8).map((entry, index) => (
+            <tr key={`${entry.name}-${entry.message}-${index}`}>
+              <td>{entry.name}</td>
+              <td>{entry.message}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>
+        [ <a href="/guestbook">open full guestbook</a> ]
+      </p>
+
+      <h3>social</h3>
+      <ul>
+        {SOCIAL_LINKS.map((link) => (
+          <li key={link.label}>
+            <a href={link.url} target={link.url.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
 
       <hr />
 
@@ -939,7 +734,6 @@ function HomePage() {
 }
 
 function FeedPage() {
-  const isMobile = useIsMobile();
   const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed({ apiLimit: 5000, maxItems: null });
   const [bootDotCount, setBootDotCount] = useState(1);
 
@@ -968,21 +762,15 @@ function FeedPage() {
           <i>what is seb doing // live feed</i>
         </p>
         <p>
-          {isMobile ? (
-            <>[ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
-          ) : (
-            <>[ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]</>
-          )}
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
         </p>
       </center>
 
       <hr />
 
-      {isMobile ? (
-        <p>
-          <small>{feedStatusLine}</small>
-        </p>
-      ) : null}
+      <p>
+        <small>{feedStatusLine}</small>
+      </p>
 
       <p>
         <b>live timeline</b> (newest first)
@@ -1026,7 +814,6 @@ function FeedPage() {
 }
 
 function GuestbookPage() {
-  const isMobile = useIsMobile();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [guestbook, setGuestbook] = useState([]);
@@ -1080,7 +867,7 @@ function GuestbookPage() {
       <center>
         <h1>{SITE_DOMAIN}</h1>
         <p>
-          <i>guestbook.exe // full history</i>
+          <i>guestbook.exe [NEW] // full history</i>
         </p>
         <p>
           [ <a href="/">home</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/guestbook">guestbook</a> ]
@@ -1092,11 +879,11 @@ function GuestbookPage() {
       <form onSubmit={submitGuestbook}>
         <p>
           name:{' '}
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} size={isMobile ? '16' : '24'} />
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} size="20" />
         </p>
         <p>
           message:{' '}
-          <input type="text" value={message} onChange={(event) => setMessage(event.target.value)} size={isMobile ? '30' : '60'} />
+          <input type="text" value={message} onChange={(event) => setMessage(event.target.value)} size="36" />
         </p>
         <p>
           <button type="submit">sign guestbook</button>
@@ -1107,17 +894,17 @@ function GuestbookPage() {
         <tbody>
           {guestbook.length === 0 ? (
             <tr>
-              <td width={isMobile ? undefined : '24%'}>system</td>
+              <td>system</td>
               <td>
                 {guestbookStatus === 'loading' || guestbookStatus === 'saving'
                   ? 'loading entries...'
-                  : 'no entries yet'}
+                  : 'new feature: be the first to sign.'}
               </td>
             </tr>
           ) : null}
           {guestbook.map((entry, index) => (
             <tr key={`${entry.name}-${entry.message}-${index}`}>
-              <td width={isMobile ? undefined : '24%'}>{entry.name}</td>
+              <td>{entry.name}</td>
               <td>{entry.message}</td>
             </tr>
           ))}
