@@ -13,11 +13,19 @@ const SOCIAL_LINKS = [
   { label: 'email', url: 'mailto:hello@cbassuarez.com' }
 ];
 
-const FEED_FALLBACK = [
-  'boot complete',
-  'waiting for live feeds',
-  'type refresh in your brain'
+const OBLIQUE_STRATEGIES = [
+  'Use an old idea.',
+  'Honor thy error as a hidden intention.',
+  'Try faking it.',
+  'Emphasize differences.',
+  'Repetition is a form of change.',
+  'What would your closest friend do?',
+  'Work at a different speed.',
+  'Listen to the quiet voice.',
+  'Is there something missing?',
+  'Do the last thing first.'
 ];
+const OBLIQUE_ATTRIBUTION = 'Brian Eno + Peter Schmidt, Oblique Strategies';
 
 function stamp(dateInput = Date.now()) {
   const now = new Date(dateInput);
@@ -173,16 +181,10 @@ function formatMs(ms) {
 }
 
 function useSebFeed() {
-  const [feedItems, setFeedItems] = useState(() =>
-    FEED_FALLBACK.map((line) => ({
-      source: 'boot',
-      text: line,
-      at: Date.now(),
-      url: ''
-    }))
-  );
+  const [feedItems, setFeedItems] = useState([]);
   const [feedMeta, setFeedMeta] = useState('syncing');
   const [feedSources, setFeedSources] = useState({});
+  const [isBooting, setIsBooting] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -199,11 +201,13 @@ function useSebFeed() {
 
         if (result.items.length === 0) {
           setFeedMeta('no live entries found');
+          setIsBooting(false);
           return;
         }
 
         setFeedItems(result.items);
         setFeedSources(result.sources || {});
+        setIsBooting(false);
 
         if (result.failedCount > 0) {
           setFeedMeta(`partial sync (${result.failedCount} source${result.failedCount > 1 ? 's' : ''} failed)`);
@@ -213,6 +217,7 @@ function useSebFeed() {
       } catch (error) {
         if (active) {
           setFeedMeta('feed sync failed');
+          setIsBooting(false);
         }
       }
     };
@@ -230,7 +235,8 @@ function useSebFeed() {
   return {
     feedItems,
     feedMeta,
-    feedSources
+    feedSources,
+    isBooting
   };
 }
 
@@ -330,11 +336,16 @@ function WorksPage() {
 
 function HomePage() {
   const hits = useTruthfulHitCounter();
-  const { feedItems, feedMeta, feedSources } = useSebFeed();
+  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [guestbook, setGuestbook] = useState([]);
   const [guestbookStatus, setGuestbookStatus] = useState('loading');
+  const [bootDotCount, setBootDotCount] = useState(1);
+  const obliqueLine = useMemo(() => {
+    const index = Math.floor(Math.random() * OBLIQUE_STRATEGIES.length);
+    return OBLIQUE_STRATEGIES[index] || 'Use an old idea.';
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -361,7 +372,23 @@ function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isBooting) return;
+
+    const intervalId = window.setInterval(() => {
+      setBootDotCount((count) => (count % 3) + 1);
+    }, 450);
+
+    return () => window.clearInterval(intervalId);
+  }, [isBooting]);
+
+  const bootDots = '.'.repeat(bootDotCount);
+
   const marqueeText = useMemo(() => {
+    if (isBooting) {
+      return `boot: syncing seb feed${bootDots} /// boot: fetching sources${bootDots} /// boot: compiling timeline${bootDots}`;
+    }
+
     const pieces = feedItems.slice(0, 6).map((item) => `${item.source}: ${item.text}`);
 
     if (pieces.length === 0) {
@@ -369,7 +396,7 @@ function HomePage() {
     }
 
     return pieces.join(' /// ');
-  }, [feedItems]);
+  }, [feedItems, isBooting, bootDots]);
 
   const spotifyNow = useMemo(
     () => feedItems.find((item) => String(item.source || '').toLowerCase() === 'spotify') || null,
@@ -426,7 +453,9 @@ function HomePage() {
           <i>cybernetic artist homepage</i>
         </p>
         <p>
-          <small>best viewed with no style sheet at 800x600</small>
+          <small>
+            oblique strategy: "<q>{obliqueLine}</q>" — {OBLIQUE_ATTRIBUTION}
+          </small>
         </p>
       </center>
 
@@ -446,7 +475,7 @@ function HomePage() {
                   <a href="/about">about</a>
                 </li>
                 <li>
-                  <a href="#seb-feed">seb feed</a>
+                  <a href="/feed">seb feed</a>
                 </li>
                 <li>
                   <a href="#guestbook">guestbook</a>
@@ -486,21 +515,28 @@ function HomePage() {
                 this landing is intentionally raw HTML-era output. no stylesheet. browser defaults only.
               </p>
 
-              <a id="seb-feed" />
               <h2>what is seb doing // live feed</h2>
               <ul>
-                {feedItems.slice(0, 12).map((item, index) => (
-                  <li key={`${item.source}-${item.at}-${index}`}>
-                    {item.url ? (
-                      <a href={item.url} target="_blank" rel="noreferrer">
-                        [{stamp(item.at)}] {item.source}
-                      </a>
-                    ) : (
-                      <span>[{stamp(item.at)}] {item.source}</span>
-                    )}{' '}
-                    - {item.text}
-                  </li>
-                ))}
+                {isBooting ? (
+                  <>
+                    <li>[--:--:--] boot - syncing feed{bootDots}</li>
+                    <li>[--:--:--] boot - checking spotify / instagram / bandcamp{bootDots}</li>
+                    <li>[--:--:--] boot - sorting chronologically{bootDots}</li>
+                  </>
+                ) : (
+                  feedItems.slice(0, 12).map((item, index) => (
+                    <li key={`${item.source}-${item.at}-${index}`}>
+                      {item.url ? (
+                        <a href={item.url} target="_blank" rel="noreferrer">
+                          [{stamp(item.at)}] {item.source}
+                        </a>
+                      ) : (
+                        <span>[{stamp(item.at)}] {item.source}</span>
+                      )}{' '}
+                      - {item.text}
+                    </li>
+                  ))
+                )}
               </ul>
               {spotifyNow && spotifyTrackId ? (
                 <>
@@ -600,9 +636,82 @@ function HomePage() {
               ]
             </span>
           ))}{' '}
-          [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
+          [ <a href="/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ under construction ]
         </small>
       </center>
+    </>
+  );
+}
+
+function FeedPage() {
+  const { feedItems, feedMeta, feedSources, isBooting } = useSebFeed();
+  const [bootDotCount, setBootDotCount] = useState(1);
+
+  useEffect(() => {
+    if (!isBooting) return;
+
+    const intervalId = window.setInterval(() => {
+      setBootDotCount((count) => (count % 3) + 1);
+    }, 450);
+
+    return () => window.clearInterval(intervalId);
+  }, [isBooting]);
+
+  const bootDots = '.'.repeat(bootDotCount);
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>what is seb doing // live feed</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <p>
+        <b>live timeline</b> (newest first)
+      </p>
+
+      <ul>
+        {isBooting ? (
+          <>
+            <li>[--:--:--] boot - syncing feed{bootDots}</li>
+            <li>[--:--:--] boot - checking spotify / instagram / bandcamp{bootDots}</li>
+            <li>[--:--:--] boot - sorting chronologically{bootDots}</li>
+          </>
+        ) : (
+          feedItems.map((item, index) => (
+            <li key={`${item.source}-${item.at}-${index}`}>
+              {item.url ? (
+                <a href={item.url} target="_blank" rel="noreferrer">
+                  [{stamp(item.at)}] {item.source}
+                </a>
+              ) : (
+                <span>[{stamp(item.at)}] {item.source}</span>
+              )}{' '}
+              - {item.text}
+            </li>
+          ))
+        )}
+      </ul>
+
+      <p>
+        <small>
+          feed sync: {feedMeta}
+          <br />
+          sources:{' '}
+          {Object.keys(feedSources).length > 0
+            ? Object.entries(feedSources)
+                .map(([name, status]) => `${name}:${status?.status || 'unknown'}`)
+                .join(' | ')
+            : 'worker feed (pending)'}
+        </small>
+      </p>
     </>
   );
 }
@@ -619,14 +728,33 @@ function LegacyWorksRedirect() {
   );
 }
 
+function LegacyFeedHashRedirect() {
+  useEffect(() => {
+    window.location.replace('/feed');
+  }, []);
+
+  return (
+    <p>
+      redirecting to <a href="/feed">/feed</a>...
+    </p>
+  );
+}
+
 export default function App() {
   const pathname = window.location.pathname;
+  const hash = window.location.hash;
   const isWorksPage = window.location.pathname.startsWith('/works');
   const isAboutPage = window.location.pathname.startsWith('/about');
+  const isFeedPage = window.location.pathname.startsWith('/feed');
   const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
+  const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
   if (isLegacyWorksPage) {
     return <LegacyWorksRedirect />;
+  }
+
+  if (isLegacyFeedHash) {
+    return <LegacyFeedHashRedirect />;
   }
 
   if (isAboutPage) {
@@ -635,6 +763,10 @@ export default function App() {
 
   if (isWorksPage) {
     return <WorksPage />;
+  }
+
+  if (isFeedPage) {
+    return <FeedPage />;
   }
 
   return <HomePage />;
