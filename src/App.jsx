@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
+const OPERATOR_IMAGE = '/seb-portrait.jpg';
 const FEED_API_BASE = import.meta.env.VITE_FEED_API_BASE || 'https://seb-feed.cbassuarez.workers.dev';
 
 const SOCIAL_LINKS = [
@@ -250,6 +251,9 @@ function AboutPage() {
 
       <h2>Seb Suarez</h2>
       <p>
+        <img src={OPERATOR_IMAGE} alt="Seb Suarez portrait" width="360" />
+      </p>
+      <p>
         Composer-performer and visual artist based in Los Angeles, working across albums, installation,
         and research.
       </p>
@@ -453,6 +457,9 @@ function HomePage() {
               </ul>
 
               <h3>operator</h3>
+              <p>
+                <img src={OPERATOR_IMAGE} alt="Seb Suarez" width="180" />
+              </p>
               <p>{OPERATOR_NAME}</p>
               <p>hits: {hits}</p>
 
