@@ -1,0 +1,110 @@
+<meta name="prae-data-source" content="user">
+<!-- ===== GROUP WRAPPER: Title • Console • Breadcrumbs (one-page fit) ===== -->
+
+  <!-- Title (stacked, minimal, mono) -->
+<section id="works-group" class="wc-group" data-prae-banner>
+  <header id="works-title" class="wc-titlebar" aria-label="Page Title">
+    <div class="wt-wrap">
+<!-- Theme toggle -->
+    <button id="wc-theme-toggle" class="wc-theme" type="button" role="switch" aria-checked="false" aria-label="Toggle theme" title="Toggle theme">
+      <!-- Sun (for switching to Light) -->
+      <span class="wc-ico wc-ico-sun" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd" />
+        </svg>
+      </span>
+      <!-- Moon (for switching to Dark) -->
+      <span class="wc-ico wc-ico-moon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+        </svg>
+      </span>
+    </button>
+      <h1 class="wt-title">
+  <span data-site-title>Your Name</span>, <span data-list-label>Works List</span>
+</h1>
+      
+      <p class="wt-subtitle">
+  <span data-site-subtitle>Selected works with cues &amp; notes (DEMO)</span>
+  <span class="wt-updated" data-updated aria-label="Last updated">Updated&nbsp;[DATE]</span>
+</p>
+
+    </div>
+  </header>
+
+
+<!-- Works List — Single-Page CLI Console (AeroShell: translucent black + amber) -->
+<section id="works-console" aria-label="Works List Console">
+<div class="wc-split"> 
+  <div class="wc-frame">
+    <div class="wc-output" aria-live="polite"></div>
+    <!-- HUD: sticky status + progress -->
+    <div class="wc-hud" aria-live="polite" aria-atomic="true"></div>
+    <form class="wc-input" autocomplete="off" spellcheck="false">
+      <label class="wc-prompt" aria-hidden="true">$</label>
+      <input id="wc-cmd" type="text" inputmode="latin" autocapitalize="off" autocomplete="off" aria-label="Console command" />
+    </form>
+  </div>
+<!-- Right PDF pane (split view; not a modal) -->
+    <aside class="wc-pdfpane" aria-label="Score PDF" aria-hidden="true">
+      <header class="wc-pdfbar">
+        <button type="button" class="wc-pdf-close" aria-label="Close PDF">✕</button>
+        <div class="wc-pdf-title" aria-live="polite"></div>
+      </header>
+      <iframe class="wc-pdf-frame" title="Score PDF" loading="lazy"
+         allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+    </aside>
+  </div>
+
+</section>
+
+
+
+ 
+
+
+
+  <!-- ↑↑↑ KEEP YOUR EXISTING CONSOLE BLOCK VERBATIM HERE ↑↑↑ -->
+  <!-- Breadcrumbs (inline, transparent, bottom) -->
+  <nav id="works-breadcrumbs" class="wc-crumbs" aria-label="Breadcrumb">
+  <div class="wb-wrap" role="group" aria-label="Navigation and meta">
+    <!-- SVG orbit: hover-only spin; subtle; inline, no canvas -->
+   <div class="wb-brand">
+      <svg class="wb-orbit" viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false">
+        <g class="iris-rot" stroke="#0f0f0f" stroke-width="1.4" fill="none"
+           stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">
+          <circle class="iris-ring" cx="32" cy="32" r="20"/>
+          <circle class="iris-pupil" cx="32" cy="32" r="5"/>
+          <g class="iris-blades" shape-rendering="geometricPrecision">
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32"/>
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32" transform="rotate(60 32 32)"/>
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32" transform="rotate(120 32 32)"/>
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32" transform="rotate(180 32 32)"/>
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32" transform="rotate(240 32 32)"/>
+            <path class="blade" d="M32 18 C38 23, 42 27, 44 32" transform="rotate(300 32 32)"/>
+          </g>
+        </g>
+      </svg>
+      <a class="wb-badge" href="https://www.npmjs.com/package/praetorius" target="_blank" rel="noopener">
+  <img
+    src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.npmjs.org%2Fpraetorius%2Flatest&query=$.version&prefix=v&label=Praetorius%20%E2%80%93%20Interactive%20Portfolio&logo=npm&labelColor=000&color=fff&style=flat&cacheSeconds=3600"
+    alt="Praetorius – Interactive Portfolio version (live from npm)">
+</a>
+    </div>
+
+    
+
+    <!-- Minimal microcopy -->
+    <div class="wb-actions" data-links></div>
+<small class="wb-micro">© <span data-copyright-name>Your Name</span> <span data-copyright-year>2025</span></small>
+  </div>
+</nav>
+
+</section>
+
+
+<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./app.css">
+<script id="prae-data" data-source="user" data-count="3">window.__PRAE_DATA__ = {"works":[{"id":1,"slug":"soundnoisemusic","title":"WORK 1 — String Quartet No. 2 “SOUNDNOISEMUSIC”","oneliner":"A through-composed/indeterminate quartet that alternates fixed score, structured mischief, and noise permissions.","description":"A large-scale quartet that toggles between rigor and chaos. Structured movements, improvisatory noise passages, and deliberate performer subversions are interleaved to question how fixed notation and indeterminate practice can coexist in chamber music.","audio":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/SSS_soundnoisemusic_audio.mp3","pdf":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/STRING%20QUARTET%20NO.%202%20_soundnoisemusic_%20-%20Score-min.pdf","cues":[{"label":"@10:30","at":630}],"audioUrl":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/SSS_soundnoisemusic_audio.mp3","pdfUrl":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/STRING%20QUARTET%20NO.%202%20_soundnoisemusic_%20-%20Score-min.pdf","audioId":"wc-a1","one":"A through-composed/indeterminate quartet that alternates fixed score, structured mischief, and noise permissions.","onelinerEffective":"A through-composed/indeterminate quartet that alternates fixed score, structured mischief, and noise permissions.","descriptionEffective":"A large-scale quartet that toggles between rigor and chaos. Structured movements, improvisatory noise passages, and deliberate performer subversions are interleaved to question how fixed notation and indeterminate practice can coexist in chamber music."},{"id":2,"slug":"lux-nova","title":"WORK 2 — Organum Quadruplum “Lux Nova”","oneliner":"A stained-glass acoustics study: bowed dalle-de-verre slab transduced into a ring of pianos—polyphony by distance rather than shared air.","description":"Organum Quadruplum reframed for glass and transducers. Light-conditioned harmonics from a dalle-de-verre slab are bowed, captured, and redistributed across a circle of pianos so the counterpoint arises from distance rather than shared resonance.","audio":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/luxnova.mp3","pdf":null,"cues":[{"label":"@7:45","at":465},{"label":"@9:15","at":555}],"audioUrl":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/luxnova.mp3","audioId":"wc-a2","one":"A stained-glass acoustics study: bowed dalle-de-verre slab transduced into a ring of pianos—polyphony by distance rather than shared air.","onelinerEffective":"A stained-glass acoustics study: bowed dalle-de-verre slab transduced into a ring of pianos—polyphony by distance rather than shared air.","descriptionEffective":"Organum Quadruplum reframed for glass and transducers. Light-conditioned harmonics from a dalle-de-verre slab are bowed, captured, and redistributed across a circle of pianos so the counterpoint arises from distance rather than shared resonance."},{"id":3,"slug":"amplifications-marimbaideefixe","title":"WORK 3 — AMPLIFICATIONS I · MARIMBAideefixe","oneliner":"Two prepared pianos as resonators for a 5.0-octave marimba: sympathetic “ghost ensemble” via transduction.","description":"Marimbaideefixe extends the marimba through dual prepared pianos acting as resonant bodies. Transduced sustain, bell resonances, and baroque-inflected improvisations blur solo and ensemble roles into a ghostly amplification ritual.","audio":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/amplifications.mp3","pdf":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/AMPLIFICATIONS%201.%20MARIMBAideefixe.pdf","cues":[{"label":"@5:49","at":349}],"audioUrl":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/amplifications.mp3","pdfUrl":"https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/AMPLIFICATIONS%201.%20MARIMBAideefixe.pdf","audioId":"wc-a3","one":"Two prepared pianos as resonators for a 5.0-octave marimba: sympathetic “ghost ensemble” via transduction.","onelinerEffective":"Two prepared pianos as resonators for a 5.0-octave marimba: sympathetic “ghost ensemble” via transduction.","descriptionEffective":"Marimbaideefixe extends the marimba through dual prepared pianos acting as resonant bodies. Transduced sustain, bell resonances, and baroque-inflected improvisations blur solo and ensemble roles into a ghostly amplification ritual."}],"pageFollowMaps":{},"config":{"theme":"dark","site":{"firstName":"","lastName":"","fullName":"","copyrightName":"","listLabel":"Works List","subtitle":"","updated":{"mode":"auto","value":""},"links":[{"label":"Home","href":"#","external":false},{"label":"Projects","href":"#","external":false},{"label":"Contact","href":"#","external":false}]}},"source":"user","seeded":false,"count":3,"schemaVersion":"0.2.8","warnings":[]};</script>
+<script src="./script.js" defer></script>
+<script type="module" src="./app.js" defer></script>

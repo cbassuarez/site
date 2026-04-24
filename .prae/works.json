@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "works": [
+    {
+      "id": 1,
+      "slug": "soundnoisemusic",
+      "title": "WORK 1 — String Quartet No. 2 “SOUNDNOISEMUSIC”",
+      "oneliner": "A through-composed/indeterminate quartet that alternates fixed score, structured mischief, and noise permissions.",
+      "description": "A large-scale quartet that toggles between rigor and chaos. Structured movements, improvisatory noise passages, and deliberate performer subversions are interleaved to question how fixed notation and indeterminate practice can coexist in chamber music.",
+      "audio": "https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/SSS_soundnoisemusic_audio.mp3",
+      "pdf": "https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/STRING%20QUARTET%20NO.%202%20_soundnoisemusic_%20-%20Score-min.pdf",
+      "cues": [
+        {
+          "label": "@10:30",
+          "t": 630
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "slug": "lux-nova",
+      "title": "WORK 2 — Organum Quadruplum “Lux Nova”",
+      "oneliner": "A stained-glass acoustics study: bowed dalle-de-verre slab transduced into a ring of pianos—polyphony by distance rather than shared air.",
+      "description": "Organum Quadruplum reframed for glass and transducers. Light-conditioned harmonics from a dalle-de-verre slab are bowed, captured, and redistributed across a circle of pianos so the counterpoint arises from distance rather than shared resonance.",
+      "audio": "https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/luxnova.mp3",
+      "pdf": null,
+      "cues": [
+        {
+          "label": "@7:45",
+          "t": 465
+        },
+        {
+          "label": "@9:15",
+          "t": 555
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "slug": "amplifications-marimbaideefixe",
+      "title": "WORK 3 — AMPLIFICATIONS I · MARIMBAideefixe",
+      "oneliner": "Two prepared pianos as resonators for a 5.0-octave marimba: sympathetic “ghost ensemble” via transduction.",
+      "description": "Marimbaideefixe extends the marimba through dual prepared pianos acting as resonant bodies. Transduced sustain, bell resonances, and baroque-inflected improvisations blur solo and ensemble roles into a ghostly amplification ritual.",
+      "audio": "https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/audio/amplifications.mp3",
+      "pdf": "https://cdn.jsdelivr.net/gh/cbassuarez/website-blog/AMPLIFICATIONS%201.%20MARIMBAideefixe.pdf",
+      "cues": [
+        {
+          "label": "@5:49",
+          "t": 349
+        }
+      ]
+    }
+  ]
+}
