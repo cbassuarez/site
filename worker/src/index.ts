@@ -42,6 +42,10 @@ type SpotifyPlaybackState = {
   observedAt: string;
 };
 
+type RateLimitBinding = {
+  limit: (options: { key: string }) => Promise<{ success: boolean }>;
+};
+
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   HITS_KV?: KVNamespace;
@@ -61,7 +65,20 @@ type Env = {
   CF_ZONE_ID?: string;
   CF_API_TOKEN?: string;
   CF_ANALYTICS_SINCE?: string;
+  RATE_LIMIT_FEED?: RateLimitBinding;
+  RATE_LIMIT_HIT?: RateLimitBinding;
+  RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
 };
+
+type FeedSnapshot = {
+  items: FeedItem[];
+  sources: Record<string, SourceStatus>;
+  generatedAt: string;
+};
+
+const FEED_SNAPSHOT_KEY = "feed:snapshot-v1";
+const FEED_MAX_ITEMS = 500;
+const FEED_EDGE_CACHE_SECONDS = 60;
 
 const jsonHeaders = (origin: string) => ({
   "access-control-allow-origin": origin,
@@ -96,6 +113,11 @@ const parseFeedTimeMs = (value: unknown) => {
   return Number.isFinite(ms) ? ms : 0;
 };
 
+const normalizeIsoAt = (value: unknown): string | null => {
+  const ms = parseFeedTimeMs(value);
+  return ms > 0 ? new Date(ms).toISOString() : null;
+};
+
 function parseSpotifyEvent(text: string): { action: string; label: string } {
   const cleaned = clean(text);
   const match = cleaned.match(/^(now playing|played|last played|resumed|paused):\s*(.+)$/i);
@@ -105,12 +127,28 @@ function parseSpotifyEvent(text: string): { action: string; label: string } {
   return { action: clean(match[1]).toLowerCase(), label: clean(match[2]).toLowerCase() };
 }
 
+function spotifyLabelRaw(text: string): string {
+  const cleaned = clean(text);
+  const match = cleaned.match(/^(?:now playing|played|last played|resumed|paused):\s*(.+)$/i);
+  return clean(match?.[1] || cleaned);
+}
+
+function withSpotifyAction(item: FeedItem, action: "now playing" | "paused" | "played"): FeedItem {
+  const label = spotifyLabelRaw(item.text);
+  return {
+    ...item,
+    text: `${action}: ${label}`,
+    isPlaying: action === "now playing",
+  };
+}
+
 function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
   const newestFirst = [...items].sort((a, b) => parseFeedTimeMs(b.at) - parseFeedTimeMs(a.at));
   const kept: FeedItem[] = [];
 
   const seenSessionKeys = new Set<string>();
   const seenBurstKeys = new Set<string>();
+  let seenNewestSpotifyState = false;
 
   for (const item of newestFirst) {
     if (sourceBase(item.source) !== "spotify") {
@@ -142,7 +180,20 @@ function sanitizeSpotifyTimeline(items: FeedItem[]): FeedItem[] {
       const sessionKey = `play:${trackKey}:${clean(item.at)}`;
       if (seenSessionKeys.has(sessionKey)) continue;
       seenSessionKeys.add(sessionKey);
-      kept.push(item);
+
+      if (action === "paused") {
+        seenNewestSpotifyState = true;
+        kept.push(withSpotifyAction(item, "paused"));
+        continue;
+      }
+
+      if (!seenNewestSpotifyState && item.isPlaying !== false) {
+        kept.push(withSpotifyAction(item, "now playing"));
+        seenNewestSpotifyState = true;
+      } else {
+        seenNewestSpotifyState = true;
+        kept.push(withSpotifyAction(item, "played"));
+      }
       continue;
     }
 
@@ -586,7 +637,6 @@ async function incrementHitCount(env: Env): Promise<number> {
   }
 
   const deltaKey = "hits:delta-v2";
-  const legacyKey = "hits:landing-v1";
 
   const resolveCloudflareBaseline = async () => {
     const zoneId = clean(env.CF_ZONE_ID);
@@ -672,7 +722,6 @@ async function incrementHitCount(env: Env): Promise<number> {
       baseline = 0;
     }
   }
-  await kv.delete(legacyKey);
 
   const deltaRaw = await kv.get(deltaKey);
   const delta = toNonNegativeInt(deltaRaw) ?? 0;
@@ -717,41 +766,224 @@ async function writeGuestbookEntries(env: Env, entries: GuestbookEntry[]): Promi
   await kv.put("guestbook:entries-v1", JSON.stringify(entries));
 }
 
-async function readFeedTimeline(env: Env): Promise<FeedItem[]> {
-  const kv = env.HITS_KV;
-  if (!kv) return [];
+async function hashGuestbookSigner(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(`gb-signer-v1:${ip}`);
+  const buffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
-  const raw = await kv.get("feed:timeline-v1");
-  if (!raw) return [];
+async function hasGuestbookSignature(env: Env, ip: string): Promise<boolean> {
+  const kv = env.HITS_KV;
+  if (!kv) return false;
+  const hash = await hashGuestbookSigner(ip);
+  return (await kv.get(`guestbook:signer:${hash}`)) !== null;
+}
+
+async function recordGuestbookSignature(env: Env, ip: string): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  const hash = await hashGuestbookSigner(ip);
+  await kv.put(`guestbook:signer:${hash}`, new Date().toISOString());
+}
+
+async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
+  const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
+    ["github", () => fetchGitHub(env, FEED_MAX_ITEMS)],
+    ["bandcamp", () => fetchBandcamp(env, FEED_MAX_ITEMS)],
+    ["instagram", () => fetchInstagram(env, FEED_MAX_ITEMS)],
+    ["spotify", () => fetchSpotify(env)],
+    ["x", () => fetchX(env, FEED_MAX_ITEMS)],
+    ["youtube", () => fetchYouTube(env, FEED_MAX_ITEMS)],
+  ];
+
+  const results = await Promise.allSettled(tasks.map((task) => task[1]()));
+  const items: FeedItem[] = [];
+  const sources: Record<string, SourceStatus> = {};
+  const configured = (name: string) => {
+    switch (name) {
+      case "github":
+        return !!clean(env.GITHUB_USERNAME || "cbassuarez");
+      case "bandcamp":
+        return !!clean(env.BANDCAMP_DOMAIN || "cbassuarez.bandcamp.com");
+      case "instagram":
+        return !!clean(env.IG_USER_ID) && !!clean(env.IG_ACCESS_TOKEN);
+      case "spotify":
+        return (
+          !!clean(env.SPOTIFY_CLIENT_ID) &&
+          !!clean(env.SPOTIFY_CLIENT_SECRET) &&
+          !!clean(env.SPOTIFY_REFRESH_TOKEN)
+        );
+      case "x":
+        return !!clean(env.X_USERNAME) && !!clean(env.X_BEARER_TOKEN);
+      case "youtube":
+        return !!clean(env.YT_CHANNEL_ID) && !!clean(env.YT_API_KEY);
+      default:
+        return false;
+    }
+  };
+
+  results.forEach((result, index) => {
+    const name = tasks[index][0];
+    if (result.status === "fulfilled") {
+      const value = result.value || [];
+      items.push(...value);
+      sources[name] = {
+        status: value.length > 0 || configured(name) ? "ok" : "missing_config",
+        count: value.length,
+        message: value.length > 0 ? undefined : configured(name) ? "No recent activity." : "No data returned.",
+      };
+      return;
+    }
+
+    const message = clean(result.reason?.message || result.reason || "unknown error");
+    sources[name] = {
+      status: message.toLowerCase().includes("missing") ? "missing_config" : "error",
+      count: 0,
+      message,
+    };
+  });
+
+  const previous = await readFeedSnapshot(env);
+  const historical = previous?.items || [];
+  const merged = [...items, ...historical]
+    .map((item) => {
+      const at = normalizeIsoAt(item?.at);
+      return at ? { ...item, at } : null;
+    })
+    .filter((item): item is FeedItem => !!item && item.text.length > 0)
+    .sort((a, b) => parseFeedTimeMs(b.at) - parseFeedTimeMs(a.at))
+    .filter((item, index, array) => {
+      const key = timelineIdentity(item);
+      return array.findIndex((candidate) => timelineIdentity(candidate) === key) === index;
+    });
+
+  const persisted = sanitizeSpotifyTimeline(merged).slice(0, FEED_MAX_ITEMS);
+  return {
+    items: persisted,
+    sources,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function persistFeedSnapshot(env: Env, snapshot: FeedSnapshot): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  await kv.put(FEED_SNAPSHOT_KEY, JSON.stringify(snapshot));
+}
+
+async function readFeedSnapshot(env: Env): Promise<FeedSnapshot | null> {
+  const kv = env.HITS_KV;
+  if (!kv) return null;
+
+  const raw = await kv.get(FEED_SNAPSHOT_KEY);
+  if (!raw) return null;
 
   try {
     const parsed: any = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item: any) => ({
-        source: clean(item?.source || "feed"),
-        text: clean(item?.text || ""),
-        at: clean(item?.at || ""),
-        url: clean(item?.url || ""),
-        media: clean(item?.media || ""),
-        progressMs: Number.isFinite(item?.progressMs) ? item.progressMs : 0,
-        durationMs: Number.isFinite(item?.durationMs) ? item.durationMs : 0,
-        isPlaying: Boolean(item?.isPlaying),
-      }))
-      .filter((item: FeedItem) => item.text.length > 0 && item.at.length > 0);
+    if (parsed && Array.isArray(parsed.items)) {
+      return {
+        items: parsed.items as FeedItem[],
+        sources: (parsed.sources || {}) as Record<string, SourceStatus>,
+        generatedAt: clean(parsed.generatedAt) || new Date().toISOString(),
+      };
+    }
   } catch {
-    return [];
+    // ignore parse failure, treat as missing
+  }
+  return null;
+}
+
+async function checkRateLimit(binding: RateLimitBinding | undefined, key: string): Promise<boolean> {
+  if (!binding) return true;
+  try {
+    const result = await binding.limit({ key });
+    return result.success;
+  } catch {
+    return true;
   }
 }
 
-async function writeFeedTimeline(env: Env, items: FeedItem[]): Promise<void> {
-  const kv = env.HITS_KV;
-  if (!kv) return;
-  await kv.put("feed:timeline-v1", JSON.stringify(items));
+function tooManyRequests(allowOrigin: string): Response {
+  return new Response(
+    JSON.stringify({ error: "rate_limited", at: new Date().toISOString() }),
+    { status: 429, headers: { ...jsonHeaders(allowOrigin), "retry-after": "60" } }
+  );
+}
+
+function clientKey(request: Request): string {
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
+async function handleFeedRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  allowOrigin: string
+): Promise<Response> {
+  const url = new URL(request.url);
+  const limit = Math.max(1, Math.min(FEED_MAX_ITEMS, Number(url.searchParams.get("limit")) || 24));
+
+  const cacheUrl = new URL(request.url);
+  cacheUrl.search = `?limit=${limit}`;
+  const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
+  const cache = caches.default;
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const response = new Response(cached.body, cached);
+    response.headers.set("access-control-allow-origin", allowOrigin);
+    response.headers.set("cache-control", "no-store");
+    return response;
+  }
+
+  let snapshot = await readFeedSnapshot(env);
+  if (!snapshot) {
+    snapshot = { items: [], sources: {}, generatedAt: new Date().toISOString() };
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const built = await buildFeedSnapshot(env);
+          await persistFeedSnapshot(env, built);
+        } catch {
+          // surfaces in observability logs
+        }
+      })()
+    );
+  }
+
+  const body = JSON.stringify(
+    {
+      items: snapshot.items.slice(0, limit),
+      sources: snapshot.sources,
+      currentActivity: selectCurrentActivity(snapshot.items),
+      generatedAt: snapshot.generatedAt,
+    },
+    null,
+    2
+  );
+
+  if (snapshot.items.length > 0) {
+    const cacheable = new Response(body, {
+      status: 200,
+      headers: {
+        ...jsonHeaders(allowOrigin),
+        "cache-control": `public, s-maxage=${FEED_EDGE_CACHE_SECONDS}`,
+      },
+    });
+    ctx.waitUntil(cache.put(cacheKey, cacheable.clone()));
+  }
+
+  return new Response(body, { status: 200, headers: jsonHeaders(allowOrigin) });
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const allowOrigin = env.FEED_ALLOW_ORIGIN || "*";
 
@@ -760,93 +992,16 @@ export default {
     }
 
     if (url.pathname === "/api/feed") {
-      const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get("limit")) || 24));
-      const sourceWindow = Math.min(limit, 120);
-
-      const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
-        ["github", () => fetchGitHub(env, sourceWindow)],
-        ["bandcamp", () => fetchBandcamp(env, sourceWindow)],
-        ["instagram", () => fetchInstagram(env, sourceWindow)],
-        ["spotify", () => fetchSpotify(env)],
-        ["x", () => fetchX(env, sourceWindow)],
-        ["youtube", () => fetchYouTube(env, sourceWindow)],
-      ];
-
-      const results = await Promise.allSettled(tasks.map((task) => task[1]()));
-      const items: FeedItem[] = [];
-      const sources: Record<string, SourceStatus> = {};
-      const configured = (name: string) => {
-        switch (name) {
-          case "github":
-            return !!clean(env.GITHUB_USERNAME || "cbassuarez");
-          case "bandcamp":
-            return !!clean(env.BANDCAMP_DOMAIN || "cbassuarez.bandcamp.com");
-          case "instagram":
-            return !!clean(env.IG_USER_ID) && !!clean(env.IG_ACCESS_TOKEN);
-          case "spotify":
-            return (
-              !!clean(env.SPOTIFY_CLIENT_ID) &&
-              !!clean(env.SPOTIFY_CLIENT_SECRET) &&
-              !!clean(env.SPOTIFY_REFRESH_TOKEN)
-            );
-          case "x":
-            return !!clean(env.X_USERNAME) && !!clean(env.X_BEARER_TOKEN);
-          case "youtube":
-            return !!clean(env.YT_CHANNEL_ID) && !!clean(env.YT_API_KEY);
-          default:
-            return false;
-        }
-      };
-
-      results.forEach((result, index) => {
-        const name = tasks[index][0];
-        if (result.status === "fulfilled") {
-          const value = result.value || [];
-          items.push(...value);
-          sources[name] = {
-            status: value.length > 0 || configured(name) ? "ok" : "missing_config",
-            count: value.length,
-            message: value.length > 0 ? undefined : configured(name) ? "No recent activity." : "No data returned.",
-          };
-          return;
-        }
-
-        const message = clean(result.reason?.message || result.reason || "unknown error");
-        sources[name] = {
-          status: message.toLowerCase().includes("missing") ? "missing_config" : "error",
-          count: 0,
-          message,
-        };
-      });
-
-      const historical = await readFeedTimeline(env);
-      const merged = [...items, ...historical]
-        .filter((item) => item && item.text)
-        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-        .filter((item, index, array) => {
-          const key = timelineIdentity(item);
-          return array.findIndex((candidate) => timelineIdentity(candidate) === key) === index;
-        });
-
-      const persisted = sanitizeSpotifyTimeline(merged).slice(0, 5000);
-      await writeFeedTimeline(env, persisted);
-
-      return new Response(
-        JSON.stringify(
-          {
-            items: persisted.slice(0, limit),
-            sources,
-            currentActivity: selectCurrentActivity(persisted),
-            generatedAt: new Date().toISOString(),
-          },
-          null,
-          2
-        ),
-        { status: 200, headers: jsonHeaders(allowOrigin) }
-      );
+      if (!(await checkRateLimit(env.RATE_LIMIT_FEED, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+      return handleFeedRequest(request, env, ctx, allowOrigin);
     }
 
     if (url.pathname === "/api/hit") {
+      if (!(await checkRateLimit(env.RATE_LIMIT_HIT, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
       try {
         const value = await incrementHitCount(env);
         return new Response(JSON.stringify({ value, at: new Date().toISOString() }), {
@@ -888,7 +1043,18 @@ export default {
       }
 
       if (request.method === "POST") {
+        if (!(await checkRateLimit(env.RATE_LIMIT_GUESTBOOK_POST, clientKey(request)))) {
+          return tooManyRequests(allowOrigin);
+        }
         try {
+          const signerIp = clientKey(request);
+          if (await hasGuestbookSignature(env, signerIp)) {
+            return new Response(
+              JSON.stringify({ error: "already_signed", at: new Date().toISOString() }),
+              { status: 409, headers: jsonHeaders(allowOrigin) }
+            );
+          }
+
           const body: any = await request.json();
           const name = clean(body?.name || "anonymous").slice(0, 48) || "anonymous";
           const message = clean(body?.message || "").slice(0, 280);
@@ -903,6 +1069,7 @@ export default {
           const entries = await readGuestbookEntries(env);
           const next: GuestbookEntry[] = [{ name, message, at: new Date().toISOString() }, ...entries];
           await writeGuestbookEntries(env, next);
+          await recordGuestbookSignature(env, signerIp);
 
           return new Response(JSON.stringify({ ok: true, entries: next, at: new Date().toISOString() }), {
             status: 200,
@@ -936,5 +1103,14 @@ export default {
       status: 404,
       headers: jsonHeaders(allowOrigin),
     });
+  },
+
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        const snapshot = await buildFeedSnapshot(env);
+        await persistFeedSnapshot(env, snapshot);
+      })()
+    );
   },
 };

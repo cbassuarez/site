@@ -8,3 +8,30 @@ enabled = true
 [[kv_namespaces]]
 binding = "HITS_KV"
 id = "5034b4f88e04478d84f90350268b5aa3"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[ratelimits]]
+name = "RATE_LIMIT_FEED"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_HIT"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_GUESTBOOK_POST"
+namespace_id = "1003"
+
+  [ratelimits.simple]
+  limit = 3
+  period = 60

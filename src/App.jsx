@@ -289,6 +289,12 @@ async function createGuestbookEntry({ name, message }) {
     body: JSON.stringify({ name, message })
   });
 
+  if (response.status === 409) {
+    const err = new Error('already_signed');
+    err.code = 'already_signed';
+    throw err;
+  }
+
   if (!response.ok) {
     throw new Error(`guestbook write failed (${response.status})`);
   }
@@ -620,7 +626,11 @@ function HomePage() {
       setMessage('');
       setGuestbookStatus('ready');
     } catch (error) {
-      setGuestbookStatus('offline');
+      if (error?.code === 'already_signed') {
+        setGuestbookStatus('duplicate');
+      } else {
+        setGuestbookStatus('offline');
+      }
     }
   };
 
@@ -747,6 +757,9 @@ function HomePage() {
             <p>
               <button type="submit">sign guestbook</button>
             </p>
+            {guestbookStatus === 'duplicate' ? (
+              <p><small>you&apos;ve already signed the guestbook.</small></p>
+            ) : null}
           </form>
 
           <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
@@ -862,7 +875,7 @@ function HomePage() {
                   )}
                   {spotifyNow && spotifyTrackId ? (
                     <>
-                      <h3>listen with seb</h3>
+                      <h3 style={{ fontFamily: UI_FONT_STACK }}>listen with seb</h3>
                       <p>
                         <small>
                           {spotifyNow.text}
@@ -921,6 +934,9 @@ function HomePage() {
                   <p>
                     <button type="submit">sign guestbook</button>
                   </p>
+                  {guestbookStatus === 'duplicate' ? (
+                    <p><small>you&apos;ve already signed the guestbook.</small></p>
+                  ) : null}
                 </form>
 
                 <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
@@ -973,7 +989,7 @@ function HomePage() {
 
 function FeedPage() {
   const isMobile = useIsMobile();
-  const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed({ apiLimit: 5000, maxItems: null });
+  const { feedItems, feedMeta, feedSources, isBooting, currentActivity } = useSebFeed({ apiLimit: 200, maxItems: null });
   const [bootDotCount, setBootDotCount] = useState(1);
 
   useEffect(() => {
@@ -1106,7 +1122,11 @@ function GuestbookPage() {
       setMessage('');
       setGuestbookStatus('ready');
     } catch (error) {
-      setGuestbookStatus('offline');
+      if (error?.code === 'already_signed') {
+        setGuestbookStatus('duplicate');
+      } else {
+        setGuestbookStatus('offline');
+      }
     }
   };
 
@@ -1136,6 +1156,9 @@ function GuestbookPage() {
         <p>
           <button type="submit">sign guestbook</button>
         </p>
+        {guestbookStatus === 'duplicate' ? (
+          <p><small>you&apos;ve already signed the guestbook.</small></p>
+        ) : null}
       </form>
 
       <table border="1" cellPadding="6" width="100%" style={{ fontFamily: MONO_FONT_STACK }}>
