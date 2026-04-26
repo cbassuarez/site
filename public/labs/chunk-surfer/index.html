@@ -8,8 +8,9 @@
     /* minimal — ADR-inspired dark shell. no kitsch. */
     *{box-sizing:border-box;margin:0;padding:0;}
     html,body{height:100%;background:#0d0d0d;color:#bbb;overflow:hidden;}
-    #wrap{display:flex;flex-direction:column;height:100vh;padding:10px 14px;}
-    #map{flex:1;overflow:hidden;font-family:'Courier New',Courier,monospace;font-size:13px;line-height:1.38;white-space:pre;letter-spacing:0;}
+    #wrap{display:flex;flex-direction:column;height:100vh;padding:10px 14px;position:relative;}
+    #map{flex:1;overflow:hidden;font-family:'Courier New',Courier,monospace;font-size:13px;line-height:1.38;white-space:pre;letter-spacing:0;background:transparent;transition:background 360ms ease-out;}
+    #map.flash{background:rgba(230,236,245,0.85);transition:background 80ms linear;}
     #catalog{display:none;border-top:1px solid #222;margin-top:6px;padding-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;color:#8d8d8d;min-height:6.2em;}
     #catalogCtl{margin-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;}
     #catalogCtl button{font:inherit;color:#999;background:#111;border:1px solid #333;padding:2px 8px;cursor:pointer;}
@@ -33,6 +34,79 @@
     .t-chunk-on {color:#fff;font-weight:bold;}
     .t-trail    {color:#444;}
     .t-fog      {color:rgba(170,185,200,0.12);}
+    .t-intro-trail {color:rgba(238,244,252,0.96);font-weight:bold;}
+    .t-intro-halo  {color:rgba(185,195,210,0.32);}
+    .t-intro-bloom {color:rgba(214,228,210,0.72);}
+    .t-gate-frame {color:rgba(214,224,240,0.26);font-weight:bold;}
+    .t-gate-mark  {color:#ffffff;font-weight:bold;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 7px rgba(228,242,255,0.36);}
+    .t-gate-spectral {color:rgba(255,255,255,0.88);text-shadow:-1px 0 0 rgba(255,90,168,0.4),1px 0 0 rgba(120,236,255,0.4),0 0 6px rgba(238,244,255,0.35);}
+    #introVignette{
+      position:absolute;
+      top:0;left:0;right:0;bottom:0;
+      pointer-events:none;
+      z-index:1;
+      /* Pure tunnel-vision: transparent center, hard fade to true black
+         past ~140px so the periphery clearly disappears against #0d0d0d. */
+      background:radial-gradient(circle at 50% 50%,
+        transparent 50px,
+        rgba(0,0,0,0.65) 130px,
+        rgba(0,0,0,0.95) 230px,
+        #000 320px);
+      transition:opacity 220ms linear;
+      opacity:0;
+    }
+    #introTitle{
+      position:absolute;
+      top:18%;
+      left:50%;
+      transform:translate(-50%,calc(0px + var(--introLift,0px)));
+      font-family:'Courier New',Courier,monospace;
+      pointer-events:none;
+      user-select:none;
+      z-index:2;
+      text-align:center;
+      transition:opacity 220ms linear, transform 380ms cubic-bezier(.22,.61,.36,1);
+    }
+    #introTitleAuthor{
+      font-size:12px;
+      letter-spacing:0.32em;
+      color:rgba(196,204,218,0.62);
+      text-transform:lowercase;
+    }
+    #introTitleWork{
+      margin-top:1.6em;
+      font-size:30px;
+      font-weight:bold;
+      letter-spacing:0.42em;
+      color:rgba(238,244,252,0.96);
+      text-shadow:0 0 18px rgba(182,192,210,0.18);
+      /* offset so the visual centre accounts for the trailing letter-spacing */
+      padding-left:0.42em;
+    }
+    #introTitleRule{
+      margin:0.9em auto 0;
+      width:170px;
+      height:1px;
+      background:rgba(214,220,232,0.42);
+    }
+    #introTitleDesc{
+      margin-top:0.85em;
+      font-size:13px;
+      letter-spacing:0.06em;
+      color:rgba(214,220,232,0.78);
+    }
+    #introTitleMeta{
+      margin-top:0.4em;
+      font-size:12px;
+      letter-spacing:0.18em;
+      color:rgba(170,180,196,0.55);
+    }
+    #introTitleSub{
+      margin-top:2.4em;
+      font-size:11px;
+      letter-spacing:0.22em;
+      color:rgba(160,170,186,0.52);
+    }
     /* dimmed wilderness (void) palette — keep topology, drop brightness/chroma */
     .t-void-drone   {color:rgba(120,145,130,0.12);}
     .t-void-shimmer {color:rgba(145,155,165,0.12);}
@@ -42,14 +116,28 @@
     /* world identity overlays */
     .t-world-main_b3 {color:rgba(170,188,160,0.9);}
     .t-world-the_tub {color:rgba(145,175,205,0.9);}
+    .t-world-amplifications {color:rgba(202,168,230,0.9);}
     .t-world-border-main_b3 {color:rgba(145,170,135,0.28);}
     .t-world-border-the_tub {color:rgba(130,160,190,0.28);}
+    .t-world-border-amplifications {color:rgba(172,138,206,0.32);}
   </style>
 </head>
 <body>
 <div id="wrap">
+  <div id="introTitle">
+    <div id="introTitleAuthor">cbassuarez</div>
+    <div id="introTitleWork">CHUNK SURFER</div>
+    <div id="introTitleRule"></div>
+    <div id="introTitleDesc">a walkable field of audio</div>
+    <div id="introTitleMeta">main_b3 &middot; 2026</div>
+    <div id="introTitleSub">&uarr; to step into the field</div>
+  </div>
   <div id="map"></div>
-  <div id="catalogCtl"><button id="catalogToggleBtn" type="button">catalog [c]</button></div>
+  <div id="introVignette"></div>
+  <div id="catalogCtl">
+    <button id="catalogToggleBtn" type="button">catalog [c]</button>
+    <button id="onboardingToggleBtn" type="button">onboarding [o] (on)</button>
+  </div>
   <div id="catalog"></div>
   <div id="event"></div>
   <div id="status"></div>
@@ -72,6 +160,42 @@ const TRAIL_LEN    = 100;
 const POLY_MAX     = 16;
 const MOVE_MS      = 90;
 const RMS_TARGET   = 0.12;
+const ONBOARDING_PHASES = {
+  INTRO_PRELUDE: 'intro_prelude',
+  INTRO_FUNNEL: 'intro_funnel',
+  INTRO_DISABLED_SESSION: 'intro_disabled_session',
+  WORLD_LIVE: 'world_live'
+};
+const INTRO_SCENE = {
+  worldId: 'main_b3',
+  forwardDx: 0,
+  forwardDy: -1,
+  introDistanceSteps: 42,
+  speedStartMs: 220,
+  speedEndMs: 68,
+  ambientStart: 0.01,
+  ambientEnd: 0.095,
+  primaryGateDist: 5,
+  finalGateDist: 42,
+  funnelStartDist: 6,
+  funnelLength: 36,
+  funnelWidthStart: 7,
+  funnelWidthEnd: 0,
+  fogReleaseRadius: 6,
+  // Phase boundaries as fractions of introProgress(); referenced by visuals/audio.
+  voidEnd: 0.25,
+  thresholdStart: 0.85
+};
+
+// Chunk-crossing friction. When the dominant chunk under the player changes,
+// the next `voidWidth` steps cost `slowMult`× the normal interval — subtle
+// resistance, "you can feel it but it doesn't fight you." Per-chunk voidWidth
+// derived from terrainRadius so larger / heavier chunks have a deeper void.
+const CHUNK_TRANSITION = {
+  voidWidthMin: 2,
+  voidWidthMax: 8,
+  slowMult: 1.6
+};
 
 // Per-sample visual terrain radius (renders glyphs around the chunk).
 const TERRAIN_R_MIN = 20;
@@ -110,6 +234,10 @@ const TUB_ULTRACHUNK_FILES = [
   'S0025.wav','S0028.wav','S0030.wav','S0032.wav','S0033.wav','S0036.wav',
   'S0038.wav','S0040.wav','S0041.wav','S0044.wav','S0046.wav','S0048.wav'
 ];
+const AMPLIFICATIONS_FILES = Array.from({length: 64}, (_, i) => {
+  const n = String(i + 1).padStart(3, '0');
+  return { label: `amp-${n}`, url: `/audio/amplifications/amp_${n}.mp3` };
+});
 
 const MANIFEST = {
   worlds: [
@@ -143,6 +271,11 @@ const MANIFEST = {
           url: `/audio/the_tub/${name}`
         }))
       ]
+    },
+    {
+      id: 'amplifications',
+      label: 'AMPLIFICATIONS',
+      files: AMPLIFICATIONS_FILES
     }
   ]
 };
@@ -157,6 +290,11 @@ const PIECE_CATALOG = {
     title: 'THE TUB',
     year: '2026',
     description: 'A harness-derived landscape of wet-air, trillion, acharia, xemf, and ultrachunk materials: procedural, bounded, and performative in its constraints.'
+  },
+  amplifications: {
+    title: 'AMPLIFICATIONS',
+    year: '2026',
+    description: 'Movement I (MARIMBAideefixe) exploded into 64 stratified clips: transient cuts, silence seams, and long resonant holds mapped as a walkable amplified field.'
   }
 };
 
@@ -200,6 +338,17 @@ let trail=[];        // [{x,y}] recent steps
 let eventQueue=[];   // messages to show
 let weirdShown=new Set();
 let showCatalog=false;
+let onboardingPhase=ONBOARDING_PHASES.INTRO_PRELUDE;
+let introAnchorX=0;
+let introAnchorY=0;
+let introDistance=0;
+let introTitleEl=null;
+let chunkTrackingSeeded=false; // becomes true after the first post-intro step
+let lastChunkIdx=-1;           // dominant chunk on previous post-intro step (-1 = wilderness)
+let chunkTransitionDebt=0;     // remaining slowed steps after a chunk crossing
+let gateFlashTimer=null;
+let gateFlashUntilMs=0;
+let onboardingHoldLastMs=0;
 
 const WEIRD=[
   [50, '// echo detected in the distance.'],
@@ -292,20 +441,31 @@ function fogGet(x,y){ return fog.get(fogKey(x,y)) || 0; }
 function fogSet(x,y,v){ if(v>0) fog.set(fogKey(x,y), v); }
 function divFloor(n,d){ return Math.floor(n/d); }
 function mod(n,d){ const m=n%d; return m<0?m+d:m; }
-function worldClassFor(worldId){ return worldId==='the_tub' ? 't-world-the_tub' : 't-world-main_b3'; }
-function worldBorderClassFor(worldId){ return worldId==='the_tub' ? 't-world-border-the_tub' : 't-world-border-main_b3'; }
+const WORLD_VISUALS = {
+  main_b3: {
+    tintClass: 't-world-main_b3',
+    borderClass: 't-world-border-main_b3',
+    borderGlyphs: ['=', '-', '/', '|']
+  },
+  the_tub: {
+    tintClass: 't-world-the_tub',
+    borderClass: 't-world-border-the_tub',
+    borderGlyphs: ['~', ':', '/', '\\']
+  },
+  amplifications: {
+    tintClass: 't-world-amplifications',
+    borderClass: 't-world-border-amplifications',
+    borderGlyphs: ['+', '*', ':', '!']
+  }
+};
+function worldVisual(worldId){ return WORLD_VISUALS[worldId] || WORLD_VISUALS.main_b3; }
+function worldClassFor(worldId){ return worldVisual(worldId).tintClass; }
+function worldBorderClassFor(worldId){ return worldVisual(worldId).borderClass; }
 function worldBorderGlyphFor(worldId, x, y){
   const n = hash01(x*0.91, y*0.73);
-  if(worldId==='the_tub'){
-    if(n>0.78) return '~';
-    if(n>0.52) return ':';
-    if(n>0.26) return '/';
-    return '\\';
-  }
-  if(n>0.78) return '=';
-  if(n>0.52) return '-';
-  if(n>0.26) return '/';
-  return '|';
+  const glyphs = worldVisual(worldId).borderGlyphs || ['|'];
+  const idx = n>0.78 ? 0 : n>0.52 ? 1 : n>0.26 ? 2 : 3;
+  return glyphs[Math.min(idx, glyphs.length - 1)] || '|';
 }
 function worldIdForWarpedTile(tx, ty){
   const ids = worldsConfig.map((w) => w.id);
@@ -473,13 +633,26 @@ function ensureAmbientDrone(){
   return ambientDrone;
 }
 function startAmbientDrone(){
+  startAmbientDroneAt(AMBIENT_DRONE_GAIN);
+}
+function startAmbientDroneAt(targetGain){
   ensureAmbientDrone();
-  if(ambientDrone.target===AMBIENT_DRONE_GAIN) return;
+  const goal=clamp(targetGain, 0, 0.25);
+  if(ambientDrone.target===goal) return;
   const now=actx.currentTime;
   ambientDrone.gain.gain.cancelScheduledValues(now);
   ambientDrone.gain.gain.setValueAtTime(ambientDrone.gain.gain.value, now);
-  ambientDrone.gain.gain.linearRampToValueAtTime(AMBIENT_DRONE_GAIN, now+FADE_SEC);
-  ambientDrone.target=AMBIENT_DRONE_GAIN;
+  ambientDrone.gain.gain.linearRampToValueAtTime(goal, now+FADE_SEC);
+  ambientDrone.target=goal;
+}
+function setAmbientDroneTarget(targetGain, rampSec=FADE_SEC){
+  if(!ambientDrone || !actx) return;
+  const goal=clamp(targetGain, 0, 0.25);
+  const now=actx.currentTime;
+  ambientDrone.gain.gain.cancelScheduledValues(now);
+  ambientDrone.gain.gain.setValueAtTime(ambientDrone.gain.gain.value, now);
+  ambientDrone.gain.gain.linearRampToValueAtTime(goal, now+Math.max(0.04, rampSec));
+  ambientDrone.target=goal;
 }
 function silenceAmbientDrone(){
   if(!ambientDrone) return;
@@ -910,32 +1083,182 @@ function stampChunk(c){
 }
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rightVector(){
+  return { dx: -INTRO_SCENE.forwardDy, dy: INTRO_SCENE.forwardDx };
+}
+function introForwardDistanceAt(x,y){
+  const rx=x-introAnchorX;
+  const ry=y-introAnchorY;
+  return (rx * INTRO_SCENE.forwardDx) + (ry * INTRO_SCENE.forwardDy);
+}
+function introLateralOffsetAt(x,y){
+  const rx=x-introAnchorX;
+  const ry=y-introAnchorY;
+  const rv=rightVector();
+  return (rx * rv.dx) + (ry * rv.dy);
+}
+function gatePosAtDistance(dist){
+  return {
+    x: introAnchorX + (INTRO_SCENE.forwardDx * dist),
+    y: introAnchorY + (INTRO_SCENE.forwardDy * dist)
+  };
+}
+function primaryGatePos(){ return gatePosAtDistance(INTRO_SCENE.primaryGateDist); }
+function finalGatePos(){ return gatePosAtDistance(INTRO_SCENE.finalGateDist); }
+function isOnPrimaryGate(x,y){
+  const g=primaryGatePos();
+  return x===g.x && y===g.y;
+}
+function hasCrossedFinalGate(x,y){
+  return introForwardDistanceAt(x,y) >= INTRO_SCENE.finalGateDist;
+}
+function isOnboardingActive(){
+  return onboardingPhase===ONBOARDING_PHASES.INTRO_PRELUDE || onboardingPhase===ONBOARDING_PHASES.INTRO_FUNNEL;
+}
+function isPrelude(){ return onboardingPhase===ONBOARDING_PHASES.INTRO_PRELUDE; }
+function isFunnel(){ return onboardingPhase===ONBOARDING_PHASES.INTRO_FUNNEL; }
+function funnelWidthAt(forwardDist){
+  const start=INTRO_SCENE.funnelStartDist;
+  const end=INTRO_SCENE.finalGateDist;
+  const t=clamp((forwardDist-start)/Math.max(1,end-start), 0, 1);
+  return Math.round(INTRO_SCENE.funnelWidthStart + (INTRO_SCENE.funnelWidthEnd-INTRO_SCENE.funnelWidthStart)*t);
+}
+function canMoveInOnboarding(nx,ny,dx,dy){
+  const deltaAlong=(dx * INTRO_SCENE.forwardDx) + (dy * INTRO_SCENE.forwardDy);
+  // No backwards during onboarding.
+  if(deltaAlong<0) return false;
+  if(isPrelude()){
+    // Prelude is intentionally strict: only forward steps to hit the first gate.
+    return deltaAlong>0;
+  }
+  if(!isFunnel()) return true;
+  const along=introForwardDistanceAt(nx,ny);
+  const lateral=Math.abs(introLateralOffsetAt(nx,ny));
+  const w=funnelWidthAt(along);
+  return lateral<=w;
+}
+function startFunnelIntro(){
+  onboardingPhase=ONBOARDING_PHASES.INTRO_FUNNEL;
+  introDistance=Math.max(introDistance, introForwardDistanceAt(px,py));
+  pushEvent('// gate open: follow the funnel.');
+  runGateFlashPulse(px, py);
+  onboardingHoldLastMs=0;
+  updateOnboardingButton();
+}
 
 // ── Fog ───────────────────────────────────────────────────────────────────────
+function currentFovRadius(){
+  if(!isOnboardingActive()) return FOG_R;
+  if(isPrelude()) return Math.max(8, INTRO_SCENE.primaryGateDist + 2);
+  // Keep intro void feeling while always showing enough terrain for movement read.
+  const p=introProgress();
+  return Math.max(6, Math.round(6 + (FOG_R-6) * Math.pow(p, 2.0)));
+}
 function revealAround(x,y){
-  const ringR=FOG_R+1;
-  const r2=FOG_R*FOG_R;
-  const ringR2=ringR*ringR;
-  for(let cy=y-ringR;cy<=y+ringR;cy++){
-    for(let cx=x-ringR;cx<=x+ringR;cx++){
-      const dx=cx-x, dy=cy-y;
-      const d2=dx*dx+dy*dy;
-      if(d2<=r2){
-        fogSet(cx,cy,1);
-        continue;
-      }
-      if(d2<=ringR2){
-        // Deterministic stipple ring (no flicker), softens the circular edge.
-        if(hash01(cx*1.93, cy*1.37) > 0.52){
-          fogSet(cx,cy,1);
-        }
-      }
-    }
-  }
-  fogSet(x,y,2);
+  revealAroundWithRadius(x,y,currentFovRadius());
 }
 
 // ── Movement + sound ──────────────────────────────────────────────────────────
+function isIntroActive(){ return isOnboardingActive(); }
+function isWorldLive(){ return onboardingPhase===ONBOARDING_PHASES.WORLD_LIVE || onboardingPhase===ONBOARDING_PHASES.INTRO_DISABLED_SESSION; }
+function introProgress(){
+  const d=Math.max(introDistance, introForwardDistanceAt(px,py));
+  return clamp(d/INTRO_SCENE.introDistanceSteps, 0, 1);
+}
+function currentMoveIntervalMs(){
+  if(isIntroActive()){
+    const p=introProgress();
+    return Math.round(INTRO_SCENE.speedStartMs + (INTRO_SCENE.speedEndMs-INTRO_SCENE.speedStartMs)*p);
+  }
+  if(chunkTransitionDebt>0) return Math.round(MOVE_MS * CHUNK_TRANSITION.slowMult);
+  return MOVE_MS;
+}
+function voidWidthForChunk(chunk){
+  if(!chunk) return CHUNK_TRANSITION.voidWidthMin;
+  const r = chunk.terrainRadius ?? TERRAIN_R_MIN;
+  const t = clamp((r - TERRAIN_R_MIN) / (TERRAIN_R_MAX - TERRAIN_R_MIN), 0, 1);
+  return Math.round(CHUNK_TRANSITION.voidWidthMin + t * (CHUNK_TRANSITION.voidWidthMax - CHUNK_TRANSITION.voidWidthMin));
+}
+function currentAmbientTarget(){
+  if(isIntroActive()){
+    const p=introProgress();
+    return INTRO_SCENE.ambientStart + (INTRO_SCENE.ambientEnd-INTRO_SCENE.ambientStart)*p;
+  }
+  return AMBIENT_DRONE_GAIN;
+}
+function applyIntroAudioEnvelope(){
+  if(paused || !actx) return;
+  ensureAmbientDrone();
+  setAmbientDroneTarget(currentAmbientTarget(), isIntroActive()?0.12:0.35);
+}
+function updateOnboardingButton(){
+  if(!ONBOARDING_TOGGLE_BTN) return;
+  const off=onboardingPhase===ONBOARDING_PHASES.INTRO_DISABLED_SESSION;
+  ONBOARDING_TOGGLE_BTN.textContent = off ? 'onboarding [o] (off this session)' : 'onboarding [o] (on)';
+}
+function finalizeIntroTransition(targetPhase, reason='world'){
+  const keepMove = forwardHeld() || leftHeld() || rightHeld();
+  onboardingPhase=targetPhase;
+  introDistance=INTRO_SCENE.introDistanceSteps;
+  const landing=nearestWildernessCell(px, py, 24);
+  px=landing.x; py=landing.y;
+  trail=[];
+  fog = new Map();
+  if(moveTimer){ clearTimeout(moveTimer); moveTimer=null; }
+  if(keepMove) startMoveTimer();
+  pushEvent(`// release: ${reason}.`);
+  applyIntroAudioEnvelope();
+  updateAudio();
+  updateOnboardingButton();
+  // Seed chunk-crossing tracking at the landing — no friction yet.
+  chunkTrackingSeeded = false;
+  lastChunkIdx = -1;
+  chunkTransitionDebt = 0;
+}
+function releaseIntoWorld(reason='world'){
+  if(!isOnboardingActive()) return;
+  // Dramatic threshold: same shared gate flash as prelude->funnel.
+  finalizeIntroTransition(ONBOARDING_PHASES.WORLD_LIVE, reason);
+  runGateFlashPulse(px, py);
+  // Override the post-intro ambient target with a brief overshoot, then settle.
+  if(actx){
+    setAmbientDroneTarget(AMBIENT_DRONE_GAIN*1.6, 0.08);
+    setTimeout(()=>setAmbientDroneTarget(AMBIENT_DRONE_GAIN, 0.6), 600);
+  }
+}
+function triggerGateFlash(ms=220, vignetteMs=420){
+  if(!MAP_EL) return;
+  gateFlashUntilMs = Date.now() + Math.max(ms, vignetteMs);
+  MAP_EL.classList.add('flash');
+  if(gateFlashTimer!==null) clearTimeout(gateFlashTimer);
+  gateFlashTimer=setTimeout(()=>{
+    MAP_EL.classList.remove('flash');
+    gateFlashTimer=null;
+    if(Date.now() >= gateFlashUntilMs){
+      gateFlashUntilMs = 0;
+    }
+  }, ms);
+}
+function runGateFlashPulse(cx, cy){
+  triggerGateFlash();
+  pulseRevealRings(cx, cy, [2,4,6,9]);
+}
+function pulseRevealRings(cx, cy, radii=[2,4,6,9]){
+  let i=0;
+  const tickReveal=()=>{
+    if(i>=radii.length) return;
+    revealAroundWithRadius(cx, cy, radii[i++]);
+    requestAnimationFrame(tickReveal);
+  };
+  requestAnimationFrame(tickReveal);
+}
+function disableOnboardingForSession(){
+  if(!isOnboardingActive()) return;
+  finalizeIntroTransition(ONBOARDING_PHASES.INTRO_DISABLED_SESSION, 'session off');
+  revealAroundWithRadius(px, py, INTRO_SCENE.fogReleaseRadius);
+  pushEvent('// onboarding off for this session.');
+}
+
 function audibleCandidates(){
   const ctx=playerContext();
   const out=[];
@@ -967,6 +1290,17 @@ function audibleCandidates(){
 }
 
 function updateAudio(){
+  if(isOnboardingActive()){
+    const worldId=INTRO_SCENE.worldId;
+    const membership={};
+    for(const w of worldsConfig) membership[w.id]=(w.id===worldId?1:0);
+    curPlayerCtx = { onTerrain:false, biomeId:null, worldId, worldMembership: membership };
+    if(curChunkKey){ curChunkKey=''; curChunkIdx=-1; }
+    if(voices.size>0) stopAllVoices();
+    applyIntroAudioEnvelope();
+    return;
+  }
+
   const { ctx, audible } = audibleCandidates();
   curPlayerCtx = ctx;
 
@@ -984,6 +1318,7 @@ function updateAudio(){
   }
 
   if(paused) return;
+  applyIntroAudioEnvelope();
 
   // Polyphony: ramp existing, start missing, stop departed.
   const want=new Set(audible.map(a=>a.key));
@@ -1004,6 +1339,7 @@ function step(dx,dy){
   const nx=px+dx;
   const ny=py+dy;
   if(nx===px&&ny===py) return;
+  if(isOnboardingActive() && !canMoveInOnboarding(nx,ny,dx,dy)) return;
   px=nx; py=ny; stepCount++;
 
   trail.push({x:px,y:py});
@@ -1016,6 +1352,34 @@ function step(dx,dy){
   WEIRD.forEach(([t,m])=>{
     if(stepCount===t&&!weirdShown.has(t)){weirdShown.add(t);pushEvent(m);}
   });
+
+  if(isOnboardingActive()){
+    introDistance=Math.max(introDistance, introForwardDistanceAt(px,py));
+    if(isPrelude() && isOnPrimaryGate(px,py)){
+      startFunnelIntro();
+    } else if(isFunnel() && hasCrossedFinalGate(px,py)){
+      releaseIntoWorld('final gate');
+    }
+    applyIntroAudioEnvelope();
+  } else {
+    // Chunk-crossing friction: detect a change in dominant chunk (just refreshed
+    // by updateAudio above) and start a debt of slowed steps. Each chunk's
+    // voidWidth comes from its terrainRadius — heavier chunks resist more.
+    const nowIdx = curChunkIdx;
+    if(!chunkTrackingSeeded){
+      chunkTrackingSeeded = true;
+      lastChunkIdx = nowIdx;
+    } else if(nowIdx !== lastChunkIdx){
+      if(nowIdx >= 0){
+        chunkTransitionDebt = voidWidthForChunk(chunks[nowIdx]);
+      } else {
+        chunkTransitionDebt = 0; // exiting to wilderness — no resistance
+      }
+      lastChunkIdx = nowIdx;
+    } else if(chunkTransitionDebt > 0){
+      chunkTransitionDebt--;
+    }
+  }
 }
 
 function teleport(){
@@ -1037,30 +1401,50 @@ function teleport(){
   stopAllVoices();
   revealAround(px,py);
   updateAudio();
+  // Teleport drops you cleanly somewhere — reset chunk-crossing tracking.
+  chunkTrackingSeeded = false;
+  lastChunkIdx = -1;
+  chunkTransitionDebt = 0;
   pushEvent('// teleport.');
 }
 
 function arrowDelta(){
+  if(isPrelude()){
+    return forwardHeld() ? [INTRO_SCENE.forwardDx, INTRO_SCENE.forwardDy] : [0,0];
+  }
+  if(isFunnel()){
+    let dx=0, dy=0;
+    if(leftHeld())  dx-=1;
+    if(rightHeld()) dx+=1;
+    if(forwardHeld()) dy-=1;
+    return [dx,dy];
+  }
   let dx=0, dy=0;
-  if(keysDown.has('ArrowLeft'))  dx-=1;
-  if(keysDown.has('ArrowRight')) dx+=1;
-  if(keysDown.has('ArrowUp'))    dy-=1;
-  if(keysDown.has('ArrowDown'))  dy+=1;
+  if(leftHeld())  dx-=1;
+  if(rightHeld()) dx+=1;
+  if(forwardHeld()) dy-=1;
+  if(backHeld()) dy+=1;
   return [dx,dy];
 }
 function startMoveTimer(){
   if(moveTimer) return;
-  moveTimer=setInterval(()=>{
+  const run=()=>{
     const [dx,dy]=arrowDelta();
-    if(dx===0&&dy===0){ clearInterval(moveTimer); moveTimer=null; return; }
+    if(dx===0&&dy===0){ moveTimer=null; return; }
     step(dx,dy);
-  }, MOVE_MS);
+    moveTimer=setTimeout(run, currentMoveIntervalMs());
+  };
+  moveTimer=setTimeout(run, currentMoveIntervalMs());
 }
 
 function togglePause(){
   paused=!paused;
   if(paused){ stopAllVoices(); silenceAmbientDrone(); pushEvent('// paused.'); }
-  else { startAmbientDrone(); pushEvent('// resumed.'); updateAudio(); }
+  else {
+    startAmbientDroneAt(currentAmbientTarget());
+    pushEvent('// resumed.');
+    updateAudio();
+  }
 }
 
 // ── Event log ─────────────────────────────────────────────────────────────────
@@ -1075,7 +1459,10 @@ const MAP_EL    = document.getElementById('map');
 const CATALOG_EL = document.getElementById('catalog');
 const CATALOG_CTL_EL = document.getElementById('catalogCtl');
 const CATALOG_TOGGLE_BTN = document.getElementById('catalogToggleBtn');
+const ONBOARDING_TOGGLE_BTN = document.getElementById('onboardingToggleBtn');
 const STATUS_EL = document.getElementById('status');
+introTitleEl = document.getElementById('introTitle');
+const INTRO_VIGNETTE_EL = document.getElementById('introVignette');
 
 const trailSet = new Set();
 function wrapText(text, width=88){
@@ -1101,15 +1488,172 @@ function fogGlyph(x,y){
   if(n>0.34) return '·';
   return ',';
 }
+function renderIntroTitle(){
+  if(!introTitleEl) return;
+  if(!isIntroActive()){
+    introTitleEl.style.opacity='0';
+    if(INTRO_VIGNETTE_EL) INTRO_VIGNETTE_EL.style.opacity='0';
+    return;
+  }
+  const p=introProgress();
+  const v=INTRO_SCENE.voidEnd;
+  const t=INTRO_SCENE.thresholdStart;
+  let opacity;
+  if(p<v) opacity=1;                                       // Void: hold full
+  else if(p<t) opacity=1 - ((p-v)/(t-v))*0.92;             // Stirring: fade
+  else opacity=Math.max(0, 0.08*(1-(p-t)/(1-t)));          // Threshold: collapse
+  introTitleEl.style.opacity=String(opacity);
+  // Score lifts gently upward as it retires (max ~18px over the journey).
+  introTitleEl.style.setProperty('--introLift', `${-Math.round(p*18)}px`);
+  // Tunnel-vision vignette: full dark over the Void, eases off through Stirring,
+  // gone by Threshold. Mirrors the title curve but ends earlier so the gate is clear.
+  if(INTRO_VIGNETTE_EL){
+    // Never mix vignette with gate flash/funnel visuals.
+    if(gateFlashUntilMs > Date.now() || isFunnel()){
+      INTRO_VIGNETTE_EL.style.opacity='0';
+      return;
+    }
+    let vig;
+    if(p<v) vig=1;
+    else if(p<t) vig=Math.max(0, 1 - ((p-v)/(t-v))*1.0);
+    else vig=0;
+    INTRO_VIGNETTE_EL.style.opacity=String(vig);
+  }
+}
+function introSceneCell(wx, wy){
+  const rx=wx-introAnchorX;
+  const ry=wy-introAnchorY;
+  const inIntroDepth = Math.abs(ry) <= (INTRO_SCENE.introDistanceSteps+14);
+  if(!inIntroDepth) return {char:fogGlyph(wx,wy), colorClass:'t-fog'};
+
+  const p=introProgress();
+  const pg=primaryGatePos();
+  const fg=finalGatePos();
+  const dPrimary=Math.hypot(wx-pg.x, wy-pg.y);
+  const dFinal=Math.hypot(wx-fg.x, wy-fg.y);
+  const prelude=isPrelude();
+
+  // Prelude: almost empty void + one bright primary gate target.
+  if(prelude){
+    if(wx===pg.x && wy===pg.y) return {char:'█', colorClass:'t-gate-mark'};
+    if(dPrimary<=1.35) return {char:'·', colorClass:'t-gate-spectral'};
+    return {char:fogGlyph(wx,wy), colorClass:'t-fog'};
+  }
+
+  // Funnel phase: world-space downstream flow.
+  const flow = (rx * INTRO_SCENE.forwardDx) + (ry * INTRO_SCENE.forwardDy);
+  const flowDelta = flow - introDistance;
+  const ahead = flowDelta >= 0;
+  const wakeLag = introDistance - flow;
+  const WAKE_LEN = 8;
+  const flowWake = ahead ? 0 : clamp((WAKE_LEN - wakeLag) / WAKE_LEN, 0, 1);
+  const pAhead = ahead ? (0.12 + p * 0.88) : (0.14 + flowWake * 0.26);
+  const along=introForwardDistanceAt(wx,wy);
+  const lateral=Math.abs(introLateralOffsetAt(wx,wy));
+  const width=funnelWidthAt(along);
+  const inFunnel=along>=INTRO_SCENE.funnelStartDist-1 && along<=INTRO_SCENE.finalGateDist+2 && lateral<=width+2;
+
+  // Primary gate is now de-emphasized after unlock.
+  if(wx===pg.x && wy===pg.y) return {char:'□', colorClass:'t-gate-frame'};
+  if(dPrimary<=1.25) return {char:'.', colorClass:'t-gate-frame'};
+
+  // Final gate remains dominant target.
+  if(wx===fg.x && wy===fg.y) return {char:'█', colorClass:'t-gate-mark'};
+  if(dFinal<=1.35) return {char:'·', colorClass:'t-gate-spectral'};
+
+  if(!inFunnel) return {char:fogGlyph(wx,wy), colorClass:'t-fog'};
+
+  if(lateral===0){
+    if(!ahead && flowWake < 0.35){
+      if(Math.abs(flow)%4===0) return {char:'¦', colorClass:'t-intro-halo'};
+      return {char:'|', colorClass:'t-intro-halo'};
+    }
+    if(Math.abs(flow+introDistance)%3===0) return {char:'¦', colorClass:'t-intro-trail'};
+    return {char:'|', colorClass:'t-intro-trail'};
+  }
+  if(lateral===1){
+    if(!ahead && flowWake < 0.35){
+      if(Math.abs(flow)%5===0) return {char:':', colorClass:'t-fog'};
+      return {char:'.', colorClass:'t-fog'};
+    }
+    if(Math.abs(flow+introDistance)%4===0) return {char:':', colorClass:'t-intro-halo'};
+    return {char:'.', colorClass:'t-intro-halo'};
+  }
+
+  const haloR=Math.max(2, Math.round(width + pAhead*1.6));
+  if(lateral>haloR+1) return {char:fogGlyph(wx,wy), colorClass:'t-fog'};
+  const ringFalloff=1-(lateral/(haloR+1.25));
+  const noise=hash01(wx*0.93, wy*1.37);
+  const density=clamp(pAhead*ringFalloff*1.24, 0, 1);
+  if(noise>1-density){
+    const g = noise>0.94 ? '°'
+            : noise>0.88 ? '*'
+            : noise>0.78 ? "'"
+            : noise>0.62 ? ','
+            : '·';
+    const cls = (!ahead && flowWake < 0.6) ? 't-fog'
+              : p>=INTRO_SCENE.thresholdStart ? 't-intro-bloom'
+              : p>0.55 ? 't-intro-trail'
+              : 't-intro-halo';
+    return {char:g, colorClass:cls};
+  }
+  return {char:fogGlyph(wx,wy), colorClass:'t-fog'};
+}
+
+function nearestWildernessCell(startX, startY, maxR=28){
+  const startCell=getCellAt(startX,startY);
+  if(startCell && !startCell.biomeId && !startCell.isChunk){
+    return {x:startX,y:startY};
+  }
+  for(let r=1;r<=maxR;r++){
+    for(let dx=-r;dx<=r;dx++){
+      const dy=r-Math.abs(dx);
+      const candidates = dy===0 ? [[startX+dx,startY]] : [[startX+dx,startY+dy],[startX+dx,startY-dy]];
+      for(const [cx,cy] of candidates){
+        const c=getCellAt(cx,cy);
+        if(c && !c.biomeId && !c.isChunk) return {x:cx,y:cy};
+      }
+    }
+  }
+  return {x:startX,y:startY};
+}
+
+function revealAroundWithRadius(x,y,radius){
+  const ringR=radius+1;
+  const r2=radius*radius;
+  const ringR2=ringR*ringR;
+  for(let cy=y-ringR;cy<=y+ringR;cy++){
+    for(let cx=x-ringR;cx<=x+ringR;cx++){
+      const dx=cx-x, dy=cy-y;
+      const d2=dx*dx+dy*dy;
+      if(d2<=r2){
+        fogSet(cx,cy,1);
+        continue;
+      }
+      if(d2<=ringR2){
+        if(hash01(cx*1.93, cy*1.37) > 0.52){
+          fogSet(cx,cy,1);
+        }
+      }
+    }
+  }
+  fogSet(x,y,2);
+}
 
 function renderMap(){
   computeViewDims();
   const halfC=Math.floor(VIEW_W/2), halfR=Math.floor(VIEW_H/2);
   const ox=px-halfC, oy=py-halfR;
+  if(isIntroActive()) revealAround(px,py);
+  // Guarantee player cell visibility even if fog map resets between frames.
+  if(fogGet(px,py)===0) fogSet(px,py,2);
 
   // Rebuild trail set
   trailSet.clear();
   trail.forEach(p=>trailSet.add(`${p.x},${p.y}`));
+
+  const introNow = isIntroActive();
+  const playerCls = 't-player';
 
   // Build DOM structure: one span per row (faster than one per cell)
   // Use innerHTML with span classes for color
@@ -1119,19 +1663,18 @@ function renderMap(){
     let row='';
     for(let vx=0;vx<VIEW_W;vx++){
       const wx=ox+vx;
+      // Player must always render, regardless of transient fog state.
+      if(wx===px&&wy===py){
+        row+=`<span class="${playerCls}">@</span>`;
+        continue;
+      }
       const fv=fogGet(wx,wy);
       if(fv===0){
         row+=`<span class="t-fog">${fogGlyph(wx,wy)}</span>`;
         continue;
       }
 
-      // Player
-      if(wx===px&&wy===py){
-        row+=`<span class="t-player">@</span>`;
-        continue;
-      }
-
-      const cell=getCellAt(wx,wy);
+      const cell=introNow ? introSceneCell(wx,wy) : getCellAt(wx,wy);
 
       if(cell?.isChunk){
         const cls=cell.chunkKey===curChunkKey?'t-chunk-on':'t-chunk';
@@ -1140,7 +1683,8 @@ function renderMap(){
       }
 
       if(cell){
-        row+=`<span class="${cell.colorClass||'t-resonance'} ${worldClassFor(cell.worldId)}">${cell.char}</span>`;
+        const worldClass = (cell.worldId && !cell.noWorldTint && !introNow) ? ` ${worldClassFor(cell.worldId)}` : '';
+        row+=`<span class="${cell.colorClass||'t-resonance'}${worldClass}">${cell.char}</span>`;
         continue;
       }
 
@@ -1155,6 +1699,7 @@ function renderMap(){
     lines.push(row);
   }
   MAP_EL.innerHTML=lines.join('\n');
+  renderIntroTitle();
 }
 
 function renderStatus(){
@@ -1171,7 +1716,8 @@ function renderStatus(){
   const chunkStr=c?`[ ${playingNow?'▶':'■'} ] ${icon} ${c.label}  ${fmt(elapsed)} / ${fmt(dur)}  ${bar}`:'[ - ]';
   const wId=curPlayerCtx?.worldId || '—';
   const bId=curPlayerCtx?.biomeId ? curPlayerCtx.biomeId.split(':').slice(-1)[0] : '—';
-  const metaStr=`world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}`;
+  const introMeta=isIntroActive()?`  intro:${Math.round(introProgress()*100)}%`: '';
+  const metaStr=`world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}`;
   const pad=Math.max(0,VIEW_W-chunkStr.length-metaStr.length);
   STATUS_EL.textContent=chunkStr+' '.repeat(pad)+metaStr;
 }
@@ -1208,6 +1754,7 @@ function toggleCatalog(){
 }
 
 function renderBoot(){
+  if(introTitleEl) introTitleEl.style.opacity='0';
   const done=files.filter(f=>f.status==='done').length;
   const loading=files.filter(f=>f.status==='loading');
   const dots='.'.repeat((tick%3)+1).padEnd(3);
@@ -1249,7 +1796,23 @@ function renderBoot(){
 // ── Main loop ─────────────────────────────────────────────────────────────────
 function loop(){
   tick++;
-  if(inRogue){ renderMap(); renderCatalog(); renderStatus(); }
+  if(inRogue){
+    // Keep keyboard focus on the play surface to avoid intermittent movement deadlocks.
+    if((tick % 10)===0) ensureInteractionFocus();
+    // Onboarding fail-safe: movement should continue while key is held,
+    // independent of timer/focus edge cases.
+    if(isOnboardingActive()){
+      const [dx,dy]=arrowDelta();
+      if(dx!==0 || dy!==0){
+        const now=performance.now();
+        if((now - onboardingHoldLastMs) >= currentMoveIntervalMs()){
+          step(dx,dy);
+          onboardingHoldLastMs=now;
+        }
+      }
+    }
+    renderMap(); renderCatalog(); renderStatus();
+  }
   else renderBoot();
   raf=requestAnimationFrame(loop);
 }
@@ -1300,33 +1863,67 @@ async function loadAll(){
 // ── Enter roguelike ────────────────────────────────────────────────────────────
 function enterRogue(){
   inRogue=true;
+  try{
+    MAP_EL.setAttribute('tabindex','0');
+    MAP_EL.focus({ preventScroll:true });
+  }catch(_){}
+  // Set intro phase first so buildWorld's initial revealAround uses the tiny
+  // intro FOV (currentFovRadius()) instead of the full FOG_R.
+  onboardingPhase=ONBOARDING_PHASES.INTRO_PRELUDE;
+  introDistance=0;
   buildWorld();
-  startAmbientDrone();
+  introAnchorX=px;
+  introAnchorY=py;
+  updateOnboardingButton();
+  startAmbientDroneAt(currentAmbientTarget());
   updateAudio();
-  pushEvent('// awake.');
-  document.addEventListener('keydown',onKey);
-  document.addEventListener('keyup',onKeyUp);
+  pushEvent('// onboarding: advance forward into the field.');
+  window.addEventListener('keydown',onKey, {capture:true});
+  window.addEventListener('keyup',onKeyUp, {capture:true});
+  window.addEventListener('pointerdown', ()=>{
+    ensureInteractionFocus();
+  }, {passive:true});
+  window.addEventListener('focus', ensureInteractionFocus, {passive:true});
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden) ensureInteractionFocus();
+  });
   window.addEventListener('blur',onBlur);
+  // Aggressive initial focus lock for the first second of onboarding.
+  setTimeout(ensureInteractionFocus, 0);
+  setTimeout(ensureInteractionFocus, 120);
+  setTimeout(ensureInteractionFocus, 300);
+  setTimeout(ensureInteractionFocus, 650);
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
 const ARROW_KEYS=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown']);
+const MOVE_KEYS=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','A','d','D','w','W','s','S']);
+function forwardHeld(){ return keysDown.has('ArrowUp') || keysDown.has('w') || keysDown.has('W'); }
+function leftHeld(){ return keysDown.has('ArrowLeft') || keysDown.has('a') || keysDown.has('A'); }
+function rightHeld(){ return keysDown.has('ArrowRight') || keysDown.has('d') || keysDown.has('D'); }
+function backHeld(){ return keysDown.has('ArrowDown') || keysDown.has('s') || keysDown.has('S'); }
 function onKey(e){
   if(!inRogue) return;
-  if(ARROW_KEYS.has(e.key)){
+  if(MOVE_KEYS.has(e.key)){
     e.preventDefault();
-    if(e.repeat) return; // browser autorepeat — we drive movement via interval
+    if(isOnboardingActive() && (e.key==='ArrowDown' || e.key==='s' || e.key==='S')) return;
     keysDown.add(e.key);
     const [dx,dy]=arrowDelta();
-    if(dx||dy) step(dx,dy);
-    startMoveTimer();
+    if(dx||dy){
+      step(dx,dy);
+      onboardingHoldLastMs=performance.now();
+    }
+    if(!isOnboardingActive()) startMoveTimer();
     return;
   }
   switch(e.key){
     case ' ':
       e.preventDefault(); togglePause(); break;
     case 'r': case 'R':
-      e.preventDefault(); teleport(); break;
+      e.preventDefault();
+      if(isIntroActive()) break;
+      teleport();
+      break;
     case 'l': case 'L':
       e.preventDefault();
       looping=!looping;
@@ -1341,15 +1938,31 @@ function onKey(e){
       toggleCatalog();
       pushEvent(`// catalog: ${showCatalog?'open':'closed'}.`);
       break;
+    case 'o': case 'O':
+      e.preventDefault();
+      if(isIntroActive()){
+        disableOnboardingForSession();
+      } else {
+        pushEvent('// onboarding already complete this session.');
+      }
+      break;
   }
 }
 function onKeyUp(e){
-  if(ARROW_KEYS.has(e.key)) keysDown.delete(e.key);
+  if(MOVE_KEYS.has(e.key)) keysDown.delete(e.key);
 }
 function onBlur(){
   // Releasing focus mid-press would otherwise leave keys "stuck".
   keysDown.clear();
-  if(moveTimer){ clearInterval(moveTimer); moveTimer=null; }
+  if(moveTimer){ clearTimeout(moveTimer); moveTimer=null; }
+}
+function ensureInteractionFocus(){
+  if(!inRogue) return;
+  try{
+    if(document.activeElement!==MAP_EL){
+      MAP_EL.focus({ preventScroll:true });
+    }
+  }catch(_){}
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -1367,6 +1980,13 @@ function boot(){
   const next=()=>{if(i<lines.length){bootLog.push(lines[i++]);setTimeout(next,i<3?40:100);}};
   next();
   CATALOG_TOGGLE_BTN.addEventListener('click', ()=>toggleCatalog());
+  if(ONBOARDING_TOGGLE_BTN){
+    ONBOARDING_TOGGLE_BTN.addEventListener('click', ()=>{
+      if(isIntroActive()) disableOnboardingForSession();
+      else pushEvent('// onboarding already complete this session.');
+    });
+  }
+  updateOnboardingButton();
   raf=requestAnimationFrame(loop);
   loadAll();
 }

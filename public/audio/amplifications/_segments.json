@@ -1,0 +1,1709 @@
+{
+  "generator": {
+    "name": "generate_amplifications.py",
+    "version": 1,
+    "seed": 20260426,
+    "count": 64,
+    "bitrate": "192k",
+    "source_duration_sec": 1124.398866
+  },
+  "summary": {
+    "duration_buckets": {
+      "mid": 20,
+      "short": 22,
+      "long": 15,
+      "xlong": 7
+    },
+    "timeline_bins": {
+      "0": 8,
+      "1": 8,
+      "2": 8,
+      "3": 8,
+      "4": 8,
+      "5": 8,
+      "6": 8,
+      "7": 8
+    },
+    "centroid_bins": {
+      "high": 21,
+      "low": 22,
+      "mid": 21
+    },
+    "attack_bins": {
+      "high": 21,
+      "low": 22,
+      "mid": 21
+    },
+    "category_counts": {
+      "drone": 19,
+      "resonance": 34,
+      "pulse": 11
+    }
+  },
+  "segments": [
+    {
+      "id": 1,
+      "label": "amp-001",
+      "file": "amp_001.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 14.60537,
+        "end_sec": 17.40537,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.04726553,
+        "zcr": 0.02857189,
+        "centroid_hz": 1958.9735,
+        "rolloff_hz": 5289.093,
+        "attack_sec": 1.025125
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 2,
+      "label": "amp-002",
+      "file": "amp_002.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 43.846615,
+        "end_sec": 44.396615,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.07518621,
+        "zcr": 0.04609549,
+        "centroid_hz": 923.0885,
+        "rolloff_hz": 1614.9902,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 3,
+      "label": "amp-003",
+      "file": "amp_003.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 57.721524,
+        "end_sec": 62.921524,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.06632774,
+        "zcr": 0.0428488,
+        "centroid_hz": 1155.7305,
+        "rolloff_hz": 1528.8574,
+        "attack_sec": 0.006349
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 4,
+      "label": "amp-004",
+      "file": "amp_004.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 67.387188,
+        "end_sec": 68.137188,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.04440388,
+        "zcr": 0.02975147,
+        "centroid_hz": 802.7679,
+        "rolloff_hz": 1170.8679,
+        "attack_sec": 0.415283
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 5,
+      "label": "amp-005",
+      "file": "amp_005.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 69.079365,
+        "end_sec": 74.279365,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.09049941,
+        "zcr": 0.04799449,
+        "centroid_hz": 1511.3901,
+        "rolloff_hz": 2670.1172,
+        "attack_sec": 0.030159
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 6,
+      "label": "amp-006",
+      "file": "amp_006.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 109.784365,
+        "end_sec": 110.534365,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.06354381,
+        "zcr": 0.02249637,
+        "centroid_hz": 1307.7414,
+        "rolloff_hz": 2505.9265,
+        "attack_sec": 9.1e-05
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 7,
+      "label": "amp-007",
+      "file": "amp_007.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 123.5042,
+        "end_sec": 126.3042,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.08676568,
+        "zcr": 0.05566984,
+        "centroid_hz": 1001.9887,
+        "rolloff_hz": 1184.3262,
+        "attack_sec": 0.001043
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 8,
+      "label": "amp-008",
+      "file": "amp_008.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 135.136535,
+        "end_sec": 139.036535,
+        "duration_sec": 3.9
+      },
+      "features": {
+        "rms": 0.08342104,
+        "zcr": 0.05025932,
+        "centroid_hz": 1846.0397,
+        "rolloff_hz": 4352.3987,
+        "attack_sec": 0.096281
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 9,
+      "label": "amp-009",
+      "file": "amp_009.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 143.263837,
+        "end_sec": 148.463837,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.07734663,
+        "zcr": 0.03907238,
+        "centroid_hz": 1483.7336,
+        "rolloff_hz": 3561.0535,
+        "attack_sec": 1.845306
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 1,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 10,
+      "label": "amp-010",
+      "file": "amp_010.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 192.981043,
+        "end_sec": 194.981043,
+        "duration_sec": 2.0
+      },
+      "features": {
+        "rms": 0.06649935,
+        "zcr": 0.01693916,
+        "centroid_hz": 1082.9414,
+        "rolloff_hz": 1892.2302,
+        "attack_sec": 0.000726
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 11,
+      "label": "amp-011",
+      "file": "amp_011.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 211.765986,
+        "end_sec": 212.815986,
+        "duration_sec": 1.05
+      },
+      "features": {
+        "rms": 0.07283332,
+        "zcr": 0.06617425,
+        "centroid_hz": 1032.5133,
+        "rolloff_hz": 1779.1809,
+        "attack_sec": 0.0039
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 12,
+      "label": "amp-012",
+      "file": "amp_012.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 224.734481,
+        "end_sec": 226.184481,
+        "duration_sec": 1.45
+      },
+      "features": {
+        "rms": 0.08810662,
+        "zcr": 0.04013012,
+        "centroid_hz": 1269.1921,
+        "rolloff_hz": 1905.6885,
+        "attack_sec": 0.00254
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 1,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 13,
+      "label": "amp-013",
+      "file": "amp_013.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 247.199637,
+        "end_sec": 248.249637,
+        "duration_sec": 1.05
+      },
+      "features": {
+        "rms": 0.0942976,
+        "zcr": 0.03433977,
+        "centroid_hz": 1222.94,
+        "rolloff_hz": 2282.5195,
+        "attack_sec": 0.441451
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 14,
+      "label": "amp-014",
+      "file": "amp_014.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 251.499392,
+        "end_sec": 264.299392,
+        "duration_sec": 12.8
+      },
+      "features": {
+        "rms": 0.07640193,
+        "zcr": 0.04362969,
+        "centroid_hz": 908.7027,
+        "rolloff_hz": 1246.2341,
+        "attack_sec": 0.576236
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 15,
+      "label": "amp-015",
+      "file": "amp_015.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 263.101823,
+        "end_sec": 275.901823,
+        "duration_sec": 12.8
+      },
+      "features": {
+        "rms": 0.08165088,
+        "zcr": 0.03891737,
+        "centroid_hz": 1063.9699,
+        "rolloff_hz": 1641.9067,
+        "attack_sec": 0.008617
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 16,
+      "label": "amp-016",
+      "file": "amp_016.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 279.176395,
+        "end_sec": 279.926395,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.06817184,
+        "zcr": 0.0429945,
+        "centroid_hz": 987.1538,
+        "rolloff_hz": 1593.457,
+        "attack_sec": 0.002268
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 17,
+      "label": "amp-017",
+      "file": "amp_017.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 286.069841,
+        "end_sec": 286.819841,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.08384453,
+        "zcr": 0.0429971,
+        "centroid_hz": 994.6846,
+        "rolloff_hz": 1461.5662,
+        "attack_sec": 0.0561
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 18,
+      "label": "amp-018",
+      "file": "amp_018.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 390.373896,
+        "end_sec": 393.173896,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.04983651,
+        "zcr": 0.03707543,
+        "centroid_hz": 1116.3675,
+        "rolloff_hz": 1886.8469,
+        "attack_sec": 1.551746
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 19,
+      "label": "amp-019",
+      "file": "amp_019.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 396.663746,
+        "end_sec": 399.463746,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.07287349,
+        "zcr": 0.03058035,
+        "centroid_hz": 1021.9261,
+        "rolloff_hz": 1668.8232,
+        "attack_sec": 0.001905
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 20,
+      "label": "amp-020",
+      "file": "amp_020.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 400.092118,
+        "end_sec": 402.892118,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.06924685,
+        "zcr": 0.03130922,
+        "centroid_hz": 1626.1737,
+        "rolloff_hz": 3372.6379,
+        "attack_sec": 0.003356
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 21,
+      "label": "amp-021",
+      "file": "amp_021.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 405.109848,
+        "end_sec": 406.159848,
+        "duration_sec": 1.05
+      },
+      "features": {
+        "rms": 0.08867406,
+        "zcr": 0.03909118,
+        "centroid_hz": 1402.3229,
+        "rolloff_hz": 2244.8364,
+        "attack_sec": 0.001088
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 22,
+      "label": "amp-022",
+      "file": "amp_022.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 410.676299,
+        "end_sec": 415.876299,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.07211899,
+        "zcr": 0.03758972,
+        "centroid_hz": 1425.7186,
+        "rolloff_hz": 2823.5413,
+        "attack_sec": 0.014739
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 23,
+      "label": "amp-023",
+      "file": "amp_023.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 417.301224,
+        "end_sec": 419.301224,
+        "duration_sec": 2.0
+      },
+      "features": {
+        "rms": 0.05682309,
+        "zcr": 0.05412821,
+        "centroid_hz": 943.5382,
+        "rolloff_hz": 1313.5254,
+        "attack_sec": 0.435147
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 24,
+      "label": "amp-024",
+      "file": "amp_024.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 419.2761,
+        "end_sec": 421.2761,
+        "duration_sec": 2.0
+      },
+      "features": {
+        "rms": 0.06962432,
+        "zcr": 0.03959273,
+        "centroid_hz": 700.703,
+        "rolloff_hz": 565.2466,
+        "attack_sec": 0.001088
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 25,
+      "label": "amp-025",
+      "file": "amp_025.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 432.846834,
+        "end_sec": 433.396834,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.08837249,
+        "zcr": 0.03273687,
+        "centroid_hz": 788.2885,
+        "rolloff_hz": 1203.1677,
+        "attack_sec": 0.03229
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 26,
+      "label": "amp-026",
+      "file": "amp_026.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 443.263553,
+        "end_sec": 444.713553,
+        "duration_sec": 1.45
+      },
+      "features": {
+        "rms": 0.0845922,
+        "zcr": 0.04522849,
+        "centroid_hz": 1148.1334,
+        "rolloff_hz": 1402.3499,
+        "attack_sec": 0.012381
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 27,
+      "label": "amp-027",
+      "file": "amp_027.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 466.326349,
+        "end_sec": 473.126349,
+        "duration_sec": 6.8
+      },
+      "features": {
+        "rms": 0.09532098,
+        "zcr": 0.06059798,
+        "centroid_hz": 1245.7465,
+        "rolloff_hz": 1257.0007,
+        "attack_sec": 0.087619
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 28,
+      "label": "amp-028",
+      "file": "amp_028.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 477.727347,
+        "end_sec": 480.527347,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.0852837,
+        "zcr": 0.04253389,
+        "centroid_hz": 989.5673,
+        "rolloff_hz": 748.2788,
+        "attack_sec": 0.008617
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 29,
+      "label": "amp-029",
+      "file": "amp_029.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 508.377687,
+        "end_sec": 509.127687,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.03083999,
+        "zcr": 0.02787857,
+        "centroid_hz": 863.8743,
+        "rolloff_hz": 1254.3091,
+        "attack_sec": 0.67932
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 30,
+      "label": "amp-030",
+      "file": "amp_030.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 516.133571,
+        "end_sec": 516.883571,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.04785756,
+        "zcr": 0.07087567,
+        "centroid_hz": 1255.1279,
+        "rolloff_hz": 1994.5129,
+        "attack_sec": 0.326984
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 31,
+      "label": "amp-031",
+      "file": "amp_031.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 538.052789,
+        "end_sec": 540.852789,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.01326735,
+        "zcr": 0.06851423,
+        "centroid_hz": 2480.0061,
+        "rolloff_hz": 5579.7913,
+        "attack_sec": 0.018367
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 32,
+      "label": "amp-032",
+      "file": "amp_032.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 560.131683,
+        "end_sec": 565.331683,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.06273648,
+        "zcr": 0.04798577,
+        "centroid_hz": 879.1013,
+        "rolloff_hz": 1028.2104,
+        "attack_sec": 0.718503
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 33,
+      "label": "amp-033",
+      "file": "amp_033.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 578.47749,
+        "end_sec": 579.02749,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.05857838,
+        "zcr": 0.02449081,
+        "centroid_hz": 1550.3661,
+        "rolloff_hz": 3450.6958,
+        "attack_sec": 0.001769
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 34,
+      "label": "amp-034",
+      "file": "amp_034.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 587.978571,
+        "end_sec": 588.728571,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.04690012,
+        "zcr": 0.02013666,
+        "centroid_hz": 442.6672,
+        "rolloff_hz": 565.2466,
+        "attack_sec": 0.002993
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 35,
+      "label": "amp-035",
+      "file": "amp_035.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 606.574857,
+        "end_sec": 613.374857,
+        "duration_sec": 6.8
+      },
+      "features": {
+        "rms": 0.05610754,
+        "zcr": 0.04931339,
+        "centroid_hz": 957.9803,
+        "rolloff_hz": 1052.4353,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 36,
+      "label": "amp-036",
+      "file": "amp_036.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 628.574186,
+        "end_sec": 638.174186,
+        "duration_sec": 9.6
+      },
+      "features": {
+        "rms": 0.07136282,
+        "zcr": 0.04887589,
+        "centroid_hz": 1478.2455,
+        "rolloff_hz": 3079.248,
+        "attack_sec": 1.664444
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 37,
+      "label": "amp-037",
+      "file": "amp_037.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 674.414882,
+        "end_sec": 675.464882,
+        "duration_sec": 1.05
+      },
+      "features": {
+        "rms": 0.11515728,
+        "zcr": 0.03947994,
+        "centroid_hz": 762.1319,
+        "rolloff_hz": 1127.8015,
+        "attack_sec": 0.02644
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 38,
+      "label": "amp-038",
+      "file": "amp_038.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 685.82458,
+        "end_sec": 691.02458,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.05817443,
+        "zcr": 0.0282577,
+        "centroid_hz": 1281.2322,
+        "rolloff_hz": 2640.509,
+        "attack_sec": 1.622812
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 39,
+      "label": "amp-039",
+      "file": "amp_039.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 693.944943,
+        "end_sec": 695.944943,
+        "duration_sec": 2.0
+      },
+      "features": {
+        "rms": 0.06326547,
+        "zcr": 0.04226853,
+        "centroid_hz": 669.4649,
+        "rolloff_hz": 993.219,
+        "attack_sec": 0.620363
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 40,
+      "label": "amp-040",
+      "file": "amp_040.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 700.099472,
+        "end_sec": 701.549472,
+        "duration_sec": 1.45
+      },
+      "features": {
+        "rms": 0.0711786,
+        "zcr": 0.03747146,
+        "centroid_hz": 1857.8637,
+        "rolloff_hz": 4586.5723,
+        "attack_sec": 0.000726
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 41,
+      "label": "amp-041",
+      "file": "amp_041.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 704.133664,
+        "end_sec": 705.583664,
+        "duration_sec": 1.45
+      },
+      "features": {
+        "rms": 0.06689364,
+        "zcr": 0.04278878,
+        "centroid_hz": 858.7037,
+        "rolloff_hz": 1415.8081,
+        "attack_sec": 0.232925
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 42,
+      "label": "amp-042",
+      "file": "amp_042.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 713.301127,
+        "end_sec": 713.851127,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.0463439,
+        "zcr": 0.02663478,
+        "centroid_hz": 784.6872,
+        "rolloff_hz": 1197.7844,
+        "attack_sec": 0.000136
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 43,
+      "label": "amp-043",
+      "file": "amp_043.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 715.944925,
+        "end_sec": 728.744925,
+        "duration_sec": 12.8
+      },
+      "features": {
+        "rms": 0.02934192,
+        "zcr": 0.02846878,
+        "centroid_hz": 1316.8181,
+        "rolloff_hz": 2662.0422,
+        "attack_sec": 0.51161
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 44,
+      "label": "amp-044",
+      "file": "amp_044.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 745.042805,
+        "end_sec": 745.592805,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.06293634,
+        "zcr": 0.01014266,
+        "centroid_hz": 1125.6147,
+        "rolloff_hz": 2306.7444,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 45,
+      "label": "amp-045",
+      "file": "amp_045.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 777.848921,
+        "end_sec": 778.398921,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.05877592,
+        "zcr": 0.08039911,
+        "centroid_hz": 985.0618,
+        "rolloff_hz": 995.9106,
+        "attack_sec": 0.045533
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 46,
+      "label": "amp-046",
+      "file": "amp_046.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 792.451032,
+        "end_sec": 793.201032,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.06223877,
+        "zcr": 0.0635583,
+        "centroid_hz": 1027.1771,
+        "rolloff_hz": 1012.0605,
+        "attack_sec": 0.001859
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 47,
+      "label": "amp-047",
+      "file": "amp_047.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 813.607651,
+        "end_sec": 814.157651,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.04801949,
+        "zcr": 0.03537561,
+        "centroid_hz": 630.6099,
+        "rolloff_hz": 998.6023,
+        "attack_sec": 0.266803
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 48,
+      "label": "amp-048",
+      "file": "amp_048.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 818.211556,
+        "end_sec": 827.811556,
+        "duration_sec": 9.6
+      },
+      "features": {
+        "rms": 0.06033298,
+        "zcr": 0.04102911,
+        "centroid_hz": 879.0924,
+        "rolloff_hz": 1068.5852,
+        "attack_sec": 0.000272
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 49,
+      "label": "amp-049",
+      "file": "amp_049.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 844.416871,
+        "end_sec": 857.216871,
+        "duration_sec": 12.8
+      },
+      "features": {
+        "rms": 0.06882473,
+        "zcr": 0.03304292,
+        "centroid_hz": 1082.2182,
+        "rolloff_hz": 1410.4248,
+        "attack_sec": 0.012426
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 50,
+      "label": "amp-050",
+      "file": "amp_050.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 856.674268,
+        "end_sec": 859.474268,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.07554968,
+        "zcr": 0.03791769,
+        "centroid_hz": 1142.0453,
+        "rolloff_hz": 1604.2236,
+        "attack_sec": 0.02449
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 51,
+      "label": "amp-051",
+      "file": "amp_051.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 860.041438,
+        "end_sec": 863.941438,
+        "duration_sec": 3.9
+      },
+      "features": {
+        "rms": 0.08037107,
+        "zcr": 0.03104868,
+        "centroid_hz": 1132.8135,
+        "rolloff_hz": 1620.3735,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse"
+      }
+    },
+    {
+      "id": 52,
+      "label": "amp-052",
+      "file": "amp_052.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 866.874227,
+        "end_sec": 867.424227,
+        "duration_sec": 0.55
+      },
+      "features": {
+        "rms": 0.07356819,
+        "zcr": 0.02787169,
+        "centroid_hz": 1247.5588,
+        "rolloff_hz": 1962.2131,
+        "attack_sec": 0.014875
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 53,
+      "label": "amp-053",
+      "file": "amp_053.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 875.067193,
+        "end_sec": 881.867193,
+        "duration_sec": 6.8
+      },
+      "features": {
+        "rms": 0.03629269,
+        "zcr": 0.03475413,
+        "centroid_hz": 1047.5439,
+        "rolloff_hz": 1405.0415,
+        "attack_sec": 0.018231
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 54,
+      "label": "amp-054",
+      "file": "amp_054.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 883.870454,
+        "end_sec": 884.620454,
+        "duration_sec": 0.75
+      },
+      "features": {
+        "rms": 0.03674257,
+        "zcr": 0.05345589,
+        "centroid_hz": 908.1508,
+        "rolloff_hz": 998.6023,
+        "attack_sec": 0.148662
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 55,
+      "label": "amp-055",
+      "file": "amp_055.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 919.185125,
+        "end_sec": 920.235125,
+        "duration_sec": 1.05
+      },
+      "features": {
+        "rms": 0.06267977,
+        "zcr": 0.03174809,
+        "centroid_hz": 846.4006,
+        "rolloff_hz": 826.3367,
+        "attack_sec": 0.346259
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 56,
+      "label": "amp-056",
+      "file": "amp_056.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 923.307356,
+        "end_sec": 926.107356,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.06294206,
+        "zcr": 0.03472683,
+        "centroid_hz": 716.9805,
+        "rolloff_hz": 724.054,
+        "attack_sec": 0.002222
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 57,
+      "label": "amp-057",
+      "file": "amp_057.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 993.08644,
+        "end_sec": 995.08644,
+        "duration_sec": 2.0
+      },
+      "features": {
+        "rms": 0.01591075,
+        "zcr": 0.03201887,
+        "centroid_hz": 1471.0849,
+        "rolloff_hz": 3679.4861,
+        "attack_sec": 0.291338
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 58,
+      "label": "amp-058",
+      "file": "amp_058.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1022.9518,
+        "end_sec": 1029.7518,
+        "duration_sec": 6.8
+      },
+      "features": {
+        "rms": 0.02432744,
+        "zcr": 0.03975617,
+        "centroid_hz": 1120.0603,
+        "rolloff_hz": 1894.9219,
+        "attack_sec": 0.007937
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 59,
+      "label": "amp-059",
+      "file": "amp_059.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1028.94585,
+        "end_sec": 1030.39585,
+        "duration_sec": 1.45
+      },
+      "features": {
+        "rms": 0.01182706,
+        "zcr": 0.08201182,
+        "centroid_hz": 1373.452,
+        "rolloff_hz": 1932.605,
+        "attack_sec": 0.062721
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 60,
+      "label": "amp-060",
+      "file": "amp_060.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1036.852934,
+        "end_sec": 1039.652934,
+        "duration_sec": 2.8
+      },
+      "features": {
+        "rms": 0.04000254,
+        "zcr": 0.03459726,
+        "centroid_hz": 1240.8777,
+        "rolloff_hz": 2180.2368,
+        "attack_sec": 0.406349
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 61,
+      "label": "amp-061",
+      "file": "amp_061.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1040.714766,
+        "end_sec": 1044.614766,
+        "duration_sec": 3.9
+      },
+      "features": {
+        "rms": 0.0201842,
+        "zcr": 0.02711817,
+        "centroid_hz": 620.278,
+        "rolloff_hz": 664.8376,
+        "attack_sec": 0.001088
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance"
+      }
+    },
+    {
+      "id": 62,
+      "label": "amp-062",
+      "file": "amp_062.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1067.653515,
+        "end_sec": 1080.453515,
+        "duration_sec": 12.8
+      },
+      "features": {
+        "rms": 0.01590201,
+        "zcr": 0.03866595,
+        "centroid_hz": 953.7987,
+        "rolloff_hz": 1499.2493,
+        "attack_sec": 1.451519
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 63,
+      "label": "amp-063",
+      "file": "amp_063.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1083.973542,
+        "end_sec": 1087.873542,
+        "duration_sec": 3.9
+      },
+      "features": {
+        "rms": 0.02519931,
+        "zcr": 0.03700258,
+        "centroid_hz": 1597.4412,
+        "rolloff_hz": 3666.0278,
+        "attack_sec": 1.629161
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone"
+      }
+    },
+    {
+      "id": 64,
+      "label": "amp-064",
+      "file": "amp_064.mp3",
+      "source": {
+        "path": "/Users/seb/Downloads/Seb S - amplifications/Seb S - amplifications - 01 MARIMBAideefixe.mp3",
+        "start_sec": 1088.89649,
+        "end_sec": 1094.09649,
+        "duration_sec": 5.2
+      },
+      "features": {
+        "rms": 0.02584721,
+        "zcr": 0.05013126,
+        "centroid_hz": 926.2314,
+        "rolloff_hz": 1289.3005,
+        "attack_sec": 0.140408
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance"
+      }
+    }
+  ]
+}
