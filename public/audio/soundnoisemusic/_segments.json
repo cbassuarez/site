@@ -1,0 +1,1777 @@
+{
+  "generator": {
+    "name": "generate_world_segments.py",
+    "version": 1,
+    "seed": 20260426,
+    "count": 64,
+    "bitrate": "192k",
+    "profile": "quartet_dense",
+    "prefix": "snm",
+    "source_duration_sec": 710.16
+  },
+  "summary": {
+    "duration_buckets": {
+      "short": 30,
+      "mid": 23,
+      "long": 11
+    },
+    "timeline_bins": {
+      "0": 7,
+      "1": 7,
+      "2": 7,
+      "3": 7,
+      "4": 6,
+      "5": 6,
+      "6": 6,
+      "7": 6,
+      "8": 6,
+      "9": 6
+    },
+    "centroid_bins": {
+      "high": 21,
+      "mid": 21,
+      "low": 22
+    },
+    "attack_bins": {
+      "mid": 21,
+      "low": 22,
+      "high": 21
+    },
+    "category_counts": {
+      "pulse": 23,
+      "resonance": 29,
+      "noise": 9,
+      "drone": 3
+    }
+  },
+  "segments": [
+    {
+      "id": 1,
+      "label": "snm-001",
+      "file": "snm_001.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 36.457528,
+        "end_sec": 36.957528,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.16148782,
+        "zcr": 0.09869376,
+        "centroid_hz": 1954.4957,
+        "rolloff_hz": 3760.2356,
+        "attack_sec": 0.010023
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 2,
+      "label": "snm-002",
+      "file": "snm_002.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 37.234167,
+        "end_sec": 38.484167,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.17417222,
+        "zcr": 0.09244948,
+        "centroid_hz": 1725.2074,
+        "rolloff_hz": 3477.6123,
+        "attack_sec": 0.034422
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 3,
+      "label": "snm-003",
+      "file": "snm_003.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 43.989955,
+        "end_sec": 46.889955,
+        "duration_sec": 2.9
+      },
+      "features": {
+        "rms": 0.18929648,
+        "zcr": 0.06602652,
+        "centroid_hz": 1565.2099,
+        "rolloff_hz": 3100.7812,
+        "attack_sec": 0.007937
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 4,
+      "label": "snm-004",
+      "file": "snm_004.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 49.580102,
+        "end_sec": 50.830102,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.08271997,
+        "zcr": 0.07858931,
+        "centroid_hz": 2000.6464,
+        "rolloff_hz": 4271.6492,
+        "attack_sec": 0.000363
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 5,
+      "label": "snm-005",
+      "file": "snm_005.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 65.880391,
+        "end_sec": 66.230391,
+        "duration_sec": 0.35
+      },
+      "features": {
+        "rms": 0.02581652,
+        "zcr": 0.06427368,
+        "centroid_hz": 1922.979,
+        "rolloff_hz": 3911.1752,
+        "attack_sec": 0.28449
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 6,
+      "label": "snm-006",
+      "file": "snm_006.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 66.989651,
+        "end_sec": 70.789651,
+        "duration_sec": 3.8
+      },
+      "features": {
+        "rms": 0.04610138,
+        "zcr": 0.06608266,
+        "centroid_hz": 2283.677,
+        "rolloff_hz": 4949.9451,
+        "attack_sec": 1.615057
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 7,
+      "label": "snm-007",
+      "file": "snm_007.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 69.345805,
+        "end_sec": 71.545805,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.05057117,
+        "zcr": 0.04627912,
+        "centroid_hz": 1588.7998,
+        "rolloff_hz": 3157.3059,
+        "attack_sec": 0.000136
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 8,
+      "label": "snm-008",
+      "file": "snm_008.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 101.010363,
+        "end_sec": 101.510363,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.10703112,
+        "zcr": 0.04263425,
+        "centroid_hz": 1087.8332,
+        "rolloff_hz": 2209.845,
+        "attack_sec": 0.000544
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 9,
+      "label": "snm-009",
+      "file": "snm_009.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 103.020599,
+        "end_sec": 103.970599,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.08205941,
+        "zcr": 0.05915211,
+        "centroid_hz": 1422.0216,
+        "rolloff_hz": 2836.9995,
+        "attack_sec": 0.204535
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 10,
+      "label": "snm-010",
+      "file": "snm_010.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 103.436358,
+        "end_sec": 104.136358,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.07512989,
+        "zcr": 0.0600622,
+        "centroid_hz": 1301.3603,
+        "rolloff_hz": 2678.1921,
+        "attack_sec": 0.04195
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 11,
+      "label": "snm-011",
+      "file": "snm_011.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 104.814875,
+        "end_sec": 105.514875,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.08148321,
+        "zcr": 0.05494363,
+        "centroid_hz": 1364.9839,
+        "rolloff_hz": 2750.8667,
+        "attack_sec": 0.002041
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 12,
+      "label": "snm-012",
+      "file": "snm_012.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 118.727506,
+        "end_sec": 123.727506,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.17169127,
+        "zcr": 0.06350171,
+        "centroid_hz": 1595.6432,
+        "rolloff_hz": 3310.73,
+        "attack_sec": 0.189932
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 13,
+      "label": "snm-013",
+      "file": "snm_013.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 124.321837,
+        "end_sec": 124.821837,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.05410387,
+        "zcr": 0.06132075,
+        "centroid_hz": 1490.7394,
+        "rolloff_hz": 2923.1323,
+        "attack_sec": 0.003175
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 14,
+      "label": "snm-014",
+      "file": "snm_014.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 132.528061,
+        "end_sec": 132.878061,
+        "duration_sec": 0.35
+      },
+      "features": {
+        "rms": 0.19723113,
+        "zcr": 0.13424906,
+        "centroid_hz": 2234.4046,
+        "rolloff_hz": 4579.7033,
+        "attack_sec": 0.019592
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 1,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 15,
+      "label": "snm-015",
+      "file": "snm_015.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 146.165995,
+        "end_sec": 148.365995,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.14194623,
+        "zcr": 0.12119401,
+        "centroid_hz": 2034.9502,
+        "rolloff_hz": 3905.5847,
+        "attack_sec": 0.00127
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 16,
+      "label": "snm-016",
+      "file": "snm_016.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 147.10229,
+        "end_sec": 152.10229,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.1624954,
+        "zcr": 0.09483986,
+        "centroid_hz": 1735.4001,
+        "rolloff_hz": 3431.8542,
+        "attack_sec": 0.038866
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 17,
+      "label": "snm-017",
+      "file": "snm_017.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 162.234184,
+        "end_sec": 163.484184,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.11659067,
+        "zcr": 0.19512372,
+        "centroid_hz": 2236.6414,
+        "rolloff_hz": 4212.4329,
+        "attack_sec": 0.001451
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 18,
+      "label": "snm-018",
+      "file": "snm_018.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 177.983152,
+        "end_sec": 178.483152,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.0694719,
+        "zcr": 0.14150943,
+        "centroid_hz": 2574.026,
+        "rolloff_hz": 4756.1462,
+        "attack_sec": 0.007937
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 19,
+      "label": "snm-019",
+      "file": "snm_019.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 178.68483,
+        "end_sec": 180.88483,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.10595301,
+        "zcr": 0.13170752,
+        "centroid_hz": 2694.8665,
+        "rolloff_hz": 5197.5769,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 20,
+      "label": "snm-020",
+      "file": "snm_020.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 189.32917,
+        "end_sec": 190.27917,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.13861276,
+        "zcr": 0.04659601,
+        "centroid_hz": 1300.7133,
+        "rolloff_hz": 2729.3335,
+        "attack_sec": 0.145669
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 2,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 21,
+      "label": "snm-021",
+      "file": "snm_021.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 194.188481,
+        "end_sec": 194.688481,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.10049676,
+        "zcr": 0.09043904,
+        "centroid_hz": 2110.5947,
+        "rolloff_hz": 4352.3987,
+        "attack_sec": 0.00195
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 22,
+      "label": "snm-022",
+      "file": "snm_022.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 228.716574,
+        "end_sec": 229.666574,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.02133647,
+        "zcr": 0.07347465,
+        "centroid_hz": 1681.7725,
+        "rolloff_hz": 3369.9463,
+        "attack_sec": 0.012517
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 23,
+      "label": "snm-023",
+      "file": "snm_023.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 231.770947,
+        "end_sec": 233.020947,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.07105206,
+        "zcr": 0.04655129,
+        "centroid_hz": 1405.1657,
+        "rolloff_hz": 2869.2993,
+        "attack_sec": 0.426576
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 24,
+      "label": "snm-024",
+      "file": "snm_024.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 248.907451,
+        "end_sec": 251.807451,
+        "duration_sec": 2.9
+      },
+      "features": {
+        "rms": 0.11092582,
+        "zcr": 0.07292318,
+        "centroid_hz": 1422.7562,
+        "rolloff_hz": 2896.2158,
+        "attack_sec": 0.806304
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 25,
+      "label": "snm-025",
+      "file": "snm_025.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 264.144904,
+        "end_sec": 265.094904,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.1923672,
+        "zcr": 0.05681276,
+        "centroid_hz": 1182.6799,
+        "rolloff_hz": 2419.7937,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 26,
+      "label": "snm-026",
+      "file": "snm_026.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 268.840635,
+        "end_sec": 269.340635,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.23536374,
+        "zcr": 0.05388244,
+        "centroid_hz": 1509.7923,
+        "rolloff_hz": 2933.8989,
+        "attack_sec": 0.011156
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 27,
+      "label": "snm-027",
+      "file": "snm_027.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 276.108481,
+        "end_sec": 281.108481,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.1299181,
+        "zcr": 0.07258116,
+        "centroid_hz": 1654.8101,
+        "rolloff_hz": 3378.0212,
+        "attack_sec": 0.214739
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 28,
+      "label": "snm-028",
+      "file": "snm_028.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 282.236408,
+        "end_sec": 286.036408,
+        "duration_sec": 3.8
+      },
+      "features": {
+        "rms": 0.12010429,
+        "zcr": 0.05880247,
+        "centroid_hz": 1329.1115,
+        "rolloff_hz": 2729.3335,
+        "attack_sec": 0.001497
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 29,
+      "label": "snm-029",
+      "file": "snm_029.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 304.725143,
+        "end_sec": 306.925143,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.15624791,
+        "zcr": 0.06196788,
+        "centroid_hz": 1493.7963,
+        "rolloff_hz": 2963.5071,
+        "attack_sec": 0.161134
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 30,
+      "label": "snm-030",
+      "file": "snm_030.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 307.588236,
+        "end_sec": 311.388236,
+        "duration_sec": 3.8
+      },
+      "features": {
+        "rms": 0.15906429,
+        "zcr": 0.06873217,
+        "centroid_hz": 1383.6909,
+        "rolloff_hz": 2713.1836,
+        "attack_sec": 0.013832
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 31,
+      "label": "snm-031",
+      "file": "snm_031.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 320.769354,
+        "end_sec": 322.019354,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.2209453,
+        "zcr": 0.05326367,
+        "centroid_hz": 1181.4462,
+        "rolloff_hz": 2487.085,
+        "attack_sec": 0.007891
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 32,
+      "label": "snm-032",
+      "file": "snm_032.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 322.04063,
+        "end_sec": 322.74063,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.24638385,
+        "zcr": 0.0495011,
+        "centroid_hz": 1269.5279,
+        "rolloff_hz": 2643.2007,
+        "attack_sec": 0.000635
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 33,
+      "label": "snm-033",
+      "file": "snm_033.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 336.878422,
+        "end_sec": 338.578422,
+        "duration_sec": 1.7
+      },
+      "features": {
+        "rms": 0.09243135,
+        "zcr": 0.08454274,
+        "centroid_hz": 1794.6166,
+        "rolloff_hz": 3577.2034,
+        "attack_sec": 0.283039
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 34,
+      "label": "snm-034",
+      "file": "snm_034.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 348.874558,
+        "end_sec": 353.874558,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.09978772,
+        "zcr": 0.06784642,
+        "centroid_hz": 1752.8442,
+        "rolloff_hz": 3415.7043,
+        "attack_sec": 0.548571
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 35,
+      "label": "snm-035",
+      "file": "snm_035.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 355.590385,
+        "end_sec": 356.540385,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.11117919,
+        "zcr": 0.06282822,
+        "centroid_hz": 1398.7212,
+        "rolloff_hz": 2750.8667,
+        "attack_sec": 0.052971
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 36,
+      "label": "snm-036",
+      "file": "snm_036.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 372.357392,
+        "end_sec": 372.857392,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.06440475,
+        "zcr": 0.06204644,
+        "centroid_hz": 1404.2143,
+        "rolloff_hz": 2850.4578,
+        "attack_sec": 0.012744
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 37,
+      "label": "snm-037",
+      "file": "snm_037.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 379.975517,
+        "end_sec": 380.925517,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.10961846,
+        "zcr": 0.06282822,
+        "centroid_hz": 1274.8934,
+        "rolloff_hz": 2532.843,
+        "attack_sec": 0.176599
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 38,
+      "label": "snm-038",
+      "file": "snm_038.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 385.160408,
+        "end_sec": 387.360408,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.01484952,
+        "zcr": 0.04790864,
+        "centroid_hz": 1708.9499,
+        "rolloff_hz": 3219.2139,
+        "attack_sec": 0.00068
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 5,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 39,
+      "label": "snm-039",
+      "file": "snm_039.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 405.329649,
+        "end_sec": 406.279649,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.05336576,
+        "zcr": 0.16890247,
+        "centroid_hz": 2474.7284,
+        "rolloff_hz": 4293.1824,
+        "attack_sec": 0.000408
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 40,
+      "label": "snm-040",
+      "file": "snm_040.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 419.79356,
+        "end_sec": 423.59356,
+        "duration_sec": 3.8
+      },
+      "features": {
+        "rms": 0.10970145,
+        "zcr": 0.04246381,
+        "centroid_hz": 1291.3248,
+        "rolloff_hz": 2492.4683,
+        "attack_sec": 0.63932
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 5,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 41,
+      "label": "snm-041",
+      "file": "snm_041.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 433.048515,
+        "end_sec": 434.298515,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.05076994,
+        "zcr": 0.05594659,
+        "centroid_hz": 1459.4517,
+        "rolloff_hz": 3170.7642,
+        "attack_sec": 0.68449
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 42,
+      "label": "snm-042",
+      "file": "snm_042.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 450.086701,
+        "end_sec": 450.586701,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.04017432,
+        "zcr": 0.08082366,
+        "centroid_hz": 1553.4632,
+        "rolloff_hz": 3087.323,
+        "attack_sec": 0.004399
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 43,
+      "label": "snm-043",
+      "file": "snm_043.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 462.286077,
+        "end_sec": 467.286077,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.17604122,
+        "zcr": 0.09834103,
+        "centroid_hz": 1799.3433,
+        "rolloff_hz": 3491.0706,
+        "attack_sec": 0.304762
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 44,
+      "label": "snm-044",
+      "file": "snm_044.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 481.01746,
+        "end_sec": 482.26746,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.11001159,
+        "zcr": 0.03708138,
+        "centroid_hz": 648.853,
+        "rolloff_hz": 791.3452,
+        "attack_sec": 0.033515
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 45,
+      "label": "snm-045",
+      "file": "snm_045.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 484.809433,
+        "end_sec": 485.509433,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.03415464,
+        "zcr": 0.09479072,
+        "centroid_hz": 1953.3508,
+        "rolloff_hz": 3633.728,
+        "attack_sec": 0.078821
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 46,
+      "label": "snm-046",
+      "file": "snm_046.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 491.49148,
+        "end_sec": 492.44148,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.07049764,
+        "zcr": 0.05280244,
+        "centroid_hz": 1214.1905,
+        "rolloff_hz": 2371.344,
+        "attack_sec": 0.000816
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 47,
+      "label": "snm-047",
+      "file": "snm_047.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 497.557188,
+        "end_sec": 498.057188,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.10452197,
+        "zcr": 0.06857765,
+        "centroid_hz": 1883.7867,
+        "rolloff_hz": 3690.2527,
+        "attack_sec": 0.007664
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 48,
+      "label": "snm-048",
+      "file": "snm_048.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 506.11181,
+        "end_sec": 508.31181,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.19882125,
+        "zcr": 0.0381991,
+        "centroid_hz": 895.7331,
+        "rolloff_hz": 1561.1572,
+        "attack_sec": 0.878639
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 49,
+      "label": "snm-049",
+      "file": "snm_049.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 508.744025,
+        "end_sec": 511.644025,
+        "duration_sec": 2.9
+      },
+      "features": {
+        "rms": 0.13862328,
+        "zcr": 0.0682003,
+        "centroid_hz": 2116.5298,
+        "rolloff_hz": 4161.2915,
+        "attack_sec": 0.218277
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 50,
+      "label": "snm-050",
+      "file": "snm_050.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 511.791102,
+        "end_sec": 515.591102,
+        "duration_sec": 3.8
+      },
+      "features": {
+        "rms": 0.15282424,
+        "zcr": 0.06262159,
+        "centroid_hz": 1299.6921,
+        "rolloff_hz": 2691.6504,
+        "attack_sec": 0.091973
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 51,
+      "label": "snm-051",
+      "file": "snm_051.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 516.205293,
+        "end_sec": 517.905293,
+        "duration_sec": 1.7
+      },
+      "features": {
+        "rms": 0.02859893,
+        "zcr": 0.04476577,
+        "centroid_hz": 1405.5583,
+        "rolloff_hz": 2742.7917,
+        "attack_sec": 0.002041
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 52,
+      "label": "snm-052",
+      "file": "snm_052.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 565.84585,
+        "end_sec": 570.84585,
+        "duration_sec": 5.0
+      },
+      "features": {
+        "rms": 0.10194783,
+        "zcr": 0.0896244,
+        "centroid_hz": 2090.9959,
+        "rolloff_hz": 4072.467,
+        "attack_sec": 0.04585
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 53,
+      "label": "snm-053",
+      "file": "snm_053.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 570.491066,
+        "end_sec": 571.741066,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.09662759,
+        "zcr": 0.06335039,
+        "centroid_hz": 1265.983,
+        "rolloff_hz": 2452.0935,
+        "attack_sec": 0.002948
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 8,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 54,
+      "label": "snm-054",
+      "file": "snm_054.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 571.064524,
+        "end_sec": 572.764524,
+        "duration_sec": 1.7
+      },
+      "features": {
+        "rms": 0.08038037,
+        "zcr": 0.06789564,
+        "centroid_hz": 1387.6812,
+        "rolloff_hz": 2939.2822,
+        "attack_sec": 0.019229
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 8,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 55,
+      "label": "snm-055",
+      "file": "snm_055.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 584.933878,
+        "end_sec": 585.283878,
+        "duration_sec": 0.35
+      },
+      "features": {
+        "rms": 0.04348291,
+        "zcr": 0.03952825,
+        "centroid_hz": 995.9883,
+        "rolloff_hz": 1937.2684,
+        "attack_sec": 0.004762
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 8,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 56,
+      "label": "snm-056",
+      "file": "snm_056.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 596.474395,
+        "end_sec": 599.374395,
+        "duration_sec": 2.9
+      },
+      "features": {
+        "rms": 0.10523904,
+        "zcr": 0.10807894,
+        "centroid_hz": 3318.5059,
+        "rolloff_hz": 6610.6934,
+        "attack_sec": 0.007075
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 8,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 57,
+      "label": "snm-057",
+      "file": "snm_057.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 609.163311,
+        "end_sec": 611.363311,
+        "duration_sec": 2.2
+      },
+      "features": {
+        "rms": 0.1783559,
+        "zcr": 0.06413243,
+        "centroid_hz": 1653.2057,
+        "rolloff_hz": 3248.822,
+        "attack_sec": 0.126893
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 8,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 58,
+      "label": "snm-058",
+      "file": "snm_058.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 618.573492,
+        "end_sec": 619.073492,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.06963739,
+        "zcr": 0.07411103,
+        "centroid_hz": 1569.7803,
+        "rolloff_hz": 2971.582,
+        "attack_sec": 0.019048
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 8,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 59,
+      "label": "snm-059",
+      "file": "snm_059.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 642.118286,
+        "end_sec": 643.068286,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.11354755,
+        "zcr": 0.12603838,
+        "centroid_hz": 1762.9494,
+        "rolloff_hz": 3563.7451,
+        "attack_sec": 0.000181
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 9,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 60,
+      "label": "snm-060",
+      "file": "snm_060.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 642.615324,
+        "end_sec": 643.315324,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.12114647,
+        "zcr": 0.13573928,
+        "centroid_hz": 1981.4825,
+        "rolloff_hz": 3854.4434,
+        "attack_sec": 0.071474
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 9,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 61,
+      "label": "snm-061",
+      "file": "snm_061.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 648.709533,
+        "end_sec": 649.409533,
+        "duration_sec": 0.7
+      },
+      "features": {
+        "rms": 0.1420169,
+        "zcr": 0.1104056,
+        "centroid_hz": 2252.523,
+        "rolloff_hz": 4653.8635,
+        "attack_sec": 0.001088
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 9,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 62,
+      "label": "snm-062",
+      "file": "snm_062.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 658.153873,
+        "end_sec": 659.853873,
+        "duration_sec": 1.7
+      },
+      "features": {
+        "rms": 0.09935895,
+        "zcr": 0.15403906,
+        "centroid_hz": 3266.2328,
+        "rolloff_hz": 6433.0444,
+        "attack_sec": 0.000227
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 9,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 63,
+      "label": "snm-063",
+      "file": "snm_063.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 667.704116,
+        "end_sec": 668.204116,
+        "duration_sec": 0.5
+      },
+      "features": {
+        "rms": 0.24821278,
+        "zcr": 0.08998549,
+        "centroid_hz": 2298.0512,
+        "rolloff_hz": 4204.3579,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 9,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "quartet_dense"
+      }
+    },
+    {
+      "id": 64,
+      "label": "snm-064",
+      "file": "snm_064.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/SSS_soundnoisemusic_audio.mp3",
+        "start_sec": 671.592868,
+        "end_sec": 672.542868,
+        "duration_sec": 0.95
+      },
+      "features": {
+        "rms": 0.09820683,
+        "zcr": 0.23058194,
+        "centroid_hz": 3142.3685,
+        "rolloff_hz": 6373.8281,
+        "attack_sec": 0.000136
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "short",
+        "timeline_bin": 9,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "noise",
+        "profile": "quartet_dense"
+      }
+    }
+  ]
+}

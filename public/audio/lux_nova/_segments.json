@@ -1,0 +1,1774 @@
+{
+  "generator": {
+    "name": "generate_world_segments.py",
+    "version": 1,
+    "seed": 20260426,
+    "count": 64,
+    "bitrate": "192k",
+    "profile": "lux_stackable_long",
+    "prefix": "lux",
+    "source_duration_sec": 700.056
+  },
+  "summary": {
+    "duration_buckets": {
+      "xlong": 15,
+      "long": 29,
+      "mid": 20
+    },
+    "timeline_bins": {
+      "0": 8,
+      "1": 8,
+      "2": 8,
+      "3": 8,
+      "4": 8,
+      "5": 8,
+      "6": 8,
+      "7": 8
+    },
+    "centroid_bins": {
+      "low": 22,
+      "mid": 21,
+      "high": 21
+    },
+    "attack_bins": {
+      "low": 22,
+      "high": 21,
+      "mid": 21
+    },
+    "category_counts": {
+      "pulse": 51,
+      "resonance": 9,
+      "drone": 4
+    }
+  },
+  "segments": [
+    {
+      "id": 1,
+      "label": "lux-001",
+      "file": "lux_001.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 7.573651,
+        "end_sec": 20.573651,
+        "duration_sec": 13.0
+      },
+      "features": {
+        "rms": 0.10916209,
+        "zcr": 0.01192403,
+        "centroid_hz": 315.6035,
+        "rolloff_hz": 134.5825,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 2,
+      "label": "lux-002",
+      "file": "lux_002.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 24.997587,
+        "end_sec": 31.197587,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.11000361,
+        "zcr": 0.01192314,
+        "centroid_hz": 309.2026,
+        "rolloff_hz": 134.5825,
+        "attack_sec": 4.5e-05
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 3,
+      "label": "lux-003",
+      "file": "lux_003.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 32.776272,
+        "end_sec": 38.976272,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.11011548,
+        "zcr": 0.01192314,
+        "centroid_hz": 326.6554,
+        "rolloff_hz": 134.5825,
+        "attack_sec": 9.1e-05
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 4,
+      "label": "lux-004",
+      "file": "lux_004.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 52.743029,
+        "end_sec": 58.943029,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.10782737,
+        "zcr": 0.01192314,
+        "centroid_hz": 589.0255,
+        "rolloff_hz": 524.8718,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 5,
+      "label": "lux-005",
+      "file": "lux_005.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 57.913088,
+        "end_sec": 61.513088,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.11057763,
+        "zcr": 0.01193011,
+        "centroid_hz": 315.5716,
+        "rolloff_hz": 134.5825,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 6,
+      "label": "lux-006",
+      "file": "lux_006.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 63.867791,
+        "end_sec": 70.067791,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.10960378,
+        "zcr": 0.01192314,
+        "centroid_hz": 464.429,
+        "rolloff_hz": 392.981,
+        "attack_sec": 0.123039
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 7,
+      "label": "lux-007",
+      "file": "lux_007.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 72.660998,
+        "end_sec": 74.460998,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.11188218,
+        "zcr": 0.01194286,
+        "centroid_hz": 407.7973,
+        "rolloff_hz": 183.0322,
+        "attack_sec": 0.051066
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 8,
+      "label": "lux-008",
+      "file": "lux_008.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 74.76771,
+        "end_sec": 94.76771,
+        "duration_sec": 20.0
+      },
+      "features": {
+        "rms": 0.10913129,
+        "zcr": 0.01192293,
+        "centroid_hz": 482.2633,
+        "rolloff_hz": 395.6726,
+        "attack_sec": 0.139773
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 0,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 9,
+      "label": "lux-009",
+      "file": "lux_009.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 94.407755,
+        "end_sec": 97.007755,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.10664789,
+        "zcr": 0.01191369,
+        "centroid_hz": 491.988,
+        "rolloff_hz": 398.3643,
+        "attack_sec": 0.157279
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 10,
+      "label": "lux-010",
+      "file": "lux_010.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 104.729116,
+        "end_sec": 105.979116,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.11464274,
+        "zcr": 0.01193672,
+        "centroid_hz": 323.6656,
+        "rolloff_hz": 134.5825,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 11,
+      "label": "lux-011",
+      "file": "lux_011.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 106.51385,
+        "end_sec": 109.11385,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.10518721,
+        "zcr": 0.01193113,
+        "centroid_hz": 639.5153,
+        "rolloff_hz": 527.5635,
+        "attack_sec": 0.230612
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 12,
+      "label": "lux-012",
+      "file": "lux_012.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 118.26761,
+        "end_sec": 124.46761,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.10718173,
+        "zcr": 0.01193045,
+        "centroid_hz": 762.4591,
+        "rolloff_hz": 656.7627,
+        "attack_sec": 0.001043
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 13,
+      "label": "lux-013",
+      "file": "lux_013.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 129.703184,
+        "end_sec": 134.503184,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.1110761,
+        "zcr": 0.01192377,
+        "centroid_hz": 395.9515,
+        "rolloff_hz": 142.6575,
+        "attack_sec": 0.000499
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 14,
+      "label": "lux-014",
+      "file": "lux_014.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 141.568435,
+        "end_sec": 154.568435,
+        "duration_sec": 13.0
+      },
+      "features": {
+        "rms": 0.11292759,
+        "zcr": 0.01192399,
+        "centroid_hz": 409.1805,
+        "rolloff_hz": 142.6575,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 1,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 15,
+      "label": "lux-015",
+      "file": "lux_015.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 149.847075,
+        "end_sec": 169.847075,
+        "duration_sec": 20.0
+      },
+      "features": {
+        "rms": 0.11629862,
+        "zcr": 0.01192066,
+        "centroid_hz": 646.7972,
+        "rolloff_hz": 527.5635,
+        "attack_sec": 0.115782
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 1,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 16,
+      "label": "lux-016",
+      "file": "lux_016.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 166.33576,
+        "end_sec": 176.83576,
+        "duration_sec": 10.5
+      },
+      "features": {
+        "rms": 0.11758166,
+        "zcr": 0.01192533,
+        "centroid_hz": 867.9345,
+        "rolloff_hz": 1291.9922,
+        "attack_sec": 0.200363
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 1,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 17,
+      "label": "lux-017",
+      "file": "lux_017.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 178.50449,
+        "end_sec": 186.50449,
+        "duration_sec": 8.0
+      },
+      "features": {
+        "rms": 0.11817783,
+        "zcr": 0.01192751,
+        "centroid_hz": 666.2225,
+        "rolloff_hz": 527.5635,
+        "attack_sec": 0.001224
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 18,
+      "label": "lux-018",
+      "file": "lux_018.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 193.800862,
+        "end_sec": 195.050862,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.12093569,
+        "zcr": 0.01190087,
+        "centroid_hz": 742.2879,
+        "rolloff_hz": 780.5786,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 19,
+      "label": "lux-019",
+      "file": "lux_019.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 196.213116,
+        "end_sec": 198.013116,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.11971796,
+        "zcr": 0.01191766,
+        "centroid_hz": 747.3559,
+        "rolloff_hz": 656.7627,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 20,
+      "label": "lux-020",
+      "file": "lux_020.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 201.746485,
+        "end_sec": 205.346485,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.12209383,
+        "zcr": 0.01191751,
+        "centroid_hz": 754.8491,
+        "rolloff_hz": 936.6943,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 21,
+      "label": "lux-021",
+      "file": "lux_021.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 208.249469,
+        "end_sec": 214.449469,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.11971653,
+        "zcr": 0.01192314,
+        "centroid_hz": 796.5475,
+        "rolloff_hz": 974.3774,
+        "attack_sec": 0.001497
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 22,
+      "label": "lux-022",
+      "file": "lux_022.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 222.061787,
+        "end_sec": 225.661787,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.11782077,
+        "zcr": 0.01191751,
+        "centroid_hz": 1072.6474,
+        "rolloff_hz": 1972.9797,
+        "attack_sec": 0.008027
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 23,
+      "label": "lux-023",
+      "file": "lux_023.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 247.451574,
+        "end_sec": 252.251574,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.11591631,
+        "zcr": 0.01192377,
+        "centroid_hz": 1194.5607,
+        "rolloff_hz": 2632.4341,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 24,
+      "label": "lux-024",
+      "file": "lux_024.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 254.730522,
+        "end_sec": 259.530522,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.11805633,
+        "zcr": 0.01194267,
+        "centroid_hz": 1069.8442,
+        "rolloff_hz": 1967.5964,
+        "attack_sec": 0.001633
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 2,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 25,
+      "label": "lux-025",
+      "file": "lux_025.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 263.150304,
+        "end_sec": 264.950304,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.1178766,
+        "zcr": 0.01196805,
+        "centroid_hz": 1573.3245,
+        "rolloff_hz": 4059.0088,
+        "attack_sec": 0.121905
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 26,
+      "label": "lux-026",
+      "file": "lux_026.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 291.25551,
+        "end_sec": 296.05551,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.11560448,
+        "zcr": 0.01373785,
+        "centroid_hz": 1771.4962,
+        "rolloff_hz": 4624.2554,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 27,
+      "label": "lux-027",
+      "file": "lux_027.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 298.143238,
+        "end_sec": 300.743238,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.11969466,
+        "zcr": 0.01337892,
+        "centroid_hz": 1634.8753,
+        "rolloff_hz": 4040.1672,
+        "attack_sec": 0.001769
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 28,
+      "label": "lux-028",
+      "file": "lux_028.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 299.540317,
+        "end_sec": 315.540317,
+        "duration_sec": 16.0
+      },
+      "features": {
+        "rms": 0.12827861,
+        "zcr": 0.01320299,
+        "centroid_hz": 1441.4827,
+        "rolloff_hz": 3547.5952,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 29,
+      "label": "lux-029",
+      "file": "lux_029.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 316.9801,
+        "end_sec": 318.7801,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.11160132,
+        "zcr": 0.01559626,
+        "centroid_hz": 1768.9393,
+        "rolloff_hz": 4559.6558,
+        "attack_sec": 0.000363
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 30,
+      "label": "lux-030",
+      "file": "lux_030.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 325.146349,
+        "end_sec": 338.146349,
+        "duration_sec": 13.0
+      },
+      "features": {
+        "rms": 0.11147612,
+        "zcr": 0.01508116,
+        "centroid_hz": 1077.6597,
+        "rolloff_hz": 2188.3118,
+        "attack_sec": 0.106304
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 3,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 31,
+      "label": "lux-031",
+      "file": "lux_031.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 342.227211,
+        "end_sec": 345.827211,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.1190692,
+        "zcr": 0.01394575,
+        "centroid_hz": 639.1499,
+        "rolloff_hz": 998.6023,
+        "attack_sec": 0.002086
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 32,
+      "label": "lux-032",
+      "file": "lux_032.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 346.817324,
+        "end_sec": 357.317324,
+        "duration_sec": 10.5
+      },
+      "features": {
+        "rms": 0.11564295,
+        "zcr": 0.01773898,
+        "centroid_hz": 737.7718,
+        "rolloff_hz": 995.9106,
+        "attack_sec": 0.669433
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 3,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 33,
+      "label": "lux-033",
+      "file": "lux_033.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 359.415873,
+        "end_sec": 367.415873,
+        "duration_sec": 8.0
+      },
+      "features": {
+        "rms": 0.11217596,
+        "zcr": 0.01577673,
+        "centroid_hz": 564.1373,
+        "rolloff_hz": 527.5635,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 4,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 34,
+      "label": "lux-034",
+      "file": "lux_034.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 373.791946,
+        "end_sec": 377.391946,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.10854546,
+        "zcr": 0.01613777,
+        "centroid_hz": 717.6572,
+        "rolloff_hz": 995.9106,
+        "attack_sec": 0.001179
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 35,
+      "label": "lux-035",
+      "file": "lux_035.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 379.805914,
+        "end_sec": 383.405914,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.10902914,
+        "zcr": 0.0171078,
+        "centroid_hz": 571.8773,
+        "rolloff_hz": 995.9106,
+        "attack_sec": 0.009252
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 36,
+      "label": "lux-036",
+      "file": "lux_036.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 381.980735,
+        "end_sec": 386.780735,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.10787446,
+        "zcr": 0.01753607,
+        "centroid_hz": 579.1353,
+        "rolloff_hz": 995.9106,
+        "attack_sec": 0.002766
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 37,
+      "label": "lux-037",
+      "file": "lux_037.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 397.824599,
+        "end_sec": 401.424599,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.10774734,
+        "zcr": 0.01738495,
+        "centroid_hz": 723.4651,
+        "rolloff_hz": 990.5273,
+        "attack_sec": 0.000272
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 38,
+      "label": "lux-038",
+      "file": "lux_038.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 414.52839,
+        "end_sec": 416.32839,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.13341223,
+        "zcr": 0.02713598,
+        "centroid_hz": 838.952,
+        "rolloff_hz": 1001.2939,
+        "attack_sec": 0.280862
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "drone",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 39,
+      "label": "lux-039",
+      "file": "lux_039.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 417.404426,
+        "end_sec": 421.004426,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.12817383,
+        "zcr": 0.02132806,
+        "centroid_hz": 739.3418,
+        "rolloff_hz": 998.6023,
+        "attack_sec": 0.00127
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 4,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 40,
+      "label": "lux-040",
+      "file": "lux_040.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 423.898231,
+        "end_sec": 425.148231,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.15003781,
+        "zcr": 0.02772033,
+        "centroid_hz": 856.4803,
+        "rolloff_hz": 1195.0928,
+        "attack_sec": 0.001088
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 4,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 41,
+      "label": "lux-041",
+      "file": "lux_041.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 438.355302,
+        "end_sec": 441.955302,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.16083372,
+        "zcr": 0.03460613,
+        "centroid_hz": 959.7041,
+        "rolloff_hz": 1469.6411,
+        "attack_sec": 0.002449
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 42,
+      "label": "lux-042",
+      "file": "lux_042.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 444.276753,
+        "end_sec": 447.876753,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.14030139,
+        "zcr": 0.02951662,
+        "centroid_hz": 1151.1936,
+        "rolloff_hz": 2188.3118,
+        "attack_sec": 0.002358
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 43,
+      "label": "lux-043",
+      "file": "lux_043.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 446.759546,
+        "end_sec": 451.559546,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.17404987,
+        "zcr": 0.04408541,
+        "centroid_hz": 848.4683,
+        "rolloff_hz": 1450.7996,
+        "attack_sec": 0.001633
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 44,
+      "label": "lux-044",
+      "file": "lux_044.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 460.164161,
+        "end_sec": 461.414161,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.12328532,
+        "zcr": 0.02771932,
+        "centroid_hz": 774.501,
+        "rolloff_hz": 1001.2939,
+        "attack_sec": 0.00839
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 5,
+        "centroid_bin": "mid",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 45,
+      "label": "lux-045",
+      "file": "lux_045.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 463.779274,
+        "end_sec": 465.029274,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.11265763,
+        "zcr": 0.02710352,
+        "centroid_hz": 1037.4484,
+        "rolloff_hz": 2126.4038,
+        "attack_sec": 0.006485
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 46,
+      "label": "lux-046",
+      "file": "lux_046.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 476.862231,
+        "end_sec": 483.062231,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.12695165,
+        "zcr": 0.03918542,
+        "centroid_hz": 950.5723,
+        "rolloff_hz": 1318.9087,
+        "attack_sec": 0.013469
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 47,
+      "label": "lux-047",
+      "file": "lux_047.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 485.83561,
+        "end_sec": 487.63561,
+        "duration_sec": 1.8
+      },
+      "features": {
+        "rms": 0.12420552,
+        "zcr": 0.04227872,
+        "centroid_hz": 865.9726,
+        "rolloff_hz": 1316.217,
+        "attack_sec": 0.001406
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 48,
+      "label": "lux-048",
+      "file": "lux_048.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 489.476961,
+        "end_sec": 502.476961,
+        "duration_sec": 13.0
+      },
+      "features": {
+        "rms": 0.13451277,
+        "zcr": 0.05218229,
+        "centroid_hz": 956.9893,
+        "rolloff_hz": 1316.217,
+        "attack_sec": 0.468889
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 5,
+        "centroid_bin": "high",
+        "attack_bin": "high",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 49,
+      "label": "lux-049",
+      "file": "lux_049.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 525.848091,
+        "end_sec": 529.448091,
+        "duration_sec": 3.6
+      },
+      "features": {
+        "rms": 0.20180067,
+        "zcr": 0.05497676,
+        "centroid_hz": 889.1947,
+        "rolloff_hz": 1316.217,
+        "attack_sec": 0.00449
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "high",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 50,
+      "label": "lux-050",
+      "file": "lux_050.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 528.091429,
+        "end_sec": 536.091429,
+        "duration_sec": 8.0
+      },
+      "features": {
+        "rms": 0.22128256,
+        "zcr": 0.05065221,
+        "centroid_hz": 824.7982,
+        "rolloff_hz": 1316.217,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 6,
+        "centroid_bin": "high",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 51,
+      "label": "lux-051",
+      "file": "lux_051.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 536.858268,
+        "end_sec": 543.058268,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.19652978,
+        "zcr": 0.04853375,
+        "centroid_hz": 751.4054,
+        "rolloff_hz": 1316.217,
+        "attack_sec": 0.004671
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 52,
+      "label": "lux-052",
+      "file": "lux_052.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 546.97619,
+        "end_sec": 553.17619,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.19784266,
+        "zcr": 0.04458375,
+        "centroid_hz": 685.744,
+        "rolloff_hz": 1310.8337,
+        "attack_sec": 0.003447
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "long",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 53,
+      "label": "lux-053",
+      "file": "lux_053.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 573.453397,
+        "end_sec": 576.053397,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.22986847,
+        "zcr": 0.03383977,
+        "centroid_hz": 479.4068,
+        "rolloff_hz": 934.0027,
+        "attack_sec": 0.044671
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 54,
+      "label": "lux-054",
+      "file": "lux_054.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 588.522449,
+        "end_sec": 596.522449,
+        "duration_sec": 8.0
+      },
+      "features": {
+        "rms": 0.17773578,
+        "zcr": 0.02581647,
+        "centroid_hz": 409.0534,
+        "rolloff_hz": 527.5635,
+        "attack_sec": 0.027846
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "xlong",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 55,
+      "label": "lux-055",
+      "file": "lux_055.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 598.671592,
+        "end_sec": 601.271592,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.1764607,
+        "zcr": 0.02588568,
+        "centroid_hz": 503.1899,
+        "rolloff_hz": 942.0776,
+        "attack_sec": 0.002086
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 56,
+      "label": "lux-056",
+      "file": "lux_056.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 602.368424,
+        "end_sec": 603.618424,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.17943442,
+        "zcr": 0.02793701,
+        "centroid_hz": 653.101,
+        "rolloff_hz": 1087.4268,
+        "attack_sec": 0.001179
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 6,
+        "centroid_bin": "mid",
+        "attack_bin": "mid",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 57,
+      "label": "lux-057",
+      "file": "lux_057.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 615.560998,
+        "end_sec": 616.810998,
+        "duration_sec": 1.25
+      },
+      "features": {
+        "rms": 0.1721461,
+        "zcr": 0.02761148,
+        "centroid_hz": 589.7664,
+        "rolloff_hz": 1003.9856,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "onset",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "mid",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 58,
+      "label": "lux-058",
+      "file": "lux_058.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 629.73424,
+        "end_sec": 637.73424,
+        "duration_sec": 8.0
+      },
+      "features": {
+        "rms": 0.13898805,
+        "zcr": 0.01998311,
+        "centroid_hz": 306.2374,
+        "rolloff_hz": 454.8889,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 59,
+      "label": "lux-059",
+      "file": "lux_059.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 636.1279,
+        "end_sec": 642.3279,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.12998344,
+        "zcr": 0.01863813,
+        "centroid_hz": 306.1213,
+        "rolloff_hz": 452.1973,
+        "attack_sec": 0.000272
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 60,
+      "label": "lux-060",
+      "file": "lux_060.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 639.671692,
+        "end_sec": 645.871692,
+        "duration_sec": 6.2
+      },
+      "features": {
+        "rms": 0.11935048,
+        "zcr": 0.01680943,
+        "centroid_hz": 316.6547,
+        "rolloff_hz": 452.1973,
+        "attack_sec": 0.0
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "low",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 61,
+      "label": "lux-061",
+      "file": "lux_061.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 649.275392,
+        "end_sec": 651.875392,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.0990923,
+        "zcr": 0.01451272,
+        "centroid_hz": 235.7611,
+        "rolloff_hz": 392.981,
+        "attack_sec": 0.010023
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 62,
+      "label": "lux-062",
+      "file": "lux_062.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 652.313605,
+        "end_sec": 654.913605,
+        "duration_sec": 2.6
+      },
+      "features": {
+        "rms": 0.08385165,
+        "zcr": 0.01576863,
+        "centroid_hz": 295.8468,
+        "rolloff_hz": 454.8889,
+        "attack_sec": 0.063084
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "mid",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "high",
+        "category": "pulse",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 63,
+      "label": "lux-063",
+      "file": "lux_063.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 654.102277,
+        "end_sec": 658.902277,
+        "duration_sec": 4.8
+      },
+      "features": {
+        "rms": 0.07520012,
+        "zcr": 0.0142575,
+        "centroid_hz": 287.1446,
+        "rolloff_hz": 271.8567,
+        "attack_sec": 0.005306
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "long",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    },
+    {
+      "id": 64,
+      "label": "lux-064",
+      "file": "lux_064.mp3",
+      "source": {
+        "path": "/Users/seb/Documents/site/audio/luxnova.mp3",
+        "start_sec": 660.598277,
+        "end_sec": 676.598277,
+        "duration_sec": 16.0
+      },
+      "features": {
+        "rms": 0.04166728,
+        "zcr": 0.01378405,
+        "centroid_hz": 235.504,
+        "rolloff_hz": 199.1821,
+        "attack_sec": 0.000544
+      },
+      "tags": {
+        "anchor": "silence",
+        "duration_bucket": "xlong",
+        "timeline_bin": 7,
+        "centroid_bin": "low",
+        "attack_bin": "mid",
+        "category": "resonance",
+        "profile": "lux_stackable_long"
+      }
+    }
+  ]
+}

@@ -689,7 +689,11 @@ function HomePage() {
         <>
           <h3>navigation</h3>
           <p>
-            [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ]
+            [ <a href="/about">about</a> ] [ <a href="/works">works</a> ]
+          </p>
+          <h3>labs</h3>
+          <p>
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ]
           </p>
 
           <h3>operator</h3>
@@ -811,13 +815,16 @@ function HomePage() {
                   <a href="/contact">contact</a>
                 </li>
                 <li>
-                  <a href="/feed">seb feed</a>
-                </li>
+                    <a href="/works">works</a>
+                  </li>
+                </ul>
+                <h3>labs</h3>
+                <ul>
                   <li>
-                    <a href="/guestbook">guestbook</a>
+                    <a href="/feed">seb feed</a>
                   </li>
                   <li>
-                    <a href="/works">works</a>
+                    <a href="/guestbook">guestbook</a>
                   </li>
                   <li>
                     <a href="/labs/chunk-surfer/index.html">chunk surfer</a>
@@ -982,7 +989,7 @@ function HomePage() {
                 ]
               </span>
             ))}{' '}
-            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/colophon">colophon</a> ]
+            [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/feed">seb feed</a> / <a href="/guestbook">guestbook</a> / <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/colophon">colophon</a> ]
           </small>
         </center>
       </div>

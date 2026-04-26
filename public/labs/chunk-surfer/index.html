@@ -117,9 +117,13 @@
     .t-world-main_b3 {color:rgba(170,188,160,0.9);}
     .t-world-the_tub {color:rgba(145,175,205,0.9);}
     .t-world-amplifications {color:rgba(202,168,230,0.9);}
+    .t-world-soundnoisemusic {color:rgba(224,186,132,0.9);}
+    .t-world-lux_nova {color:rgba(224,234,255,0.9);}
     .t-world-border-main_b3 {color:rgba(145,170,135,0.28);}
     .t-world-border-the_tub {color:rgba(130,160,190,0.28);}
     .t-world-border-amplifications {color:rgba(172,138,206,0.32);}
+    .t-world-border-soundnoisemusic {color:rgba(210,162,108,0.3);}
+    .t-world-border-lux_nova {color:rgba(196,212,246,0.34);}
   </style>
 </head>
 <body>
@@ -187,19 +191,35 @@ const INTRO_SCENE = {
   thresholdStart: 0.85
 };
 
-// Chunk-crossing friction. When the dominant chunk under the player changes,
-// the next `voidWidth` steps cost `slowMult`× the normal interval — subtle
-// resistance, "you can feel it but it doesn't fight you." Per-chunk voidWidth
-// derived from terrainRadius so larger / heavier chunks have a deeper void.
-const CHUNK_TRANSITION = {
-  voidWidthMin: 2,
-  voidWidthMax: 8,
-  slowMult: 1.6
+// World-boundary friction: only active right at seams between worlds.
+// Hysteresis + dither keep it tactile without broad sluggish thresholds.
+const WORLD_BOUNDARY_FRICTION = {
+  enterDist: 2,
+  exitDist: 5,
+  fullDist: 1,
+  maxMult: 1.42,
+  rampIn: 0.34,
+  rampOut: 0.16,
+  dither: 0.22
+};
+// Void trudge: sustained wilderness travel gets progressively heavier.
+const VOID_TRUDGE = {
+  startPenalty: 1.02,
+  maxPenalty: 1.45,
+  buildPerStep: 0.05,
+  decayPerStep: 0.22
+};
+const VOID_SINK = {
+  startFatigue: 0.82,
+  maxFatigue: 1.0,
+  lateralChanceMin: 0.04,
+  lateralChanceMax: 0.22,
+  pureLateralBonus: 0.08
 };
 
 // Per-sample visual terrain radius (renders glyphs around the chunk).
-const TERRAIN_R_MIN = 20;
-const TERRAIN_R_MAX = 46;
+const TERRAIN_R_MIN = 10;
+const TERRAIN_R_MAX = 26;
 
 // World packing: tighter canvas + lower minimum chunk separation so travel is
 // dense and biome transitions happen quickly.
@@ -210,8 +230,10 @@ const CHUNK_MIN_SEP = 4;
 // Audible radius (proximity falloff & candidate selection) — wider than any
 // terrain so multiple samples overlap audibly wherever you stand.
 const AUDIO_R = 38;
-const WORLD_TILE_SCALE_X = 1.25;
-const WORLD_TILE_SCALE_Y = 1.1;
+const WORLD_TILE_SCALE_X = 2.8;
+const WORLD_TILE_SCALE_Y = 2.2;
+const WORLD_SPREAD_MIN = 0.2;
+const WORLD_SPREAD_MAX = 0.68;
 
 // Hierarchical voice weighting (applied on top of proximity × baseVol).
 // Softer cross-biome attenuation so blends are audible polyphony, not just hints.
@@ -223,6 +245,11 @@ const W_BIOME_FOREIGN = 0.25;  // different world
 const AMBIENT_DRONE_GAIN = 0.028;
 const AMBIENT_BIT_LEVELS = 8;   // 8 quantisation steps per side (~3-bit feel)
 const AMBIENT_LOOP_SEC   = 4;
+const WORLD_LAYER = {
+  range: 30,
+  minGain: 0.0,
+  maxGain: 0.14
+};
 
 // ── Manifest (worlds → samples) ───────────────────────────────────────────────
 // Add worlds here and the engine auto-builds World > Biome > Sample hierarchy.
@@ -237,6 +264,14 @@ const TUB_ULTRACHUNK_FILES = [
 const AMPLIFICATIONS_FILES = Array.from({length: 64}, (_, i) => {
   const n = String(i + 1).padStart(3, '0');
   return { label: `amp-${n}`, url: `/audio/amplifications/amp_${n}.mp3` };
+});
+const SOUNDNOISEMUSIC_FILES = Array.from({length: 64}, (_, i) => {
+  const n = String(i + 1).padStart(3, '0');
+  return { label: `snm-${n}`, url: `/audio/soundnoisemusic/snm_${n}.mp3` };
+});
+const LUX_NOVA_FILES = Array.from({length: 64}, (_, i) => {
+  const n = String(i + 1).padStart(3, '0');
+  return { label: `lux-${n}`, url: `/audio/lux_nova/lux_${n}.mp3` };
 });
 
 const MANIFEST = {
@@ -276,6 +311,16 @@ const MANIFEST = {
       id: 'amplifications',
       label: 'AMPLIFICATIONS',
       files: AMPLIFICATIONS_FILES
+    },
+    {
+      id: 'soundnoisemusic',
+      label: 'soundnoisemusic',
+      files: SOUNDNOISEMUSIC_FILES
+    },
+    {
+      id: 'lux_nova',
+      label: 'lux_nova',
+      files: LUX_NOVA_FILES
     }
   ]
 };
@@ -295,6 +340,16 @@ const PIECE_CATALOG = {
     title: 'AMPLIFICATIONS',
     year: '2026',
     description: 'Movement I (MARIMBAideefixe) exploded into 64 stratified clips: transient cuts, silence seams, and long resonant holds mapped as a walkable amplified field.'
+  },
+  soundnoisemusic: {
+    title: 'String Quartet No. 2 \"soundnoisemusic\"',
+    year: '—',
+    description: 'Quartet-dense segmentation of String Quartet No. 2: shorter cuts, frequent transient pivots, and tactile micro-events distributed across the entire movement.'
+  },
+  lux_nova: {
+    title: 'Organum quadruplum \"lux nova\"',
+    year: '—',
+    description: 'Longer stackable fragments tuned for monophonic-friendly layering: sustained fields, silence-edge seams, and wide-form temporal spread.'
   }
 };
 
@@ -316,6 +371,8 @@ const SAMPLE_COUNT = files.length;
 let actx=null;
 let voices=new Map(); // chunkIdx -> {src,gain,dur,startedAt,target}
 let ambientDrone=null; // {src,lfo,filt,gain,target}
+let worldLayerVoice=null; // {srcA,srcB,gain,dur,startedAt,target,chunkIdx,worldId}
+let worldDroneBanks=new Map(); // worldId -> {all:[chunkIdx], byBiome:{biome:[chunkIdx]}}
 let paused=false, looping=true;
 let inRogue=false, raf=null, tick=0;
 let bootLog=[];
@@ -343,9 +400,12 @@ let introAnchorX=0;
 let introAnchorY=0;
 let introDistance=0;
 let introTitleEl=null;
-let chunkTrackingSeeded=false; // becomes true after the first post-intro step
-let lastChunkIdx=-1;           // dominant chunk on previous post-intro step (-1 = wilderness)
-let chunkTransitionDebt=0;     // remaining slowed steps after a chunk crossing
+let voidFatigue=0;             // 0..1, increases while trudging wilderness
+let worldBoundaryLatch=false;   // hysteresis latch for seam resistance
+let worldBoundaryFriction=0;    // 0..1 smoothed seam resistance
+let lastMoveAtMs=0;            // throttles tap/hold movement uniformly
+let allFilesLoaded=false;
+let lastVoidSinkMsgStep=-9999;
 let gateFlashTimer=null;
 let gateFlashUntilMs=0;
 let onboardingHoldLastMs=0;
@@ -369,19 +429,31 @@ function makeCharId(n) {
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
 let master=null;
+let audioInitFailed=false;
 function ensureCtx(){
+  if(audioInitFailed) return;
   if(!actx){
-    actx=new(window.AudioContext||window.webkitAudioContext)();
-    // Master soft-limiter — keeps 16 simultaneous voices from clipping.
-    master=actx.createDynamicsCompressor();
-    master.threshold.setValueAtTime(-14, actx.currentTime);
-    master.knee.setValueAtTime(12, actx.currentTime);
-    master.ratio.setValueAtTime(4, actx.currentTime);
-    master.attack.setValueAtTime(0.005, actx.currentTime);
-    master.release.setValueAtTime(0.1, actx.currentTime);
-    master.connect(actx.destination);
+    try{
+      actx=new(window.AudioContext||window.webkitAudioContext)();
+      // Master soft-limiter — keeps 16 simultaneous voices from clipping.
+      master=actx.createDynamicsCompressor();
+      master.threshold.setValueAtTime(-14, actx.currentTime);
+      master.knee.setValueAtTime(12, actx.currentTime);
+      master.ratio.setValueAtTime(4, actx.currentTime);
+      master.attack.setValueAtTime(0.005, actx.currentTime);
+      master.release.setValueAtTime(0.1, actx.currentTime);
+      master.connect(actx.destination);
+    }catch(err){
+      audioInitFailed=true;
+      console.error('AudioContext init failed', err);
+      return;
+    }
   }
-  if(actx.state==='suspended') actx.resume();
+  if(actx && actx.state==='suspended'){
+    actx.resume().catch((err)=>{
+      console.warn('AudioContext resume blocked', err);
+    });
+  }
 }
 // Per-chunk baseline volume from analysis — quiet chunks (low RMS) get a boost,
 // loud percussive ones get a slight cut, so the polyphonic mix stays balanced.
@@ -456,6 +528,16 @@ const WORLD_VISUALS = {
     tintClass: 't-world-amplifications',
     borderClass: 't-world-border-amplifications',
     borderGlyphs: ['+', '*', ':', '!']
+  },
+  soundnoisemusic: {
+    tintClass: 't-world-soundnoisemusic',
+    borderClass: 't-world-border-soundnoisemusic',
+    borderGlyphs: ['x', '+', ':', ';']
+  },
+  lux_nova: {
+    tintClass: 't-world-lux_nova',
+    borderClass: 't-world-border-lux_nova',
+    borderGlyphs: ['|', '!', ';', ':']
   }
 };
 function worldVisual(worldId){ return WORLD_VISUALS[worldId] || WORLD_VISUALS.main_b3; }
@@ -468,6 +550,8 @@ function worldBorderGlyphFor(worldId, x, y){
   return glyphs[Math.min(idx, glyphs.length - 1)] || '|';
 }
 function worldIdForWarpedTile(tx, ty){
+  // Keep world routing deterministic and stable across refresh/load phases.
+  // Do not tie mapping to currently-loaded templates (that causes remap flicker).
   const ids = worldsConfig.map((w) => w.id);
   if(ids.length===0) return 'main_b3';
   if(ids.length===1) return ids[0];
@@ -499,6 +583,18 @@ function isWorldBoundaryAt(x,y,worldId){
          worldIdAt(x-1,y)!==worldId ||
          worldIdAt(x,y+1)!==worldId ||
          worldIdAt(x,y-1)!==worldId;
+}
+function worldBoundaryDistance(x, y, worldId, maxDist){
+  if(!worldId) return maxDist + 1;
+  if(isWorldBoundaryAt(x, y, worldId)) return 0;
+  for(let r=1; r<=maxDist; r++){
+    for(let dx=-r; dx<=r; dx++){
+      const dy=r-Math.abs(dx);
+      if(worldIdAt(x+dx, y+dy)!==worldId) return r;
+      if(dy!==0 && worldIdAt(x+dx, y-dy)!==worldId) return r;
+    }
+  }
+  return maxDist + 1;
 }
 function getCellAt(x,y){
   const {tx,ty,lx,ly}=tileCoordFor(x,y);
@@ -587,6 +683,125 @@ function stopAllVoices(){
   for(const [,v] of voices) stopVoice(v);
   voices.clear();
 }
+function stopWorldLayerVoice(){
+  if(!worldLayerVoice) return;
+  stopVoice(worldLayerVoice);
+  worldLayerVoice=null;
+}
+function terrainDensityWeight(cell){
+  if(!cell || !cell.biomeId) return 0;
+  const ch = cell.char || '.';
+  if(cell.isChunk) return 1;
+  if(ch==='.' || ch===',' || ch===':' || ch===';' || ch==='`' || ch==='\'') return 0.22;
+  if(ch==='·' || ch===' ' || ch==='¦' || ch==='|') return 0.32;
+  if(ch==='~' || ch==='=' || ch==='-') return 0.5;
+  if(ch==='%' || ch==='+' || ch==='x' || ch==='*') return 0.72;
+  if(ch==='T' || ch==='^' || ch==='O' || ch==='&' || ch==='#') return 0.9;
+  return 0.64;
+}
+function worldLayerScore(chunk){
+  const a=chunk.analysis||{};
+  const len=Math.max(0.2, a.length||0.2);
+  const z=Math.max(0, a.zcr||0);
+  const hf=Math.max(0, a.hf||0);
+  const centroid=Math.max(20, a.centroid||20);
+  return (len*1.8) + (0.12/(0.012+z)) + (0.08/(0.004+hf)) + (1200/centroid);
+}
+function buildWorldDroneBanks(){
+  worldDroneBanks = new Map();
+  for(const wc of worldsConfig){
+    const byWorld = chunks.filter((c)=>c.worldId===wc.id);
+    if(byWorld.length===0){
+      worldDroneBanks.set(wc.id, {all:[], byBiome:{}});
+      continue;
+    }
+    const sorted = byWorld.slice().sort((a,b)=>worldLayerScore(b)-worldLayerScore(a));
+    const all = sorted.slice(0, Math.min(18, sorted.length)).map((c)=>c.idx);
+    const byBiome={};
+    for(const c of byWorld){
+      if(!byBiome[c.biome]) byBiome[c.biome]=[];
+      byBiome[c.biome].push(c);
+    }
+    for(const biome of Object.keys(byBiome)){
+      byBiome[biome] = byBiome[biome]
+        .slice()
+        .sort((a,b)=>worldLayerScore(b)-worldLayerScore(a))
+        .slice(0, Math.min(8, byBiome[biome].length))
+        .map((c)=>c.idx);
+    }
+    worldDroneBanks.set(wc.id, {all, byBiome});
+  }
+}
+function nearestWorldChunk(worldId){
+  const tpl=worldTemplates.get(worldId);
+  if(!tpl || tpl.sampleIdxs.length===0) return null;
+  const center=tileCoordFor(px,py);
+  const tileR=Math.max(1, Math.ceil(WORLD_LAYER.range/Math.min(WORLD_TILE_W, WORLD_TILE_H))+1);
+  let bestIdx=-1, bestD=Infinity;
+  for(let ty=center.ty-tileR; ty<=center.ty+tileR; ty++){
+    for(let tx=center.tx-tileR; tx<=center.tx+tileR; tx++){
+      const ox=tx*WORLD_TILE_W, oy=ty*WORLD_TILE_H;
+      for(const idx of tpl.sampleIdxs){
+        const c=chunks[idx];
+        const wx=ox+c.wx, wy=oy+c.wy;
+        if(worldIdAt(wx,wy)!==worldId) continue;
+        const d=Math.hypot(px-wx, py-wy);
+        if(d<bestD){ bestD=d; bestIdx=idx; }
+      }
+    }
+  }
+  if(bestIdx<0) return null;
+  return {idx:bestIdx, distance:bestD, proximity:Math.max(0, 1-(bestD/WORLD_LAYER.range))};
+}
+function chooseWorldLayerChunk(worldId, biome, cell, fallbackIdx=-1){
+  const bank=worldDroneBanks.get(worldId);
+  if(!bank) return fallbackIdx;
+  const list=(biome && bank.byBiome[biome] && bank.byBiome[biome].length>0) ? bank.byBiome[biome] : bank.all;
+  if(!list || list.length===0) return fallbackIdx;
+  const chCode=(cell?.char||'.').charCodeAt(0);
+  const h=Math.floor(Math.abs(hash01(px*0.71+chCode, py*0.43+list.length*9.7))*1000000);
+  return list[h % list.length];
+}
+function updateWorldLayer(){
+  if(paused || isOnboardingActive()){
+    stopWorldLayerVoice();
+    return;
+  }
+  const cell=getCellAt(px,py);
+  if(!cell || !cell.biomeId || !cell.worldId){
+    stopWorldLayerVoice();
+    return;
+  }
+  const biomeType = (cell.biomeId.split(':')[1] || '').trim();
+  const nearest=nearestWorldChunk(cell.worldId);
+  if(!nearest){
+    stopWorldLayerVoice();
+    return;
+  }
+  const prox=nearest.proximity*nearest.proximity;
+  const density=terrainDensityWeight(cell);
+  const targetGain = clamp(WORLD_LAYER.maxGain * prox * density, WORLD_LAYER.minGain, WORLD_LAYER.maxGain);
+  if(targetGain<=0.0005){
+    stopWorldLayerVoice();
+    return;
+  }
+  const desiredIdx = chooseWorldLayerChunk(cell.worldId, biomeType, cell, nearest.idx);
+  if(desiredIdx<0){
+    stopWorldLayerVoice();
+    return;
+  }
+  if(!worldLayerVoice || worldLayerVoice.chunkIdx!==desiredIdx){
+    stopWorldLayerVoice();
+    const v=startVoice(desiredIdx, targetGain);
+    if(v){
+      v.chunkIdx=desiredIdx;
+      v.worldId=cell.worldId;
+      worldLayerVoice=v;
+    }
+  }else{
+    rampVoice(worldLayerVoice, targetGain);
+  }
+}
 
 // ── Ambient drone — bit-crushed brown-noise bed, always on under polyphony ────
 // Subtle, lo-fi, tasteful. Loops a small noise buffer; lowpass + slow LFO
@@ -610,6 +825,7 @@ function makeAmbientNoiseBuffer(){
 function ensureAmbientDrone(){
   if(ambientDrone) return ambientDrone;
   ensureCtx();
+  if(!actx || !master) return null;
   const now=actx.currentTime;
   const src=actx.createBufferSource();
   src.buffer=makeAmbientNoiseBuffer();
@@ -628,7 +844,15 @@ function ensureAmbientDrone(){
   const gain=actx.createGain();
   gain.gain.setValueAtTime(0, now);
   src.connect(filt); filt.connect(gain); gain.connect(master);
-  src.start(); lfo.start();
+  try{
+    src.start(); lfo.start();
+  }catch(err){
+    console.warn('Ambient drone start blocked', err);
+    try{ src.disconnect(); }catch(_){}
+    try{ lfo.disconnect(); }catch(_){}
+    try{ gain.disconnect(); }catch(_){}
+    return null;
+  }
   ambientDrone={src, lfo, filt, gain, target:0};
   return ambientDrone;
 }
@@ -636,7 +860,8 @@ function startAmbientDrone(){
   startAmbientDroneAt(AMBIENT_DRONE_GAIN);
 }
 function startAmbientDroneAt(targetGain){
-  ensureAmbientDrone();
+  const d=ensureAmbientDrone();
+  if(!d) return;
   const goal=clamp(targetGain, 0, 0.25);
   if(ambientDrone.target===goal) return;
   const now=actx.currentTime;
@@ -830,6 +1055,21 @@ function fbm2(x, y, seed){
 function hash01(x, y){
   return Math.abs(Math.sin(x*127.1+y*311.7)*43758.5)%1;
 }
+function hashString01(s){
+  let h=2166136261>>>0;
+  for(let i=0;i<s.length;i++){
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h>>>0) / 4294967295);
+}
+function worldSpreadFor(worldId){
+  const hx=hashString01(`${worldId}:x`);
+  const hy=hashString01(`${worldId}:y`);
+  const sx=WORLD_SPREAD_MIN + hx*(WORLD_SPREAD_MAX-WORLD_SPREAD_MIN);
+  const sy=WORLD_SPREAD_MIN + hy*(WORLD_SPREAD_MAX-WORLD_SPREAD_MIN);
+  return {sx, sy};
+}
 
 // Per-cell glyph — biome palette + layered noise + distance falloff + attack-driven edge softness.
 // Always returns a glyph inside R (no holes); outside R returns null so wilderness can fill in.
@@ -947,35 +1187,27 @@ function buildWorldTemplates(){
     if(sampleIdxs.length===0) continue;
 
     const templateTerrain = Array.from({length:WORLD_TILE_H},()=>Array(WORLD_TILE_W).fill(null));
-    const allZ = sampleIdxs.map((idx)=>chunks[idx].analysis.zcr);
-    const allH = sampleIdxs.map((idx)=>chunks[idx].analysis.hf);
-    const [minZ,maxZ]=[Math.min(...allZ),Math.max(...allZ)||0.001];
-    const [minH,maxH]=[Math.min(...allH),Math.max(...allH)||0.001];
-
+    const spread=worldSpreadFor(wc.id);
+    const spanX=Math.max(10, Math.round((WORLD_TILE_W-8)*spread.sx));
+    const spanY=Math.max(8, Math.round((WORLD_TILE_H-8)*spread.sy));
+    const xPad=Math.max(2, Math.round((WORLD_TILE_W-spanX)/2));
+    const yPad=Math.max(2, Math.round((WORLD_TILE_H-spanY)/2));
+    // Stable placement: each chunk gets deterministic coordinates derived from
+    // its own analysis + id. This prevents terrain "morphing" during async load.
     for(const idx of sampleIdxs){
       const c=chunks[idx];
       c.worldId=wc.id;
       c.biomeId=`${wc.id}:${c.biome}`;
-      c.wx=Math.round(4+((c.analysis.zcr-minZ)/(maxZ-minZ))*(WORLD_TILE_W-8));
-      c.wy=Math.round(4+(1-(c.analysis.hf-minH)/(maxH-minH))*(WORLD_TILE_H-8));
-    }
-
-    for(let p=0;p<18;p++){
-      for(let i=0;i<sampleIdxs.length;i++){
-        for(let j=i+1;j<sampleIdxs.length;j++){
-          const a=chunks[sampleIdxs[i]], b=chunks[sampleIdxs[j]];
-          const dx=a.wx-b.wx, dy=a.wy-b.wy;
-          const d=Math.hypot(dx,dy);
-          if(d<CHUNK_MIN_SEP){
-            const nx=d<.01?1:dx/d, ny=d<.01?0:dy/d;
-            const push=Math.ceil((CHUNK_MIN_SEP-d)/2)+1;
-            a.wx=clamp(a.wx+Math.round(nx*push),2,WORLD_TILE_W-3);
-            a.wy=clamp(a.wy+Math.round(ny*push),2,WORLD_TILE_H-3);
-            b.wx=clamp(b.wx-Math.round(nx*push),2,WORLD_TILE_W-3);
-            b.wy=clamp(b.wy-Math.round(ny*push),2,WORLD_TILE_H-3);
-          }
-        }
-      }
+      const z = clamp(((c.analysis?.zcr ?? 0) - 0.004) / 0.09, 0, 1);
+      const h = clamp(((c.analysis?.hf  ?? 0) - 0.002) / 0.022, 0, 1);
+      const jitterX = (hash01((idx+1)*17.3, (c.analysis?.centroid ?? 0)*0.0017 + wc.id.length*11.7) - 0.5) * 0.18;
+      const jitterY = (hash01((idx+1)*23.9, (c.analysis?.attack ?? 0)*91.0 + wc.id.length*7.1) - 0.5) * 0.18;
+      const xNorm = clamp(z + jitterX, 0, 1);
+      const yNorm = clamp(1 - h + jitterY, 0, 1);
+      const wxRaw=xPad + xNorm * Math.max(1, spanX-1);
+      const wyRaw=yPad + yNorm * Math.max(1, spanY-1);
+      c.wx=clamp(Number.isFinite(wxRaw)?Math.round(wxRaw):Math.round(WORLD_TILE_W/2),2,WORLD_TILE_W-3);
+      c.wy=clamp(Number.isFinite(wyRaw)?Math.round(wyRaw):Math.round(WORLD_TILE_H/2),2,WORLD_TILE_H-3);
     }
 
     for(let cy=0;cy<WORLD_TILE_H;cy++){
@@ -1062,8 +1294,14 @@ function buildWorld(){
   WORLD_TILE_H=Math.max(24, Math.round(VIEW_H*WORLD_TILE_SCALE_Y));
   assignTerrainRadii();
   buildWorldTemplates();
+  buildWorldDroneBanks();
   fog = new Map();
-  const home=worldTemplates.get(worldIdAt(0,0));
+  // Always spawn in a currently loaded world; avoid unresolved world routing
+  // during partial boot (prevents null-cell start states).
+  const preferredHome = worldTemplates.get(INTRO_SCENE.worldId);
+  const hashedHome = worldTemplates.get(worldIdAt(0,0));
+  const anyHome = worlds[0] || null;
+  const home = preferredHome || hashedHome || anyHome;
   if(home){
     px=Math.round(home.region.cx);
     py=Math.round(home.region.cy);
@@ -1079,7 +1317,8 @@ function stampChunk(c){
     c.terrainRadius=clamp(TERRAIN_R_MIN+len*6, TERRAIN_R_MIN, TERRAIN_R_MAX);
   }
   if(!c.iconChar) c.iconChar=iconFor(c.analysis);
-  buildWorldTemplates();
+  // Deliberately no live template rebuild here; we finalize once at load end
+  // to avoid visible terrain/color oscillation during play.
 }
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
@@ -1170,14 +1409,54 @@ function currentMoveIntervalMs(){
     const p=introProgress();
     return Math.round(INTRO_SCENE.speedStartMs + (INTRO_SCENE.speedEndMs-INTRO_SCENE.speedStartMs)*p);
   }
-  if(chunkTransitionDebt>0) return Math.round(MOVE_MS * CHUNK_TRANSITION.slowMult);
-  return MOVE_MS;
+  let ms = MOVE_MS;
+  ms *= (1 + worldBoundaryFriction * (WORLD_BOUNDARY_FRICTION.maxMult - 1));
+  if(curPlayerCtx && !curPlayerCtx.onTerrain){
+    const trudge = VOID_TRUDGE.startPenalty + (VOID_TRUDGE.maxPenalty-VOID_TRUDGE.startPenalty)*voidFatigue;
+    ms *= trudge;
+  }
+  // Keep motion responsive; difficulty is mostly handled by sink/lateral drag.
+  return Math.round(clamp(ms, 44, 120));
 }
-function voidWidthForChunk(chunk){
-  if(!chunk) return CHUNK_TRANSITION.voidWidthMin;
-  const r = chunk.terrainRadius ?? TERRAIN_R_MIN;
-  const t = clamp((r - TERRAIN_R_MIN) / (TERRAIN_R_MAX - TERRAIN_R_MIN), 0, 1);
-  return Math.round(CHUNK_TRANSITION.voidWidthMin + t * (CHUNK_TRANSITION.voidWidthMax - CHUNK_TRANSITION.voidWidthMin));
+function targetBoundaryFriction(){
+  if(isOnboardingActive()) return 0;
+  const worldId = (curPlayerCtx && curPlayerCtx.worldId) ? curPlayerCtx.worldId : worldIdAt(px, py);
+  const d = worldBoundaryDistance(px, py, worldId, WORLD_BOUNDARY_FRICTION.exitDist + 1);
+  if(!worldBoundaryLatch && d <= WORLD_BOUNDARY_FRICTION.enterDist){
+    worldBoundaryLatch = true;
+  } else if(worldBoundaryLatch && d > WORLD_BOUNDARY_FRICTION.exitDist){
+    worldBoundaryLatch = false;
+  }
+  if(!worldBoundaryLatch) return 0;
+  const base = 1 - clamp(
+    (d - WORLD_BOUNDARY_FRICTION.fullDist) /
+    Math.max(1, WORLD_BOUNDARY_FRICTION.exitDist - WORLD_BOUNDARY_FRICTION.fullDist),
+    0,
+    1
+  );
+  const n = hash01((px+0.5)*0.63 + stepCount*0.19, (py-0.5)*0.57 - stepCount*0.13);
+  const jitter = (n - 0.5) * 2 * WORLD_BOUNDARY_FRICTION.dither;
+  return clamp(base + jitter, 0, 1);
+}
+function shouldSinkLateral(dx, dy){
+  if(isOnboardingActive()) return false;
+  if(!curPlayerCtx || curPlayerCtx.onTerrain) return false;
+  if(Math.abs(dx)===0) return false;
+  // Only apply sink to pure lateral strafing, not diagonal forward travel.
+  if(Math.abs(dy)!==0) return false;
+  // Require deep void (no dominant nearby chunk), otherwise keep controls clean.
+  if(curChunkIdx>=0) return false;
+  if(voidFatigue < VOID_SINK.startFatigue) return false;
+  const t = clamp(
+    (voidFatigue - VOID_SINK.startFatigue) / Math.max(0.0001, (VOID_SINK.maxFatigue - VOID_SINK.startFatigue)),
+    0,
+    1
+  );
+  let chance = VOID_SINK.lateralChanceMin + t * (VOID_SINK.lateralChanceMax - VOID_SINK.lateralChanceMin);
+  if(Math.abs(dy)===0) chance += VOID_SINK.pureLateralBonus;
+  chance = clamp(chance, 0, 0.95);
+  const n = hash01((px+dx)*0.83 + stepCount*0.29, (py+dy)*1.27 + voidFatigue*9.1);
+  return n < chance;
 }
 function currentAmbientTarget(){
   if(isIntroActive()){
@@ -1188,7 +1467,7 @@ function currentAmbientTarget(){
 }
 function applyIntroAudioEnvelope(){
   if(paused || !actx) return;
-  ensureAmbientDrone();
+  if(!ensureAmbientDrone()) return;
   setAmbientDroneTarget(currentAmbientTarget(), isIntroActive()?0.12:0.35);
 }
 function updateOnboardingButton(){
@@ -1210,10 +1489,10 @@ function finalizeIntroTransition(targetPhase, reason='world'){
   applyIntroAudioEnvelope();
   updateAudio();
   updateOnboardingButton();
-  // Seed chunk-crossing tracking at the landing — no friction yet.
-  chunkTrackingSeeded = false;
-  lastChunkIdx = -1;
-  chunkTransitionDebt = 0;
+  voidFatigue = 0;
+  worldBoundaryLatch = false;
+  worldBoundaryFriction = 0;
+  lastMoveAtMs = 0;
 }
 function releaseIntoWorld(reason='world'){
   if(!isOnboardingActive()) return;
@@ -1297,6 +1576,7 @@ function updateAudio(){
     curPlayerCtx = { onTerrain:false, biomeId:null, worldId, worldMembership: membership };
     if(curChunkKey){ curChunkKey=''; curChunkIdx=-1; }
     if(voices.size>0) stopAllVoices();
+    stopWorldLayerVoice();
     applyIntroAudioEnvelope();
     return;
   }
@@ -1333,13 +1613,28 @@ function updateAudio(){
       if(v) voices.set(key,v);
     }
   }
+  updateWorldLayer();
 }
 
 function step(dx,dy){
-  const nx=px+dx;
-  const ny=py+dy;
+  const nowMs=performance.now();
+  if(lastMoveAtMs>0 && !isOnboardingActive()){
+    const needMs=currentMoveIntervalMs();
+    if((nowMs-lastMoveAtMs) < needMs) return;
+  }
+  let sx=dx, sy=dy;
+  if(shouldSinkLateral(sx, sy)){
+    sx=0;
+    if((stepCount-lastVoidSinkMsgStep) >= 28){
+      pushEvent('// void drag resists side-step.');
+      lastVoidSinkMsgStep=stepCount;
+    }
+  }
+  const nx=px+sx;
+  const ny=py+sy;
   if(nx===px&&ny===py) return;
-  if(isOnboardingActive() && !canMoveInOnboarding(nx,ny,dx,dy)) return;
+  if(isOnboardingActive() && !canMoveInOnboarding(nx,ny,sx,sy)) return;
+  lastMoveAtMs=nowMs;
   px=nx; py=ny; stepCount++;
 
   trail.push({x:px,y:py});
@@ -1362,23 +1657,14 @@ function step(dx,dy){
     }
     applyIntroAudioEnvelope();
   } else {
-    // Chunk-crossing friction: detect a change in dominant chunk (just refreshed
-    // by updateAudio above) and start a debt of slowed steps. Each chunk's
-    // voidWidth comes from its terrainRadius — heavier chunks resist more.
-    const nowIdx = curChunkIdx;
-    if(!chunkTrackingSeeded){
-      chunkTrackingSeeded = true;
-      lastChunkIdx = nowIdx;
-    } else if(nowIdx !== lastChunkIdx){
-      if(nowIdx >= 0){
-        chunkTransitionDebt = voidWidthForChunk(chunks[nowIdx]);
-      } else {
-        chunkTransitionDebt = 0; // exiting to wilderness — no resistance
-      }
-      lastChunkIdx = nowIdx;
-    } else if(chunkTransitionDebt > 0){
-      chunkTransitionDebt--;
+    if(curPlayerCtx && !curPlayerCtx.onTerrain){
+      voidFatigue = clamp(voidFatigue + VOID_TRUDGE.buildPerStep, 0, 1);
+    } else {
+      voidFatigue = clamp(voidFatigue - VOID_TRUDGE.decayPerStep, 0, 1);
     }
+    const target = targetBoundaryFriction();
+    const k = target > worldBoundaryFriction ? WORLD_BOUNDARY_FRICTION.rampIn : WORLD_BOUNDARY_FRICTION.rampOut;
+    worldBoundaryFriction = clamp(worldBoundaryFriction + (target - worldBoundaryFriction) * k, 0, 1);
   }
 }
 
@@ -1401,10 +1687,10 @@ function teleport(){
   stopAllVoices();
   revealAround(px,py);
   updateAudio();
-  // Teleport drops you cleanly somewhere — reset chunk-crossing tracking.
-  chunkTrackingSeeded = false;
-  lastChunkIdx = -1;
-  chunkTransitionDebt = 0;
+  voidFatigue = 0;
+  worldBoundaryLatch = false;
+  worldBoundaryFriction = 0;
+  lastMoveAtMs = 0;
   pushEvent('// teleport.');
 }
 
@@ -1432,14 +1718,15 @@ function startMoveTimer(){
     const [dx,dy]=arrowDelta();
     if(dx===0&&dy===0){ moveTimer=null; return; }
     step(dx,dy);
-    moveTimer=setTimeout(run, currentMoveIntervalMs());
+    // High-frequency polling + in-step interval gating avoids double-throttle lag.
+    moveTimer=setTimeout(run, 16);
   };
-  moveTimer=setTimeout(run, currentMoveIntervalMs());
+  moveTimer=setTimeout(run, 16);
 }
 
 function togglePause(){
   paused=!paused;
-  if(paused){ stopAllVoices(); silenceAmbientDrone(); pushEvent('// paused.'); }
+  if(paused){ stopAllVoices(); stopWorldLayerVoice(); silenceAmbientDrone(); pushEvent('// paused.'); }
   else {
     startAmbientDroneAt(currentAmbientTarget());
     pushEvent('// resumed.');
@@ -1795,26 +2082,32 @@ function renderBoot(){
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
 function loop(){
-  tick++;
-  if(inRogue){
-    // Keep keyboard focus on the play surface to avoid intermittent movement deadlocks.
-    if((tick % 10)===0) ensureInteractionFocus();
-    // Onboarding fail-safe: movement should continue while key is held,
-    // independent of timer/focus edge cases.
-    if(isOnboardingActive()){
-      const [dx,dy]=arrowDelta();
-      if(dx!==0 || dy!==0){
-        const now=performance.now();
-        if((now - onboardingHoldLastMs) >= currentMoveIntervalMs()){
-          step(dx,dy);
-          onboardingHoldLastMs=now;
+  try{
+    tick++;
+    if(inRogue){
+      // Keep keyboard focus on the play surface to avoid intermittent movement deadlocks.
+      if((tick % 10)===0) ensureInteractionFocus();
+      // Onboarding fail-safe: movement should continue while key is held,
+      // independent of timer/focus edge cases.
+      if(isOnboardingActive()){
+        const [dx,dy]=arrowDelta();
+        if(dx!==0 || dy!==0){
+          const now=performance.now();
+          if((now - onboardingHoldLastMs) >= currentMoveIntervalMs()){
+            step(dx,dy);
+            onboardingHoldLastMs=now;
+          }
         }
       }
+      renderMap(); renderCatalog(); renderStatus();
     }
-    renderMap(); renderCatalog(); renderStatus();
+    else renderBoot();
+  }catch(err){
+    console.error('loop error', err);
+    pushEvent('// runtime fault recovered.');
+  }finally{
+    raf=requestAnimationFrame(loop);
   }
-  else renderBoot();
-  raf=requestAnimationFrame(loop);
 }
 
 // ── Loading ───────────────────────────────────────────────────────────────────
@@ -1858,36 +2151,42 @@ async function loadAll(){
   let qi=0;
   const worker=async()=>{while(qi<files.length)await fetchFile(files[qi++]);};
   await Promise.all(Array.from({length:CONCURRENCY},()=>worker()));
+  allFilesLoaded=true;
+  if(inRogue){
+    buildWorldTemplates();
+    buildWorldDroneBanks();
+    revealAround(px,py);
+    updateAudio();
+    pushEvent('// world sync complete.');
+  }
 }
 
 // ── Enter roguelike ────────────────────────────────────────────────────────────
 function enterRogue(){
-  inRogue=true;
+  // Never enter active mode until world build succeeds.
+  try{
+    // Set intro phase first so buildWorld's initial revealAround uses the tiny
+    // intro FOV (currentFovRadius()) instead of the full FOG_R.
+    onboardingPhase=ONBOARDING_PHASES.INTRO_PRELUDE;
+    introDistance=0;
+    buildWorld();
+    introAnchorX=px;
+    introAnchorY=py;
+    inRogue=true;
+  }catch(err){
+    inRogue=false;
+    pushEvent('// boot error: world init failed.');
+    console.error('enterRogue failed', err);
+    return;
+  }
   try{
     MAP_EL.setAttribute('tabindex','0');
     MAP_EL.focus({ preventScroll:true });
   }catch(_){}
-  // Set intro phase first so buildWorld's initial revealAround uses the tiny
-  // intro FOV (currentFovRadius()) instead of the full FOG_R.
-  onboardingPhase=ONBOARDING_PHASES.INTRO_PRELUDE;
-  introDistance=0;
-  buildWorld();
-  introAnchorX=px;
-  introAnchorY=py;
   updateOnboardingButton();
   startAmbientDroneAt(currentAmbientTarget());
   updateAudio();
   pushEvent('// onboarding: advance forward into the field.');
-  window.addEventListener('keydown',onKey, {capture:true});
-  window.addEventListener('keyup',onKeyUp, {capture:true});
-  window.addEventListener('pointerdown', ()=>{
-    ensureInteractionFocus();
-  }, {passive:true});
-  window.addEventListener('focus', ensureInteractionFocus, {passive:true});
-  document.addEventListener('visibilitychange', ()=>{
-    if(!document.hidden) ensureInteractionFocus();
-  });
-  window.addEventListener('blur',onBlur);
   // Aggressive initial focus lock for the first second of onboarding.
   setTimeout(ensureInteractionFocus, 0);
   setTimeout(ensureInteractionFocus, 120);
@@ -1986,6 +2285,18 @@ function boot(){
       else pushEvent('// onboarding already complete this session.');
     });
   }
+  // Register input/focus handlers once; avoid missing controls during a partial
+  // enterRogue path.
+  window.addEventListener('keydown',onKey, {capture:true});
+  window.addEventListener('keyup',onKeyUp, {capture:true});
+  window.addEventListener('pointerdown', ()=>{
+    ensureInteractionFocus();
+  }, {passive:true});
+  window.addEventListener('focus', ensureInteractionFocus, {passive:true});
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden) ensureInteractionFocus();
+  });
+  window.addEventListener('blur',onBlur);
   updateOnboardingButton();
   raf=requestAnimationFrame(loop);
   loadAll();
