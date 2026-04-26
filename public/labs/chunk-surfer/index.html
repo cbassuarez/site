@@ -220,6 +220,14 @@ const VOID_SINK = {
 // Per-sample visual terrain radius (renders glyphs around the chunk).
 const TERRAIN_R_MIN = 10;
 const TERRAIN_R_MAX = 26;
+const TERRAIN_EMITTERS = {
+  minSatellites: 1,
+  maxSatellites: 5,
+  radiusFracMin: 0.22,
+  radiusFracMax: 0.78,
+  gainMin: 0.42,
+  gainMax: 0.82
+};
 
 // World packing: tighter canvas + lower minimum chunk separation so travel is
 // dense and biome transitions happen quickly.
@@ -229,7 +237,7 @@ const CHUNK_MIN_SEP = 4;
 
 // Audible radius (proximity falloff & candidate selection) — wider than any
 // terrain so multiple samples overlap audibly wherever you stand.
-const AUDIO_R = 38;
+const AUDIO_R = 52;
 const WORLD_TILE_SCALE_X = 2.8;
 const WORLD_TILE_SCALE_Y = 2.2;
 const WORLD_SPREAD_MIN = 0.2;
@@ -493,14 +501,14 @@ function proxFor(d, R){
 // Combined voice gain: proximity × per-chunk baseline × biome × world × terrain-gate.
 // terrainGate enforces the "no audio in voids" rule on the *player's* cell;
 // each sample's contribution is governed by AUDIO_R, not its visual terrain.
-function voiceGain(chunk, d, ctx){
+function voiceGain(chunk, d, ctx, emitterGain=1){
   if(!ctx.onTerrain) return 0;
   const prox=proxFor(d, AUDIO_R);
   if(prox<=0) return 0;
   const bw=biomeWeightFor(ctx, chunk);
   const ww=ctx.worldMembership[chunk.worldId]??0;
   if(ww<=0) return 0;
-  return prox*(chunk.baseVol||1)*bw*ww;
+  return prox*(chunk.baseVol||1)*bw*ww*emitterGain;
 }
 // Hierarchical biome weight: same biome > different biome same world > different world.
 function biomeWeightFor(ctx, chunk){
@@ -1177,6 +1185,27 @@ function assignTerrainRadii(){
     c.terrainRadius=clamp(TERRAIN_R_MIN+len*6, TERRAIN_R_MIN, TERRAIN_R_MAX);
   }
 }
+function assignEmittersForChunk(c){
+  if(!c) return;
+  const r = c.terrainRadius ?? TERRAIN_R_MIN;
+  const t = clamp((r - TERRAIN_R_MIN) / Math.max(1, (TERRAIN_R_MAX - TERRAIN_R_MIN)), 0, 1);
+  const satCount = Math.round(
+    TERRAIN_EMITTERS.minSatellites + t * (TERRAIN_EMITTERS.maxSatellites - TERRAIN_EMITTERS.minSatellites)
+  );
+  const emitters = [{ x: c.wx, y: c.wy, g: 1, id: 'c' }];
+  for(let i=0; i<satCount; i++){
+    const aN = hash01((c.idx + 1) * 17.13, (i + 1) * 29.7 + (c.analysis?.centroid || 0) * 0.0007);
+    const rN = hash01((c.idx + 1) * 23.91, (i + 1) * 13.11 + (c.analysis?.attack || 0) * 73.1);
+    const gN = hash01((c.idx + 1) * 31.07, (i + 1) * 19.73 + (c.analysis?.zcr || 0) * 910);
+    const ang = aN * Math.PI * 2;
+    const rr = r * (TERRAIN_EMITTERS.radiusFracMin + rN * (TERRAIN_EMITTERS.radiusFracMax - TERRAIN_EMITTERS.radiusFracMin));
+    const ex = clamp(Math.round(c.wx + Math.cos(ang) * rr), 1, WORLD_TILE_W - 2);
+    const ey = clamp(Math.round(c.wy + Math.sin(ang) * rr * 0.88), 1, WORLD_TILE_H - 2);
+    const eg = TERRAIN_EMITTERS.gainMin + gN * (TERRAIN_EMITTERS.gainMax - TERRAIN_EMITTERS.gainMin);
+    emitters.push({ x: ex, y: ey, g: eg, id: `s${i}` });
+  }
+  c.emitters = emitters;
+}
 
 function buildWorldTemplates(){
   worldTemplates = new Map();
@@ -1208,6 +1237,7 @@ function buildWorldTemplates(){
       const wyRaw=yPad + yNorm * Math.max(1, spanY-1);
       c.wx=clamp(Number.isFinite(wxRaw)?Math.round(wxRaw):Math.round(WORLD_TILE_W/2),2,WORLD_TILE_W-3);
       c.wy=clamp(Number.isFinite(wyRaw)?Math.round(wyRaw):Math.round(WORLD_TILE_H/2),2,WORLD_TILE_H-3);
+      assignEmittersForChunk(c);
     }
 
     for(let cy=0;cy<WORLD_TILE_H;cy++){
@@ -1553,12 +1583,24 @@ function audibleCandidates(){
         if(!tpl) continue;
         for(const idx of tpl.sampleIdxs){
           const c=chunks[idx];
-          const vx=ox+c.wx, vy=oy+c.wy;
-          if(worldIdAt(vx,vy)!==c.worldId) continue;
-          const d=Math.hypot(px-vx, py-vy);
-          if(d>=AUDIO_R) continue;
-          const g=voiceGain(c,d,ctx);
-          if(g>0) out.push({key:`${tx},${ty}:${idx}`, idx, d, g, wx:vx, wy:vy, worldId:c.worldId});
+          const emitters=(c.emitters && c.emitters.length>0)
+            ? c.emitters
+            : [{ x:c.wx, y:c.wy, g:1, id:'c' }];
+          let bestD=Infinity, bestG=0, bestX=ox+c.wx, bestY=oy+c.wy;
+          for(const em of emitters){
+            const vx=ox+em.x, vy=oy+em.y;
+            if(worldIdAt(vx,vy)!==c.worldId) continue;
+            const d=Math.hypot(px-vx, py-vy);
+            if(d<bestD){
+              bestD=d;
+              bestG=em.g||1;
+              bestX=vx;
+              bestY=vy;
+            }
+          }
+          if(bestD>=AUDIO_R) continue;
+          const g=voiceGain(c,bestD,ctx,bestG);
+          if(g>0) out.push({key:`${tx},${ty}:${idx}`, idx, d:bestD, g, wx:bestX, wy:bestY, worldId:c.worldId});
         }
       }
     }
