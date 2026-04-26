@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>chunk surfer // cbassuarez.com</title>
+  <style>
+    /* minimal — ADR-inspired dark shell. no kitsch. */
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:#0d0d0d;color:#bbb;overflow:hidden;}
+    #wrap{display:flex;flex-direction:column;height:100vh;padding:10px 14px;}
+    #map{flex:1;overflow:hidden;font-family:'Courier New',Courier,monospace;font-size:13px;line-height:1.38;white-space:pre;letter-spacing:0;}
+    #catalog{display:none;border-top:1px solid #222;margin-top:6px;padding-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;color:#8d8d8d;min-height:6.2em;}
+    #catalogCtl{margin-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;}
+    #catalogCtl button{font:inherit;color:#999;background:#111;border:1px solid #333;padding:2px 8px;cursor:pointer;}
+    #catalogCtl button:hover{color:#ccc;border-color:#4a4a4a;}
+    #status{border-top:1px solid #333;margin-top:6px;padding-top:5px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.5;white-space:pre;color:#888;}
+    #event{font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.5;white-space:pre;color:#666;min-height:1.5em;}
+
+    /* biome base colors — subtle, MUD-style */
+    .t-drone    {color:#576;}   /* forest — cool green */
+    .t-shimmer  {color:#aab;}   /* mountains — cool grey */
+    .t-noise    {color:#876;}   /* scrub/desert — warm tan */
+    .t-pulse    {color:#787;}   /* plains — mid */
+    .t-resonance{color:#688;}   /* cave/wetland — teal-grey */
+    /* feature accents */
+    .t-water    {color:#5a8;}   /* lakes / streams */
+    .t-feature  {color:#cce;font-weight:bold;} /* peaks / treasure / huts */
+    .t-landmark {color:#fc8;font-weight:bold;} /* world center marker */
+    /* entities */
+    .t-player   {color:#fff;font-weight:bold;}
+    .t-chunk    {color:#ddd;font-weight:bold;}
+    .t-chunk-on {color:#fff;font-weight:bold;}
+    .t-trail    {color:#444;}
+    .t-fog      {color:rgba(170,185,200,0.12);}
+    /* dimmed wilderness (void) palette — keep topology, drop brightness/chroma */
+    .t-void-drone   {color:rgba(120,145,130,0.12);}
+    .t-void-shimmer {color:rgba(145,155,165,0.12);}
+    .t-void-noise   {color:rgba(150,135,120,0.12);}
+    .t-void-pulse   {color:rgba(132,132,132,0.12);}
+    .t-void-water   {color:rgba(110,145,150,0.12);}
+    /* world identity overlays */
+    .t-world-main_b3 {color:rgba(170,188,160,0.9);}
+    .t-world-the_tub {color:rgba(145,175,205,0.9);}
+    .t-world-border-main_b3 {color:rgba(145,170,135,0.28);}
+    .t-world-border-the_tub {color:rgba(130,160,190,0.28);}
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map"></div>
+  <div id="catalogCtl"><button id="catalogToggleBtn" type="button">catalog [c]</button></div>
+  <div id="catalog"></div>
+  <div id="event"></div>
+  <div id="status"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CHUNK SURFER — cbassuarez.com · main_b3
+// a roguelike audio instrument. walk through the sonic world.
+// fog lifts as you explore. the sound changes as you move.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const CONCURRENCY  = 8;
+const SURF_AT      = 14;
+const FADE_SEC     = 0.5;
+const FOG_R        = 16;
+const FULL_FIELD_VISIBLE = false;
+const TRAIL_LEN    = 100;
+const POLY_MAX     = 16;
+const MOVE_MS      = 90;
+const RMS_TARGET   = 0.12;
+
+// Per-sample visual terrain radius (renders glyphs around the chunk).
+const TERRAIN_R_MIN = 20;
+const TERRAIN_R_MAX = 46;
+
+// World packing: tighter canvas + lower minimum chunk separation so travel is
+// dense and biome transitions happen quickly.
+const WORLD_SCALE_X = 2.2;
+const WORLD_SCALE_Y = 2.2;
+const CHUNK_MIN_SEP = 4;
+
+// Audible radius (proximity falloff & candidate selection) — wider than any
+// terrain so multiple samples overlap audibly wherever you stand.
+const AUDIO_R = 38;
+const WORLD_TILE_SCALE_X = 1.25;
+const WORLD_TILE_SCALE_Y = 1.1;
+
+// Hierarchical voice weighting (applied on top of proximity × baseVol).
+// Softer cross-biome attenuation so blends are audible polyphony, not just hints.
+const W_BIOME_SAME    = 1.00;  // same biome
+const W_BIOME_OTHER   = 0.55;  // different biome, same world
+const W_BIOME_FOREIGN = 0.25;  // different world
+
+// Ambient drone — bit-crushed noise bed that always plays under the polyphony.
+const AMBIENT_DRONE_GAIN = 0.028;
+const AMBIENT_BIT_LEVELS = 8;   // 8 quantisation steps per side (~3-bit feel)
+const AMBIENT_LOOP_SEC   = 4;
+
+// ── Manifest (worlds → samples) ───────────────────────────────────────────────
+// Add worlds here and the engine auto-builds World > Biome > Sample hierarchy.
+// { id, label, files: [{label, url}, ...] }. The engine reads worldId off each
+// sample and routes audio + topology through the World > Biome > Sample stack.
+const TUB_ULTRACHUNK_FILES = [
+  'S0001.wav','S0004.wav','S0006.wav','S0008.wav','S0009.wav','S0012.wav',
+  'S0014.wav','S0016.wav','S0017.wav','S0020.wav','S0022.wav','S0024.wav',
+  'S0025.wav','S0028.wav','S0030.wav','S0032.wav','S0033.wav','S0036.wav',
+  'S0038.wav','S0040.wav','S0041.wav','S0044.wav','S0046.wav','S0048.wav'
+];
+
+const MANIFEST = {
+  worlds: [
+    {
+      id: 'main_b3',
+      label: 'main b3',
+      files: Array.from({length: 64}, (_, i) => {
+        const n = String(i+1).padStart(2,'0');
+        return { label: n, url: `/audio/main_b3/main_b3_${n}.mp3` };
+      })
+    },
+    {
+      id: 'the_tub',
+      label: 'THE TUB',
+      files: [
+        ...Array.from({length: 20}, (_, i) => {
+          const n = String(i).padStart(2, '0');
+          const names = [
+            'xither_forge','wetair_veil','trillion_hull','acharia_arc','xemf_mass',
+            'xither_glass','wetair_core','trillion_air','acharia_depth','xemf_sheen',
+            'xither_floor','wetair_shine','trillion_low','acharia_spark','xemf_grain',
+            'xither_lift','wetair_drift','trillion_fog','acharia_haze','xemf_bloom'
+          ];
+          return {
+            label: `tub-${n}`,
+            url: `/audio/the_tub/${n}_${names[i]}.wav`
+          };
+        }),
+        ...TUB_ULTRACHUNK_FILES.map((name) => ({
+          label: `tub-${name.replace('.wav', '').toLowerCase()}`,
+          url: `/audio/the_tub/${name}`
+        }))
+      ]
+    }
+  ]
+};
+
+const PIECE_CATALOG = {
+  main_b3: {
+    title: 'main_b3',
+    year: '2026',
+    description: 'A field of resonant fragments mapped into shifting biomes. Walking changes perspective, and perspective changes what you hear.'
+  },
+  the_tub: {
+    title: 'THE TUB',
+    year: '2026',
+    description: 'A harness-derived landscape of wet-air, trillion, acharia, xemf, and ultrachunk materials: procedural, bounded, and performative in its constraints.'
+  }
+};
+
+// Flatten manifest into the load queue + remember each world's file indices.
+const files = [];
+const worldsConfig = MANIFEST.worlds.map(w => {
+  const fileIdxs = w.files.map(f => {
+    const i = files.length;
+    files.push({ idx:i, label:f.label, url:f.url, worldId:w.id,
+                 status:'queued', recv:0, total:0, buffer:null, analysis:null });
+    return i;
+  });
+  return { id:w.id, label:w.label, fileIdxs };
+});
+
+const SAMPLE_COUNT = files.length;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let actx=null;
+let voices=new Map(); // chunkIdx -> {src,gain,dur,startedAt,target}
+let ambientDrone=null; // {src,lfo,filt,gain,target}
+let paused=false, looping=true;
+let inRogue=false, raf=null, tick=0;
+let bootLog=[];
+let chunks=[]; // {idx,label,charId,name,buffer,analysis,biome,worldId,biomeId,terrainRadius,baseVol,wx,wy,heard}
+let worlds=[]; // template metadata by world id
+let worldTemplates=new Map(); // worldId -> {id,label,width,height,terrain,sampleIdxs,region,biomes}
+let keysDown=new Set();
+let moveTimer=null;
+
+// world grid
+let WORLD_TILE_W=0, WORLD_TILE_H=0;
+let VIEW_W=0, VIEW_H=0;
+let fog=new Map();   // Map<"x,y", 1|2>
+let px=0, py=0;      // player world pos
+let curChunkKey='';  // instance key ("tx,ty:chunkIdx") of currently loudest chunk
+let curChunkIdx=-1;  // chunk index for status text/icon
+let curPlayerCtx=null; // {onTerrain,biomeId,worldId,worldMembership}
+let stepCount=0, seenCount=0;
+let trail=[];        // [{x,y}] recent steps
+let eventQueue=[];   // messages to show
+let weirdShown=new Set();
+let showCatalog=false;
+
+const WEIRD=[
+  [50, '// echo detected in the distance.'],
+  [120,'// drift. not sure where centre is anymore.'],
+  [250,'// repetition is a form of change.'],
+  [400,'// you have been walking for a long time.'],
+  [600,'// honor thy error as a hidden intention.'],
+  [900,'// is there something missing?'],
+];
+
+// ── Single-char IDs for chunks (1-9, A-Z, a-z, then symbols) ─────────────────
+function makeCharId(n) {
+  if (n<9)  return String(n+1);
+  if (n<35) return String.fromCharCode(65+n-9);
+  if (n<61) return String.fromCharCode(97+n-35);
+  return '!?&#'[n-61]||'#';
+}
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+let master=null;
+function ensureCtx(){
+  if(!actx){
+    actx=new(window.AudioContext||window.webkitAudioContext)();
+    // Master soft-limiter — keeps 16 simultaneous voices from clipping.
+    master=actx.createDynamicsCompressor();
+    master.threshold.setValueAtTime(-14, actx.currentTime);
+    master.knee.setValueAtTime(12, actx.currentTime);
+    master.ratio.setValueAtTime(4, actx.currentTime);
+    master.attack.setValueAtTime(0.005, actx.currentTime);
+    master.release.setValueAtTime(0.1, actx.currentTime);
+    master.connect(actx.destination);
+  }
+  if(actx.state==='suspended') actx.resume();
+}
+// Per-chunk baseline volume from analysis — quiet chunks (low RMS) get a boost,
+// loud percussive ones get a slight cut, so the polyphonic mix stays balanced.
+function baseVolFor(analysis){
+  const rms=Math.max(0.01, analysis?.rms||RMS_TARGET);
+  return Math.max(0.35, Math.min(1.4, RMS_TARGET/rms));
+}
+function killNode(s,g){
+  try{s&&s.stop();}catch(_){}
+  try{s&&s.disconnect();}catch(_){}
+  try{g&&g.disconnect();}catch(_){}
+}
+// Bake equal-power sin/cos fades into the first/last `fadeMs` of a buffer so
+// the loop seam — and a paired-source overlap — sums to a constant amplitude.
+function smoothBufferLoop(buffer, fadeMs=60){
+  const sr=buffer.sampleRate;
+  const N=buffer.length;
+  const fadeSamples=Math.min(Math.floor(fadeMs*sr/1000), Math.floor(N/4));
+  for(let ch=0;ch<buffer.numberOfChannels;ch++){
+    const data=buffer.getChannelData(ch);
+    for(let i=0;i<fadeSamples;i++){
+      const t=i/fadeSamples;
+      const fIn =Math.sin(t*Math.PI*0.5);
+      const fOut=Math.cos(t*Math.PI*0.5);
+      data[i] *= fIn;
+      data[N-1-i] *= fOut;
+    }
+  }
+  return fadeSamples/sr;
+}
+// Proximity weight: quadratic falloff with hard cutoff at AUDIO_R.
+function proxFor(d, R){
+  if(d>=R) return 0;
+  const t=1-d/R;
+  return t*t;
+}
+// Combined voice gain: proximity × per-chunk baseline × biome × world × terrain-gate.
+// terrainGate enforces the "no audio in voids" rule on the *player's* cell;
+// each sample's contribution is governed by AUDIO_R, not its visual terrain.
+function voiceGain(chunk, d, ctx){
+  if(!ctx.onTerrain) return 0;
+  const prox=proxFor(d, AUDIO_R);
+  if(prox<=0) return 0;
+  const bw=biomeWeightFor(ctx, chunk);
+  const ww=ctx.worldMembership[chunk.worldId]??0;
+  if(ww<=0) return 0;
+  return prox*(chunk.baseVol||1)*bw*ww;
+}
+// Hierarchical biome weight: same biome > different biome same world > different world.
+function biomeWeightFor(ctx, chunk){
+  if(ctx.biomeId && chunk.biomeId===ctx.biomeId) return W_BIOME_SAME;
+  if(ctx.worldId && chunk.worldId===ctx.worldId) return W_BIOME_OTHER;
+  return W_BIOME_FOREIGN;
+}
+function fogKey(x,y){ return `${x},${y}`; }
+function fogGet(x,y){ return fog.get(fogKey(x,y)) || 0; }
+function fogSet(x,y,v){ if(v>0) fog.set(fogKey(x,y), v); }
+function divFloor(n,d){ return Math.floor(n/d); }
+function mod(n,d){ const m=n%d; return m<0?m+d:m; }
+function worldClassFor(worldId){ return worldId==='the_tub' ? 't-world-the_tub' : 't-world-main_b3'; }
+function worldBorderClassFor(worldId){ return worldId==='the_tub' ? 't-world-border-the_tub' : 't-world-border-main_b3'; }
+function worldBorderGlyphFor(worldId, x, y){
+  const n = hash01(x*0.91, y*0.73);
+  if(worldId==='the_tub'){
+    if(n>0.78) return '~';
+    if(n>0.52) return ':';
+    if(n>0.26) return '/';
+    return '\\';
+  }
+  if(n>0.78) return '=';
+  if(n>0.52) return '-';
+  if(n>0.26) return '/';
+  return '|';
+}
+function worldIdForWarpedTile(tx, ty){
+  const ids = worldsConfig.map((w) => w.id);
+  if(ids.length===0) return 'main_b3';
+  if(ids.length===1) return ids[0];
+  if(ids.length===2){
+    return (Math.abs(tx)+Math.abs(ty))%2===0 ? ids[0] : ids[1];
+  }
+  const h = Math.floor(hash01(tx*13.7, ty*91.1) * 1000000);
+  return ids[h % ids.length];
+}
+function worldIdAt(x,y){
+  // Domain warp breaks axis-aligned tile edges into jagged procedural borders.
+  const warpX = (noise2(x,y,0.006,17) + 0.5*noise2(x,y,0.015,29)) * (WORLD_TILE_W*0.95);
+  const warpY = (noise2(x,y,0.007,41) + 0.5*noise2(x,y,0.018,53)) * (WORLD_TILE_H*0.95);
+  const wx = x + warpX;
+  const wy = y + warpY;
+  const tx=divFloor(wx, WORLD_TILE_W);
+  const ty=divFloor(wy, WORLD_TILE_H);
+  return worldIdForWarpedTile(tx, ty);
+}
+function tileCoordFor(x,y){
+  const tx=divFloor(x, WORLD_TILE_W);
+  const ty=divFloor(y, WORLD_TILE_H);
+  const lx=mod(x, WORLD_TILE_W);
+  const ly=mod(y, WORLD_TILE_H);
+  return {tx, ty, lx, ly};
+}
+function isWorldBoundaryAt(x,y,worldId){
+  return worldIdAt(x+1,y)!==worldId ||
+         worldIdAt(x-1,y)!==worldId ||
+         worldIdAt(x,y+1)!==worldId ||
+         worldIdAt(x,y-1)!==worldId;
+}
+function getCellAt(x,y){
+  const {tx,ty,lx,ly}=tileCoordFor(x,y);
+  const worldId=worldIdAt(x,y);
+  const tpl=worldTemplates.get(worldId);
+  if(!tpl){
+    return {char:'.', colorClass:'t-fog', worldId, biomeId:null, isWilderness:true};
+  }
+  const base=(tpl.terrain[ly]&&tpl.terrain[ly][lx])?tpl.terrain[ly][lx]:{char:'.',colorClass:'t-fog',isWilderness:true};
+  const cell={...base, worldId};
+  if(!base?.isChunk && isWorldBoundaryAt(x,y,worldId)){
+    return {
+      ...cell,
+      char: worldBorderGlyphFor(worldId, x, y),
+      colorClass: worldBorderClassFor(worldId),
+      biomeId: null,
+      isBorder: true
+    };
+  }
+  if(base?.isChunk){
+    cell.chunkKey=`${tx},${ty}:${base.chunkIdx}`;
+  }
+  return cell;
+}
+// In infinite tiled space, player membership is one-hot for the current tile's world.
+function worldMembership(x, y){
+  const cell=getCellAt(Math.round(x), Math.round(y));
+  const out={};
+  for(const w of worldsConfig) out[w.id]=0;
+  if(cell?.worldId) out[cell.worldId]=1;
+  return out;
+}
+function playerContext(){
+  const cell=getCellAt(px, py);
+  return {
+    onTerrain: !!cell?.biomeId,
+    biomeId: cell?.biomeId ?? null,
+    worldId: cell?.worldId ?? null,
+    worldMembership: worldMembership(px, py)
+  };
+}
+// Each voice plays its sample through TWO buffer sources, offset by (dur - fade),
+// sharing one gain node. The buffer's baked sin/cos fades make A's fade-out and
+// B's fade-in equal-power-complementary, so the loop seam sums smoothly.
+function startVoice(chunkIdx, target){
+  const c=chunks[chunkIdx]; if(!c?.buffer) return null;
+  ensureCtx();
+  const now=actx.currentTime;
+  const dur=c.buffer.duration;
+  const fade=Math.max(0.02, c.loopFadeSec||0.06);
+  const stagger=Math.max(0, dur-fade);
+  const srcA=actx.createBufferSource();
+  const srcB=actx.createBufferSource();
+  srcA.buffer=c.buffer; srcB.buffer=c.buffer;
+  srcA.loop=looping;     srcB.loop=looping;
+  const g=actx.createGain();
+  srcA.connect(g); srcB.connect(g); g.connect(master);
+  g.gain.setValueAtTime(0,now);
+  g.gain.linearRampToValueAtTime(target, now+FADE_SEC);
+  srcA.start(now);
+  srcB.start(now+stagger);
+  return {srcA, srcB, gain:g, dur, startedAt:now, target};
+}
+function rampVoice(v, target){
+  if(!v) return;
+  const now=actx.currentTime;
+  v.gain.gain.cancelScheduledValues(now);
+  v.gain.gain.setValueAtTime(v.gain.gain.value, now);
+  v.gain.gain.linearRampToValueAtTime(target, now+FADE_SEC);
+  v.target=target;
+}
+function stopVoice(v){
+  if(!v) return;
+  const now=actx.currentTime;
+  v.gain.gain.cancelScheduledValues(now);
+  v.gain.gain.setValueAtTime(v.gain.gain.value, now);
+  v.gain.gain.linearRampToValueAtTime(0, now+FADE_SEC);
+  const {srcA, srcB, gain}=v;
+  setTimeout(()=>{
+    try{srcA.stop();srcA.disconnect();}catch(_){}
+    try{srcB.stop();srcB.disconnect();}catch(_){}
+    try{gain.disconnect();}catch(_){}
+  }, (FADE_SEC+0.2)*1000);
+}
+function stopAllVoices(){
+  for(const [,v] of voices) stopVoice(v);
+  voices.clear();
+}
+
+// ── Ambient drone — bit-crushed brown-noise bed, always on under polyphony ────
+// Subtle, lo-fi, tasteful. Loops a small noise buffer; lowpass + slow LFO
+// give it breath. Mixes with terrain voices through the master compressor.
+function makeAmbientNoiseBuffer(){
+  const sr=actx.sampleRate;
+  const len=Math.floor(sr*AMBIENT_LOOP_SEC);
+  const buf=actx.createBuffer(1, len, sr);
+  const ch=buf.getChannelData(0);
+  // Brown noise via leaky integrator → softer than white, less hissy.
+  let last=0;
+  const Q=AMBIENT_BIT_LEVELS;
+  for(let i=0;i<len;i++){
+    const white=Math.random()*2-1;
+    last=(last+0.02*white)/1.02;
+    // Bit-crush quantisation → vintage character.
+    ch[i]=Math.round(last*Q*4)/(Q*4);
+  }
+  return buf;
+}
+function ensureAmbientDrone(){
+  if(ambientDrone) return ambientDrone;
+  ensureCtx();
+  const now=actx.currentTime;
+  const src=actx.createBufferSource();
+  src.buffer=makeAmbientNoiseBuffer();
+  src.loop=true;
+  // Lowpass keeps it from biting; cutoff drifts on a slow LFO.
+  const filt=actx.createBiquadFilter();
+  filt.type='lowpass';
+  filt.frequency.setValueAtTime(420, now);
+  filt.Q.setValueAtTime(0.6, now);
+  const lfo=actx.createOscillator();
+  lfo.type='sine';
+  lfo.frequency.setValueAtTime(1/13, now);
+  const lfoGain=actx.createGain();
+  lfoGain.gain.setValueAtTime(160, now);
+  lfo.connect(lfoGain); lfoGain.connect(filt.frequency);
+  const gain=actx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  src.connect(filt); filt.connect(gain); gain.connect(master);
+  src.start(); lfo.start();
+  ambientDrone={src, lfo, filt, gain, target:0};
+  return ambientDrone;
+}
+function startAmbientDrone(){
+  ensureAmbientDrone();
+  if(ambientDrone.target===AMBIENT_DRONE_GAIN) return;
+  const now=actx.currentTime;
+  ambientDrone.gain.gain.cancelScheduledValues(now);
+  ambientDrone.gain.gain.setValueAtTime(ambientDrone.gain.gain.value, now);
+  ambientDrone.gain.gain.linearRampToValueAtTime(AMBIENT_DRONE_GAIN, now+FADE_SEC);
+  ambientDrone.target=AMBIENT_DRONE_GAIN;
+}
+function silenceAmbientDrone(){
+  if(!ambientDrone) return;
+  const now=actx.currentTime;
+  ambientDrone.gain.gain.cancelScheduledValues(now);
+  ambientDrone.gain.gain.setValueAtTime(ambientDrone.gain.gain.value, now);
+  ambientDrone.gain.gain.linearRampToValueAtTime(0, now+FADE_SEC);
+  ambientDrone.target=0;
+}
+
+// ── FFT (radix-2, in-place, twiddle-recurrence) ───────────────────────────────
+function fft(re, im){
+  const N=re.length;
+  // bit-reversal permutation
+  for(let i=1,j=0;i<N;i++){
+    let bit=N>>1;
+    for(;j&bit;bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){
+      let t=re[i]; re[i]=re[j]; re[j]=t;
+      t=im[i]; im[i]=im[j]; im[j]=t;
+    }
+  }
+  for(let size=2;size<=N;size<<=1){
+    const half=size>>1;
+    const ang=-2*Math.PI/size;
+    const wr0=Math.cos(ang), wi0=Math.sin(ang);
+    for(let start=0;start<N;start+=size){
+      let wr=1, wi=0;
+      for(let k=0;k<half;k++){
+        const ar=re[start+k+half], ai=im[start+k+half];
+        const tr=wr*ar - wi*ai;
+        const ti=wr*ai + wi*ar;
+        re[start+k+half]=re[start+k]-tr;
+        im[start+k+half]=im[start+k]-ti;
+        re[start+k]+=tr;
+        im[start+k]+=ti;
+        const nwr=wr*wr0 - wi*wi0;
+        wi=wr*wi0 + wi*wr0;
+        wr=nwr;
+      }
+    }
+  }
+}
+
+// ── Audio analysis (time-domain + FFT-based MIR) ──────────────────────────────
+function analyze(buffer){
+  const data=buffer.getChannelData(0);
+  const sr=buffer.sampleRate;
+  const N=Math.min(data.length, sr*2);
+
+  // time-domain (kept for biomeFrom + baseVolFor)
+  let rmsSum=0;
+  for(let i=0;i<N;i++) rmsSum+=data[i]*data[i];
+  const rms=Math.sqrt(rmsSum/N);
+
+  let zcr=0;
+  for(let i=1;i<N;i++) if((data[i]>=0)!==(data[i-1]>=0)) zcr++;
+  zcr/=N;
+
+  let diff=0;
+  for(let i=1;i<N;i++) diff+=Math.abs(data[i]-data[i-1]);
+  const hf=diff/N;
+
+  const BLOCK=128, nB=Math.floor(N/BLOCK);
+  const bm=Array.from({length:nB},(_,b)=>{
+    let s=0; for(let i=b*BLOCK;i<(b+1)*BLOCK;i++) s+=data[i]; return s/BLOCK;
+  });
+  const bMean=bm.reduce((a,b)=>a+b,0)/bm.length;
+  const lf=Math.sqrt(bm.reduce((a,b)=>a+(b-bMean)**2,0)/bm.length);
+
+  // length
+  const length=buffer.duration;
+
+  // spectral features — average centroid + 85% rolloff over up to 8 frames
+  const FFT_SIZE=1024;
+  const maxFrames=Math.max(1, Math.min(8, Math.floor(N/FFT_SIZE)));
+  const re=new Float32Array(FFT_SIZE);
+  const im=new Float32Array(FFT_SIZE);
+  let centroidSum=0, rolloffSum=0, framesUsed=0;
+  for(let f=0;f<maxFrames;f++){
+    const off=Math.floor(f*(N-FFT_SIZE)/Math.max(1,maxFrames));
+    for(let i=0;i<FFT_SIZE;i++){
+      // Hann window
+      const w=0.5*(1-Math.cos(2*Math.PI*i/(FFT_SIZE-1)));
+      re[i]=(data[off+i]||0)*w;
+      im[i]=0;
+    }
+    fft(re,im);
+    let num=0, den=0, total=0;
+    const half=FFT_SIZE/2;
+    for(let k=0;k<half;k++){
+      const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+      const freq=k*sr/FFT_SIZE;
+      num+=freq*m;
+      den+=m;
+      total+=m;
+    }
+    if(den>0){ centroidSum+=num/den; framesUsed++; }
+    let cum=0; const target=0.85*total;
+    for(let k=0;k<half;k++){
+      cum+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+      if(cum>=target){ rolloffSum+=k*sr/FFT_SIZE; break; }
+    }
+  }
+  const centroid=framesUsed>0?centroidSum/framesUsed:0;
+  const rolloff=framesUsed>0?rolloffSum/framesUsed:0;
+
+  // attack: time from start to first 50%-of-peak amplitude crossing (seconds)
+  let peak=0;
+  for(let i=0;i<N;i++){ const a=Math.abs(data[i]); if(a>peak) peak=a; }
+  let attackSamples=0;
+  if(peak>0){
+    const thr=0.5*peak;
+    for(let i=0;i<N;i++){ if(Math.abs(data[i])>=thr){ attackSamples=i; break; } }
+  }
+  const attack=attackSamples/sr;
+
+  return {rms,zcr,hf,lf,length,centroid,rolloff,attack};
+}
+
+function biomeFrom({zcr,hf,lf,rms}){
+  if(zcr>0.055&&hf>0.014)  return 'noise';
+  if(zcr<0.015&&lf>0.007)  return 'drone';
+  if(hf>0.011&&zcr<0.038)  return 'shimmer';
+  if(rms>0.11&&zcr<0.038)  return 'pulse';
+  return 'resonance';
+}
+
+// ── Terrain topology — MUD/Angband-style biome palettes + layered noise ───────
+// Each biome type has a palette of glyphs distributed by 2D noise so the
+// world has hills/valleys/lakes/clearings instead of uniform speckle.
+//
+// Roles (per palette):
+//   base      — most common ground (grass, sand, dirt)
+//   secondary — common variation (taller grass, scree, pebbles)
+//   primary   — visible feature (trees, peaks, dunes, water)
+//   feature   — rare landmark (huts, summits, oases, deep pools)
+//   sparse    — outer-ring filler (gap-prone)
+const BIOME_PALETTES = {
+  drone: {     // forest — dense, organic, cool
+    base:',', secondary:'%', primary:'T', feature:'&', sparse:'.',
+    color:'t-drone', featureColor:'t-feature'
+  },
+  shimmer: {   // mountains — rugged, sparse
+    base:'.', secondary:',', primary:'^', feature:'*', sparse:'.',
+    color:'t-shimmer', featureColor:'t-feature'
+  },
+  noise: {     // scrub / desert — chaotic
+    base:'.', secondary:':', primary:';', feature:'#', sparse:'.',
+    color:'t-noise', featureColor:'t-feature'
+  },
+  pulse: {     // plains — rhythmic, even
+    base:',', secondary:'\'', primary:';', feature:'o', sparse:'.',
+    color:'t-pulse', featureColor:'t-feature'
+  },
+  resonance: { // wetland / cave — round, watery
+    base:'.', secondary:'=', primary:'~', feature:'O', sparse:'.',
+    color:'t-resonance', featureColor:'t-feature'
+  }
+};
+function paletteForBiome(biome){ return BIOME_PALETTES[biome] || BIOME_PALETTES.resonance; }
+
+// Cheap layered noise (fbm-ish via overlapping sines) — gives clusters that
+// read as macro features (lakes, ridges) without needing a real Perlin impl.
+function noise2(x, y, scale, seed){
+  const sx=(x+seed)*scale, sy=(y+seed*1.3)*scale;
+  return 0.5*Math.sin(sx*1.7+Math.cos(sy*2.3)) + 0.5*Math.cos(sy*1.1+Math.sin(sx*1.9));
+}
+function fbm2(x, y, seed){
+  return 0.55*noise2(x,y,0.05,seed)
+       + 0.30*noise2(x,y,0.18,seed*2.1)
+       + 0.15*noise2(x,y,0.55,seed*3.7);
+}
+function hash01(x, y){
+  return Math.abs(Math.sin(x*127.1+y*311.7)*43758.5)%1;
+}
+
+// Per-cell glyph — biome palette + layered noise + distance falloff + attack-driven edge softness.
+// Always returns a glyph inside R (no holes); outside R returns null so wilderness can fill in.
+function terrainChar(chunk, d, cx, cy){
+  const R=chunk.terrainRadius;
+  if(d>R) return null;
+  const palette=paletteForBiome(chunk.biome);
+  const distFrac=d/R;
+
+  // Noise tiers — clusters of glyphs read as features.
+  const n=fbm2(cx, cy, chunk.idx);
+  let glyph;
+  if(n>0.55)        glyph=palette.feature;
+  else if(n>0.15)   glyph=palette.primary;
+  else if(n>-0.20)  glyph=palette.secondary;
+  else              glyph=palette.base;
+
+  // Soften toward the edge — outer ring shifts to the lighter sparse glyph.
+  if(distFrac>0.75){
+    const r=hash01(cx,cy);
+    if(glyph!==palette.feature && r>0.4) glyph=palette.sparse;
+  }
+  return glyph;
+}
+
+// ── Wilderness — global background terrain that fills cells with no chunk ─────
+// Macro fbm picks a region (forest / plains / scrub / waste); thin noise
+// bands carve rivers and ridges. Cells get glyph + color but no biomeId, so
+// audio still gates off (wilderness is visual only — only the ambient bed plays).
+function wildernessAt(cx, cy){
+  // River bands — long, narrow water threads.
+  const river=noise2(cx, cy, 0.018, 7) + 0.4*noise2(cx, cy, 0.06, 11);
+  if(Math.abs(river)<0.045) return {char:'~', colorClass:'t-void-water'};
+  // Mountain ridges — broad bands of peaks.
+  const mtn=noise2(cx, cy, 0.022, 23) + 0.3*noise2(cx, cy, 0.09, 31);
+  if(mtn>0.7) return {char:'^', colorClass:'t-void-shimmer'};
+
+  const macro=fbm2(cx, cy, 999);
+  const micro=fbm2(cx, cy, 1234);
+  if(macro>0.45){      // forest
+    if(micro>0.4)  return {char:'T', colorClass:'t-void-drone'};
+    if(micro>-0.1) return {char:'%', colorClass:'t-void-drone'};
+    return {char:',', colorClass:'t-void-drone'};
+  }
+  if(macro>-0.05){     // plains
+    if(micro>0.45) return {char:';', colorClass:'t-void-pulse'};
+    if(micro>0)    return {char:',', colorClass:'t-void-pulse'};
+    return {char:'\'', colorClass:'t-void-pulse'};
+  }
+  if(macro>-0.4){      // scrub
+    if(micro>0.3)  return {char:':', colorClass:'t-void-noise'};
+    if(micro>-0.1) return {char:',', colorClass:'t-void-noise'};
+    return {char:'.', colorClass:'t-void-noise'};
+  }
+  // Sparse waste
+  if(micro>0.3) return {char:'.', colorClass:'t-void-noise'};
+  return {char:',', colorClass:'t-void-pulse'};
+}
+
+// Color a stamped terrain cell. Most cells take the biome's base color;
+// specific glyph identities (water, peaks/huts) get accent colors.
+function colorFor(biome, glyph){
+  const p=paletteForBiome(biome);
+  if(glyph==='~' || glyph==='≈') return 't-water';
+  if(glyph===p.feature) return p.featureColor;
+  return p.color;
+}
+
+// ── Sample iconography — micrographic per-sample marker from MIR ──────────────
+// Each sample is a "place" on the map: cave, peak, blip, hut, well, shimmer,
+// boulder, arch. Type derived from centroid × attack × length.
+function iconFor(analysis){
+  const c=analysis.centroid||0;
+  const a=analysis.attack||0;
+  const l=analysis.length||0;
+  if(c<800){
+    if(a<0.015) return 'O';                 // heavy stone — low + sharp
+    return l>1.5 ? '&' : 'o';                // cluster/cave vs boulder
+  }
+  if(c<2500){
+    if(a<0.015) return '*';                  // spark/blip — mid + sharp
+    return l>1.5 ? 'Ω' : '+';                 // arch vs crossroads
+  }
+  // High centroid
+  if(a<0.015) return '^';                    // peak — high + sharp
+  return l>1.0 ? '~' : '!';                   // shimmer/water vs spike
+}
+// Symbolic marker for a world's centre — distinguishes worlds at a glance.
+// Cycles through a small set; future canonical worlds get distinct markers.
+const WORLD_LANDMARKS=['◆','◇','▽','△','◉','○','✦','✧'];
+function landmarkFor(worldIdx){ return WORLD_LANDMARKS[worldIdx%WORLD_LANDMARKS.length]; }
+
+// ── World ─────────────────────────────────────────────────────────────────────
+function computeViewDims(){
+  const mapEl=document.getElementById('map');
+  const cw=7.84, ch=13*1.38;
+  VIEW_W=Math.max(40, Math.floor(mapEl.clientWidth/cw));
+  VIEW_H=Math.max(10, Math.floor(mapEl.clientHeight/ch));
+}
+
+// Per-sample terrain radius — longer samples occupy more map area.
+function assignTerrainRadii(){
+  for(const c of chunks){
+    const len=c.analysis?.length||1;
+    c.terrainRadius=clamp(TERRAIN_R_MIN+len*6, TERRAIN_R_MIN, TERRAIN_R_MAX);
+  }
+}
+
+function buildWorldTemplates(){
+  worldTemplates = new Map();
+  worlds = [];
+
+  for(const wc of worldsConfig){
+    const sampleIdxs = chunks.filter(c=>wc.fileIdxs.includes(c.idx)).map(c=>c.idx);
+    if(sampleIdxs.length===0) continue;
+
+    const templateTerrain = Array.from({length:WORLD_TILE_H},()=>Array(WORLD_TILE_W).fill(null));
+    const allZ = sampleIdxs.map((idx)=>chunks[idx].analysis.zcr);
+    const allH = sampleIdxs.map((idx)=>chunks[idx].analysis.hf);
+    const [minZ,maxZ]=[Math.min(...allZ),Math.max(...allZ)||0.001];
+    const [minH,maxH]=[Math.min(...allH),Math.max(...allH)||0.001];
+
+    for(const idx of sampleIdxs){
+      const c=chunks[idx];
+      c.worldId=wc.id;
+      c.biomeId=`${wc.id}:${c.biome}`;
+      c.wx=Math.round(4+((c.analysis.zcr-minZ)/(maxZ-minZ))*(WORLD_TILE_W-8));
+      c.wy=Math.round(4+(1-(c.analysis.hf-minH)/(maxH-minH))*(WORLD_TILE_H-8));
+    }
+
+    for(let p=0;p<18;p++){
+      for(let i=0;i<sampleIdxs.length;i++){
+        for(let j=i+1;j<sampleIdxs.length;j++){
+          const a=chunks[sampleIdxs[i]], b=chunks[sampleIdxs[j]];
+          const dx=a.wx-b.wx, dy=a.wy-b.wy;
+          const d=Math.hypot(dx,dy);
+          if(d<CHUNK_MIN_SEP){
+            const nx=d<.01?1:dx/d, ny=d<.01?0:dy/d;
+            const push=Math.ceil((CHUNK_MIN_SEP-d)/2)+1;
+            a.wx=clamp(a.wx+Math.round(nx*push),2,WORLD_TILE_W-3);
+            a.wy=clamp(a.wy+Math.round(ny*push),2,WORLD_TILE_H-3);
+            b.wx=clamp(b.wx-Math.round(nx*push),2,WORLD_TILE_W-3);
+            b.wy=clamp(b.wy-Math.round(ny*push),2,WORLD_TILE_H-3);
+          }
+        }
+      }
+    }
+
+    for(let cy=0;cy<WORLD_TILE_H;cy++){
+      for(let cx=0;cx<WORLD_TILE_W;cx++){
+        let nd=Infinity, nc=null;
+        for(const idx of sampleIdxs){
+          const ch=chunks[idx];
+          const d=Math.hypot(cx-ch.wx, cy-ch.wy);
+          if(d<nd){nd=d;nc=ch;}
+        }
+        if(nc && nd<=nc.terrainRadius){
+          const g=terrainChar(nc,nd,cx,cy);
+          if(g){
+            templateTerrain[cy][cx]={
+              char:g,
+              colorClass:colorFor(nc.biome,g),
+              biomeId:nc.biomeId,
+              worldId:wc.id
+            };
+          }
+        }
+      }
+    }
+
+    for(const idx of sampleIdxs){
+      const c=chunks[idx];
+      if(!c.iconChar) c.iconChar=iconFor(c.analysis);
+      templateTerrain[c.wy][c.wx]={
+        char:c.iconChar,
+        colorClass:'t-chunk',
+        biomeId:c.biomeId,
+        worldId:wc.id,
+        isChunk:true,
+        chunkIdx:idx
+      };
+    }
+
+    const cx=sampleIdxs.reduce((acc, idx)=>acc+chunks[idx].wx,0)/sampleIdxs.length;
+    const cy=sampleIdxs.reduce((acc, idx)=>acc+chunks[idx].wy,0)/sampleIdxs.length;
+    let maxD=0;
+    for(const idx of sampleIdxs){
+      const s=chunks[idx];
+      const d=Math.hypot(s.wx-cx, s.wy-cy)+s.terrainRadius;
+      if(d>maxD) maxD=d;
+    }
+    const region={cx, cy, r:Math.max(maxD, 18)};
+
+    const groups=new Map();
+    for(const idx of sampleIdxs){
+      const c=chunks[idx];
+      if(!groups.has(c.biome)) groups.set(c.biome,[]);
+      groups.get(c.biome).push(idx);
+    }
+    const biomes=[...groups].map(([type, ids])=>({id:`${wc.id}:${type}`,type,world:wc.id,sampleIdxs:ids}));
+    const landmarkX=clamp(Math.round(region.cx),1,WORLD_TILE_W-2);
+    const landmarkY=clamp(Math.round(region.cy),1,WORLD_TILE_H-2);
+    if(!templateTerrain[landmarkY][landmarkX]?.isChunk){
+      templateTerrain[landmarkY][landmarkX]={
+        char:landmarkFor(worlds.length),
+        colorClass:'t-landmark',
+        biomeId:null,
+        worldId:wc.id,
+        isLandmark:true
+      };
+    }
+
+    for(let cy2=0;cy2<WORLD_TILE_H;cy2++){
+      for(let cx2=0;cx2<WORLD_TILE_W;cx2++){
+        if(templateTerrain[cy2][cx2]!==null) continue;
+        const w=wildernessAt(cx2, cy2);
+        templateTerrain[cy2][cx2]={char:w.char,colorClass:w.colorClass,isWilderness:true,worldId:wc.id};
+      }
+    }
+
+    const tpl={id:wc.id,label:wc.label,width:WORLD_TILE_W,height:WORLD_TILE_H,terrain:templateTerrain,sampleIdxs,region,biomes};
+    worldTemplates.set(wc.id, tpl);
+    worlds.push(tpl);
+  }
+}
+
+function buildWorld(){
+  computeViewDims();
+  WORLD_TILE_W=Math.max(36, Math.round(VIEW_W*WORLD_TILE_SCALE_X));
+  WORLD_TILE_H=Math.max(24, Math.round(VIEW_H*WORLD_TILE_SCALE_Y));
+  assignTerrainRadii();
+  buildWorldTemplates();
+  fog = new Map();
+  const home=worldTemplates.get(worldIdAt(0,0));
+  if(home){
+    px=Math.round(home.region.cx);
+    py=Math.round(home.region.cy);
+  } else {
+    px=0; py=0;
+  }
+  revealAround(px,py);
+}
+
+function stampChunk(c){
+  if(c.terrainRadius==null){
+    const len=c.analysis?.length||1;
+    c.terrainRadius=clamp(TERRAIN_R_MIN+len*6, TERRAIN_R_MIN, TERRAIN_R_MAX);
+  }
+  if(!c.iconChar) c.iconChar=iconFor(c.analysis);
+  buildWorldTemplates();
+}
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+// ── Fog ───────────────────────────────────────────────────────────────────────
+function revealAround(x,y){
+  const ringR=FOG_R+1;
+  const r2=FOG_R*FOG_R;
+  const ringR2=ringR*ringR;
+  for(let cy=y-ringR;cy<=y+ringR;cy++){
+    for(let cx=x-ringR;cx<=x+ringR;cx++){
+      const dx=cx-x, dy=cy-y;
+      const d2=dx*dx+dy*dy;
+      if(d2<=r2){
+        fogSet(cx,cy,1);
+        continue;
+      }
+      if(d2<=ringR2){
+        // Deterministic stipple ring (no flicker), softens the circular edge.
+        if(hash01(cx*1.93, cy*1.37) > 0.52){
+          fogSet(cx,cy,1);
+        }
+      }
+    }
+  }
+  fogSet(x,y,2);
+}
+
+// ── Movement + sound ──────────────────────────────────────────────────────────
+function audibleCandidates(){
+  const ctx=playerContext();
+  const out=[];
+  const center=tileCoordFor(px,py);
+  const tileR=Math.max(1, Math.ceil(AUDIO_R/Math.min(WORLD_TILE_W, WORLD_TILE_H))+1);
+  const worldIds=[...worldTemplates.keys()];
+  for(let ty=center.ty-tileR;ty<=center.ty+tileR;ty++){
+    for(let tx=center.tx-tileR;tx<=center.tx+tileR;tx++){
+      const ox=tx*WORLD_TILE_W;
+      const oy=ty*WORLD_TILE_H;
+      for(const worldId of worldIds){
+        const tpl=worldTemplates.get(worldId);
+        if(!tpl) continue;
+        for(const idx of tpl.sampleIdxs){
+          const c=chunks[idx];
+          const vx=ox+c.wx, vy=oy+c.wy;
+          if(worldIdAt(vx,vy)!==c.worldId) continue;
+          const d=Math.hypot(px-vx, py-vy);
+          if(d>=AUDIO_R) continue;
+          const g=voiceGain(c,d,ctx);
+          if(g>0) out.push({key:`${tx},${ty}:${idx}`, idx, d, g, wx:vx, wy:vy, worldId:c.worldId});
+        }
+      }
+    }
+  }
+  // Sort by gain (loudness) so biome/world weighting governs the top-N cut.
+  out.sort((a,b)=>b.g-a.g);
+  return { ctx, audible: out.slice(0,POLY_MAX) };
+}
+
+function updateAudio(){
+  const { ctx, audible } = audibleCandidates();
+  curPlayerCtx = ctx;
+
+  // Track loudest chunk for status + event log.
+  const newCur=audible.length>0?audible[0]:null;
+  const newCurKey=newCur?newCur.key:'';
+  if(newCurKey!==curChunkKey){
+    if(newCur) pushEvent(`// ${chunks[newCur.idx].label} · ${chunks[newCur.idx].biome} · ${newCur.worldId}`);
+    curChunkKey=newCurKey;
+    curChunkIdx=newCur?newCur.idx:-1;
+  }
+  for(const {idx} of audible){
+    const c=chunks[idx];
+    if(!c.heard){c.heard=true;seenCount++;}
+  }
+
+  if(paused) return;
+
+  // Polyphony: ramp existing, start missing, stop departed.
+  const want=new Set(audible.map(a=>a.key));
+  for(const [voiceKey,v] of voices){
+    if(!want.has(voiceKey)){ stopVoice(v); voices.delete(voiceKey); }
+  }
+  for(const {key,idx,g} of audible){
+    const existing=voices.get(key);
+    if(existing) rampVoice(existing,g);
+    else {
+      const v=startVoice(idx,g);
+      if(v) voices.set(key,v);
+    }
+  }
+}
+
+function step(dx,dy){
+  const nx=px+dx;
+  const ny=py+dy;
+  if(nx===px&&ny===py) return;
+  px=nx; py=ny; stepCount++;
+
+  trail.push({x:px,y:py});
+  if(trail.length>TRAIL_LEN) trail.shift();
+
+  fogSet(px,py,2);
+  revealAround(px,py);
+  updateAudio();
+
+  WEIRD.forEach(([t,m])=>{
+    if(stepCount===t&&!weirdShown.has(t)){weirdShown.add(t);pushEvent(m);}
+  });
+}
+
+function teleport(){
+  if(worldTemplates.size===0) return;
+  const center=tileCoordFor(px,py);
+  const tx=center.tx + Math.floor(Math.random()*5)-2;
+  const ty=center.ty + Math.floor(Math.random()*5)-2;
+  const worldId=worldIdAt(
+    tx*WORLD_TILE_W + Math.floor(WORLD_TILE_W/2),
+    ty*WORLD_TILE_H + Math.floor(WORLD_TILE_H/2)
+  );
+  const tpl=worldTemplates.get(worldId);
+  if(!tpl || tpl.sampleIdxs.length===0) return;
+  const idx=tpl.sampleIdxs[Math.floor(Math.random()*tpl.sampleIdxs.length)];
+  const c=chunks[idx];
+  px=tx*WORLD_TILE_W + c.wx;
+  py=ty*WORLD_TILE_H + c.wy;
+  trail=[];
+  stopAllVoices();
+  revealAround(px,py);
+  updateAudio();
+  pushEvent('// teleport.');
+}
+
+function arrowDelta(){
+  let dx=0, dy=0;
+  if(keysDown.has('ArrowLeft'))  dx-=1;
+  if(keysDown.has('ArrowRight')) dx+=1;
+  if(keysDown.has('ArrowUp'))    dy-=1;
+  if(keysDown.has('ArrowDown'))  dy+=1;
+  return [dx,dy];
+}
+function startMoveTimer(){
+  if(moveTimer) return;
+  moveTimer=setInterval(()=>{
+    const [dx,dy]=arrowDelta();
+    if(dx===0&&dy===0){ clearInterval(moveTimer); moveTimer=null; return; }
+    step(dx,dy);
+  }, MOVE_MS);
+}
+
+function togglePause(){
+  paused=!paused;
+  if(paused){ stopAllVoices(); silenceAmbientDrone(); pushEvent('// paused.'); }
+  else { startAmbientDrone(); pushEvent('// resumed.'); updateAudio(); }
+}
+
+// ── Event log ─────────────────────────────────────────────────────────────────
+function pushEvent(msg){
+  eventQueue.push(msg);
+  if(eventQueue.length>3) eventQueue.shift();
+  document.getElementById('event').textContent=eventQueue[eventQueue.length-1]||'';
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────────
+const MAP_EL    = document.getElementById('map');
+const CATALOG_EL = document.getElementById('catalog');
+const CATALOG_CTL_EL = document.getElementById('catalogCtl');
+const CATALOG_TOGGLE_BTN = document.getElementById('catalogToggleBtn');
+const STATUS_EL = document.getElementById('status');
+
+const trailSet = new Set();
+function wrapText(text, width=88){
+  const words=String(text||'').split(/\s+/).filter(Boolean);
+  const lines=[];
+  let line='';
+  for(const w of words){
+    const next=line?`${line} ${w}`:w;
+    if(next.length>width){
+      if(line) lines.push(line);
+      line=w;
+    } else {
+      line=next;
+    }
+  }
+  if(line) lines.push(line);
+  return lines.join('\n');
+}
+function fogGlyph(x,y){
+  const n=hash01(x*0.73,y*1.11);
+  if(n>0.82) return '\'';
+  if(n>0.60) return '.';
+  if(n>0.34) return '·';
+  return ',';
+}
+
+function renderMap(){
+  computeViewDims();
+  const halfC=Math.floor(VIEW_W/2), halfR=Math.floor(VIEW_H/2);
+  const ox=px-halfC, oy=py-halfR;
+
+  // Rebuild trail set
+  trailSet.clear();
+  trail.forEach(p=>trailSet.add(`${p.x},${p.y}`));
+
+  // Build DOM structure: one span per row (faster than one per cell)
+  // Use innerHTML with span classes for color
+  const lines=[];
+  for(let vy=0;vy<VIEW_H;vy++){
+    const wy=oy+vy;
+    let row='';
+    for(let vx=0;vx<VIEW_W;vx++){
+      const wx=ox+vx;
+      const fv=fogGet(wx,wy);
+      if(fv===0){
+        row+=`<span class="t-fog">${fogGlyph(wx,wy)}</span>`;
+        continue;
+      }
+
+      // Player
+      if(wx===px&&wy===py){
+        row+=`<span class="t-player">@</span>`;
+        continue;
+      }
+
+      const cell=getCellAt(wx,wy);
+
+      if(cell?.isChunk){
+        const cls=cell.chunkKey===curChunkKey?'t-chunk-on':'t-chunk';
+        row+=`<span class="${cls}">${cell.char}</span>`;
+        continue;
+      }
+
+      if(cell){
+        row+=`<span class="${cell.colorClass||'t-resonance'} ${worldClassFor(cell.worldId)}">${cell.char}</span>`;
+        continue;
+      }
+
+      // Trail
+      if(trailSet.has(`${wx},${wy}`)){
+        row+=`<span class="t-trail">.</span>`;
+        continue;
+      }
+
+      row+=' ';
+    }
+    lines.push(row);
+  }
+  MAP_EL.innerHTML=lines.join('\n');
+}
+
+function renderStatus(){
+  const c=curChunkIdx>=0?chunks[curChunkIdx]:null;
+  const v=curChunkKey?voices.get(curChunkKey):null;
+  const dur=v?v.dur:0;
+  const elapsed=(v&&actx)?((actx.currentTime-v.startedAt)%dur):0;
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${(s%60).toFixed(1).padStart(4,'0')}`;
+  const barW=Math.max(12,VIEW_W-72);
+  const p=dur>0?elapsed/dur:0;
+  const bar='▓'.repeat(Math.round(p*barW))+'░'.repeat(barW-Math.round(p*barW));
+  const playingNow=!paused;
+  const icon=c?(c.iconChar||c.charId||'·'):'·';
+  const chunkStr=c?`[ ${playingNow?'▶':'■'} ] ${icon} ${c.label}  ${fmt(elapsed)} / ${fmt(dur)}  ${bar}`:'[ - ]';
+  const wId=curPlayerCtx?.worldId || '—';
+  const bId=curPlayerCtx?.biomeId ? curPlayerCtx.biomeId.split(':').slice(-1)[0] : '—';
+  const metaStr=`world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}`;
+  const pad=Math.max(0,VIEW_W-chunkStr.length-metaStr.length);
+  STATUS_EL.textContent=chunkStr+' '.repeat(pad)+metaStr;
+}
+
+function renderCatalog(){
+  if(!showCatalog){
+    CATALOG_EL.style.display='none';
+    return;
+  }
+  CATALOG_EL.style.display='block';
+  const worldId=curPlayerCtx?.worldId || worldIdAt(px, py);
+  const piece=PIECE_CATALOG[worldId] || {
+    title:(worldId||'unknown world').toUpperCase(),
+    year:'—',
+    description:'Catalog entry pending.'
+  };
+  const header=`+---------------- piece catalog ----------------+\n` +
+               `piece: ${piece.title}\n` +
+               `year: ${piece.year}\n` +
+               `world id: ${worldId || '—'}\n` +
+               `description:\n`;
+  CATALOG_EL.textContent = `${header}${wrapText(piece.description, Math.max(52, VIEW_W-4))}`;
+}
+
+function toggleCatalog(){
+  showCatalog=!showCatalog;
+  CATALOG_TOGGLE_BTN.textContent = showCatalog ? 'catalog [c] (on)' : 'catalog [c]';
+  if(!showCatalog){
+    CATALOG_EL.textContent='';
+    CATALOG_EL.style.display='none';
+  } else {
+    renderCatalog();
+  }
+}
+
+function renderBoot(){
+  const done=files.filter(f=>f.status==='done').length;
+  const loading=files.filter(f=>f.status==='loading');
+  const dots='.'.repeat((tick%3)+1).padEnd(3);
+  const cols=8;
+  const rows=Math.max(1, Math.ceil(SAMPLE_COUNT/cols));
+
+  const grid=[];
+  for(let r=0;r<rows;r++){
+    const cells=[];
+    for(let c=0;c<cols;c++){
+      const f=files[r*cols+c]; if(!f){cells.push('   ');continue;}
+      cells.push(f.status==='done'?` ${f.label}`:f.status==='loading'?(tick%2?' ↓':' ·'):f.status==='error'?' !!':' ··');
+    }
+    grid.push(cells.join(''));
+  }
+
+  const bW=36, pct=Math.round(done/SAMPLE_COUNT*100);
+  const bar='[' + '▓'.repeat(Math.round(pct/100*bW))+'░'.repeat(bW-Math.round(pct/100*bW))+']';
+  const active=loading.slice(0,3).map(f=>{
+    const p=f.total>0?Math.min(100,Math.floor(f.recv/f.total*100)):0;
+    return `  ${f.label}  [${'▓'.repeat(Math.round(p/100*16))+'░'.repeat(16-Math.round(p/100*16))}]  ${String(p).padStart(3)}%`;
+  });
+
+  MAP_EL.innerHTML='';
+  MAP_EL.textContent=[
+    ...bootLog,'',
+    ...grid,'',
+    ...active,
+    active.length===0?'  initializing...':null,'',
+    `${bar} ${done}/${SAMPLE_COUNT}`,
+    done<SURF_AT?`// entering at ${SURF_AT} · loading${dots}`:`// ${done} loaded · building world${dots}`,
+  ].filter(l=>l!==null).join('\n');
+  CATALOG_EL.textContent='';
+  CATALOG_EL.style.display='none';
+  STATUS_EL.textContent='';
+  document.getElementById('event').textContent='';
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+function loop(){
+  tick++;
+  if(inRogue){ renderMap(); renderCatalog(); renderStatus(); }
+  else renderBoot();
+  raf=requestAnimationFrame(loop);
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+async function fetchFile(file){
+  file.status='loading';
+  try{
+    const res=await fetch(file.url);
+    if(!res.ok) throw new Error(res.status);
+    const cl=res.headers.get('content-length');
+    file.total=cl?parseInt(cl):0;
+    const reader=res.body.getReader(), parts=[];
+    while(true){const{done,value}=await reader.read();if(done)break;parts.push(value);file.recv+=value.length;}
+    const flat=new Uint8Array(file.recv);
+    let off=0; for(const p of parts){flat.set(p,off);off+=p.length;}
+    ensureCtx();
+    file.buffer=await actx.decodeAudioData(flat.buffer.slice(0));
+    file.status='done';
+    file.analysis=analyze(file.buffer);
+    file.biome=biomeFrom(file.analysis);
+    // Smooth loop boundaries before any voice ever plays this buffer.
+    file.loopFadeSec=smoothBufferLoop(file.buffer, 60);
+
+    const charId=makeCharId(chunks.length);
+    const chunk={idx:file.idx,label:file.label,charId,
+                 iconChar:iconFor(file.analysis),
+                 name:`${file.worldId}_${file.label}.mp3`,
+                 buffer:file.buffer,analysis:file.analysis,biome:file.biome,
+                 loopFadeSec:file.loopFadeSec,
+                 worldId:file.worldId,
+                 biomeId:`${file.worldId}:${file.biome}`,
+                 baseVol:baseVolFor(file.analysis),
+                 wx:0,wy:0,heard:false};
+    chunks.push(chunk);
+
+    if(!inRogue&&chunks.length>=SURF_AT) enterRogue();
+    else if(inRogue) stampChunk(chunk); // late arrival
+  }catch(e){file.status='error';}
+}
+
+async function loadAll(){
+  let qi=0;
+  const worker=async()=>{while(qi<files.length)await fetchFile(files[qi++]);};
+  await Promise.all(Array.from({length:CONCURRENCY},()=>worker()));
+}
+
+// ── Enter roguelike ────────────────────────────────────────────────────────────
+function enterRogue(){
+  inRogue=true;
+  buildWorld();
+  startAmbientDrone();
+  updateAudio();
+  pushEvent('// awake.');
+  document.addEventListener('keydown',onKey);
+  document.addEventListener('keyup',onKeyUp);
+  window.addEventListener('blur',onBlur);
+}
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
+const ARROW_KEYS=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown']);
+function onKey(e){
+  if(!inRogue) return;
+  if(ARROW_KEYS.has(e.key)){
+    e.preventDefault();
+    if(e.repeat) return; // browser autorepeat — we drive movement via interval
+    keysDown.add(e.key);
+    const [dx,dy]=arrowDelta();
+    if(dx||dy) step(dx,dy);
+    startMoveTimer();
+    return;
+  }
+  switch(e.key){
+    case ' ':
+      e.preventDefault(); togglePause(); break;
+    case 'r': case 'R':
+      e.preventDefault(); teleport(); break;
+    case 'l': case 'L':
+      e.preventDefault();
+      looping=!looping;
+      for(const [,v] of voices){
+        if(v.srcA) v.srcA.loop=looping;
+        if(v.srcB) v.srcB.loop=looping;
+      }
+      pushEvent(`// loop: ${looping?'on':'off'}`);
+      break;
+    case 'c': case 'C':
+      e.preventDefault();
+      toggleCatalog();
+      pushEvent(`// catalog: ${showCatalog?'open':'closed'}.`);
+      break;
+  }
+}
+function onKeyUp(e){
+  if(ARROW_KEYS.has(e.key)) keysDown.delete(e.key);
+}
+function onBlur(){
+  // Releasing focus mid-press would otherwise leave keys "stuck".
+  keysDown.clear();
+  if(moveTimer){ clearInterval(moveTimer); moveTimer=null; }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+function boot(){
+  const worldSummary = MANIFEST.worlds.map((w) => `${w.label}:${w.files.length}`).join(' · ');
+  const lines=[
+    'chunk surfer // cbassuarez.com',
+    worldSummary,
+    '',
+    '[ok] AudioContext',
+    `[ok] ${SAMPLE_COUNT} samples queued`,
+    '[  ] fetching ...'
+  ];
+  let i=0;
+  const next=()=>{if(i<lines.length){bootLog.push(lines[i++]);setTimeout(next,i<3?40:100);}};
+  next();
+  CATALOG_TOGGLE_BTN.addEventListener('click', ()=>toggleCatalog());
+  raf=requestAnimationFrame(loop);
+  loadAll();
+}
+
+boot();
+</script>
+</body>
+</html>

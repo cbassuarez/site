@@ -1,5 +1,21 @@
 import { normalizeWork } from './lib/work-normalize.js';
 
+const PRAE_VIEW_MODE = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    const has = (key) => {
+      if (!params.has(key)) return false;
+      const value = (params.get(key) || '').trim().toLowerCase();
+      return value !== '0' && value !== 'false' && value !== 'off' && value !== 'no';
+    };
+    const styleless = has('nostyle') || has('styleless') || has('plain');
+    const headless = has('headless') || has('bare') || has('minimal');
+    return { styleless, headless };
+  } catch (_) {
+    return { styleless: false, headless: false };
+  }
+})();
+
 (function ensureFavicon(){
   if (typeof document === 'undefined') return;
   const head = document.head || document.querySelector('head');
@@ -15,6 +31,7 @@ import { normalizeWork } from './lib/work-normalize.js';
 // Applies saved light/dark theme ASAP and sets color-scheme to avoid FOUC.
 // Safe alongside the later applyTheme(readTheme()) in initWorksConsole.
 ;(function bootTheme(){
+  if (PRAE_VIEW_MODE.styleless || PRAE_VIEW_MODE.headless) return;
   function setThemeClasses(eff){
     var host = document.getElementById('works-console');
     try {
@@ -67,6 +84,207 @@ document.documentElement.style.colorScheme = (eff === 'dark' ? 'dark' : 'light')
   const consoleRoot = $('#works-console');
 const themeRoot = document.getElementById('works-group');
 const themeBtn  = document.getElementById('wc-theme-toggle');
+  const isStylelessMode = PRAE_VIEW_MODE.styleless || PRAE_VIEW_MODE.headless;
+  const supportsTheme = !(PRAE_VIEW_MODE.styleless || PRAE_VIEW_MODE.headless);
+  let stylelessCmdWrap = null;
+  let stylelessCmdOut = null;
+  let stylelessCommandModeActive = false;
+  let stylelessNoteEl = null;
+  let stylelessTopPane = null;
+  const STYLELESS_CMD_PANE_HEIGHT = '14rem';
+
+  applyRenderMode();
+
+  function applyRenderMode(){
+    if (!(PRAE_VIEW_MODE.styleless || PRAE_VIEW_MODE.headless)) return;
+
+    document.documentElement.style.colorScheme = 'light';
+
+    if (themeRoot) {
+      themeRoot.removeAttribute('data-theme');
+      themeRoot.removeAttribute('data-theme-mode');
+      themeRoot.removeAttribute('data-size');
+    }
+    if (consoleRoot) {
+      consoleRoot.classList.remove('prae-theme-light', 'prae-theme-dark', 'has-pdf');
+      consoleRoot.removeAttribute('data-theme');
+      consoleRoot.removeAttribute('data-theme-mode');
+    }
+
+    if (themeBtn) themeBtn.remove();
+
+    if (PRAE_VIEW_MODE.headless) {
+      const title = document.getElementById('works-title');
+      if (title) title.remove();
+      const crumbs = document.getElementById('works-breadcrumbs');
+      if (crumbs) crumbs.remove();
+    }
+
+    // 1995-compatible split layout without external CSS:
+    // left = console feed, right = persistent score pane
+    const split = consoleRoot?.querySelector('.wc-split');
+    const frame = split?.querySelector('.wc-frame');
+    const pane = split?.querySelector('.wc-pdfpane');
+    if (split && frame && pane && !split.querySelector('[data-plain-split]')) {
+      const table = document.createElement('table');
+      table.setAttribute('data-plain-split', '1');
+      table.setAttribute('border', '1');
+      table.setAttribute('cellpadding', '8');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('width', '100%');
+      table.style.tableLayout = 'fixed';
+      table.style.height = '76vh';
+      table.style.minHeight = '76vh';
+
+      const tbody = document.createElement('tbody');
+      const tr = document.createElement('tr');
+      const left = document.createElement('td');
+      const right = document.createElement('td');
+      left.setAttribute('width', '62%');
+      right.setAttribute('width', '38%');
+      left.setAttribute('valign', 'top');
+      right.setAttribute('valign', 'top');
+      left.style.height = '76vh';
+      right.style.height = '76vh';
+      left.style.overflow = 'hidden';
+      right.style.overflow = 'hidden';
+
+      left.appendChild(frame);
+      right.appendChild(pane);
+      tr.appendChild(left);
+      tr.appendChild(right);
+      tbody.appendChild(tr);
+      table.appendChild(tbody);
+
+      split.textContent = '';
+      split.appendChild(table);
+    }
+    if (pane && !stylelessTopPane) {
+      stylelessTopPane = document.createElement('div');
+      stylelessTopPane.setAttribute('data-score-pane', '1');
+      stylelessTopPane.style.display = 'flex';
+      stylelessTopPane.style.flexDirection = 'column';
+      stylelessTopPane.style.flex = '1 1 auto';
+      stylelessTopPane.style.minHeight = '0';
+      stylelessTopPane.style.overflow = 'hidden';
+      stylelessTopPane.style.boxSizing = 'border-box';
+      while (pane.firstChild && pane.firstChild !== stylelessCmdWrap) {
+        stylelessTopPane.appendChild(pane.firstChild);
+      }
+      pane.appendChild(stylelessTopPane);
+      if (stylelessCmdWrap && stylelessCmdWrap.parentElement !== pane) pane.appendChild(stylelessCmdWrap);
+    }
+
+    if (!stylelessCmdWrap) {
+      const rightPane = split?.querySelector('.wc-pdfpane');
+      if (rightPane) {
+        stylelessCmdWrap = document.createElement('div');
+        stylelessCmdWrap.setAttribute('data-cmd-pane', '1');
+        stylelessCmdWrap.hidden = true;
+        stylelessCmdWrap.style.marginTop = '0';
+        stylelessCmdWrap.style.paddingTop = '0.5rem';
+        stylelessCmdWrap.style.borderTop = '1px solid';
+        stylelessCmdWrap.style.flex = `0 0 ${STYLELESS_CMD_PANE_HEIGHT}`;
+        stylelessCmdWrap.style.height = STYLELESS_CMD_PANE_HEIGHT;
+        stylelessCmdWrap.style.display = 'flex';
+        stylelessCmdWrap.style.flexDirection = 'column';
+        stylelessCmdWrap.style.minHeight = '0';
+        stylelessCmdWrap.style.overflow = 'hidden';
+        stylelessCmdWrap.style.boxSizing = 'border-box';
+
+        const heading = document.createElement('div');
+        heading.innerHTML = '<strong>command output</strong>';
+        heading.style.marginBottom = '0.35rem';
+
+        stylelessCmdOut = document.createElement('div');
+        stylelessCmdOut.setAttribute('data-cmd-out', '1');
+        stylelessCmdOut.style.flex = '1 1 auto';
+        stylelessCmdOut.style.minHeight = '0';
+        stylelessCmdOut.style.maxHeight = 'none';
+        stylelessCmdOut.style.overflowY = 'auto';
+        stylelessCmdOut.style.overflowX = 'hidden';
+        stylelessCmdOut.style.whiteSpace = 'pre-wrap';
+        stylelessCmdOut.style.overflowWrap = 'anywhere';
+        stylelessCmdOut.style.wordBreak = 'break-word';
+        stylelessCmdOut.style.paddingRight = '0.25rem';
+
+        stylelessCmdWrap.appendChild(heading);
+        stylelessCmdWrap.appendChild(stylelessCmdOut);
+        rightPane.appendChild(stylelessCmdWrap);
+      }
+    }
+
+    // Remove CSS-only affordances and keep simple CLI ergonomics.
+    if (out) {
+      out.style.maxHeight = 'none';
+      out.style.overflowY = 'auto';
+      out.style.paddingRight = '0.25rem';
+      out.style.flex = '1 1 auto';
+      out.style.minHeight = '0';
+      out.setAttribute('aria-label', 'Works console output');
+    }
+    if (form) {
+      form.setAttribute('style', 'display:block;margin-top:auto;padding-top:0.5rem;');
+    }
+    if (frame) {
+      frame.style.display = 'flex';
+      frame.style.flexDirection = 'column';
+      frame.style.height = '76vh';
+      frame.style.minHeight = '76vh';
+      frame.style.overflow = 'hidden';
+      frame.style.boxSizing = 'border-box';
+    }
+    if (input) {
+      input.setAttribute('size', '48');
+      input.setAttribute('style', 'width:95%;max-width:95%;');
+    }
+    if (pane) {
+      pane.style.display = 'flex';
+      pane.style.flexDirection = 'column';
+      pane.style.height = '76vh';
+      pane.style.minHeight = '76vh';
+      pane.style.overflow = 'hidden';
+      pane.style.boxSizing = 'border-box';
+      if (stylelessTopPane && stylelessTopPane.parentElement !== pane) {
+        pane.insertBefore(stylelessTopPane, pane.firstChild);
+      }
+      if (stylelessCmdWrap && stylelessCmdWrap.parentElement !== pane) {
+        pane.appendChild(stylelessCmdWrap);
+      }
+    }
+    const frameEl = consoleRoot?.querySelector('.wc-pdf-frame');
+    const noteEl = consoleRoot?.querySelector('.wc-note');
+    if (noteEl) stylelessNoteEl = noteEl;
+    if (frameEl) {
+      frameEl.setAttribute('width', '100%');
+      frameEl.setAttribute('height', '320');
+      frameEl.style.border = '1px solid';
+      frameEl.style.display = 'none';
+      frameEl.style.marginBottom = '0.75rem';
+      frameEl.style.flex = '0 0 auto';
+    }
+    if (noteEl) {
+      noteEl.style.maxHeight = 'none';
+      noteEl.style.flex = '1 1 auto';
+      noteEl.style.minHeight = '0';
+      noteEl.style.overflowY = 'auto';
+      noteEl.style.overflowX = 'hidden';
+      noteEl.style.whiteSpace = 'normal';
+      noteEl.style.overflowWrap = 'anywhere';
+      noteEl.style.wordBreak = 'break-word';
+      noteEl.style.paddingRight = '0.25rem';
+    }
+    const closeBtn = consoleRoot?.querySelector('.wc-pdf-close');
+    if (closeBtn && closeBtn.tagName !== 'A') {
+      const closeLink = document.createElement('a');
+      closeLink.href = '#';
+      closeLink.className = closeBtn.className;
+      closeLink.textContent = '[close score]';
+      closeLink.setAttribute('aria-label', closeBtn.getAttribute('aria-label') || 'Close PDF');
+      closeBtn.replaceWith(closeLink);
+    }
+    refreshStylelessRightPaneLayout();
+  }
 
 
   const praeData = window.__PRAE_DATA__ || {};
@@ -117,8 +335,8 @@ const pageFollowMaps = praeData.pageFollowMaps
   || (window.PRAE && window.PRAE.pageFollowMaps)
   || {};
 
-   const cmds = ['help','list','open','play','pause','stop','copy','goto','pdf','vol','speed','resume','share','unlock','clear','theme'];
- const aliases = { h:'help', ls:'list', o:'open', p:'play', pa:'pause', st:'stop', cp:'copy', g:'goto', v:'vol', sp:'speed', rs:'resume', sh:'share', ul:'unlock', cls:'clear', th:'theme' };
+   const cmds = ['help','list','open','play','pause','stop','copy','goto','pdf','vol','speed','resume','share','unlock','clear', ...(supportsTheme ? ['theme'] : [])];
+ const aliases = { h:'help', ls:'list', o:'open', p:'play', pa:'pause', st:'stop', cp:'copy', g:'goto', v:'vol', sp:'speed', rs:'resume', sh:'share', ul:'unlock', cls:'clear', ...(supportsTheme ? { th:'theme' } : {}) };
 
   const history = []; let hi = 0; let toastTimer = null;
 let bootDone = false; // prevent auto-scroll during initial render
@@ -132,7 +350,8 @@ let bootDone = false; // prevent auto-scroll during initial render
 
   /* Boot: banner + auto List (present/invoked) */
   banner();
-  echo('list', true); list(true);
+  if (!isStylelessMode) echo('list', true);
+  list(true);
   focusInput();
 // Re-align title since console column may expand
   requestAnimationFrame(alignTitleToConsole);
@@ -146,11 +365,13 @@ window.addEventListener('load', ()=>{ out.scrollTop = 0; }, { once:true });
   e.preventDefault();
   const raw = input.value.trim();
   if(!raw){ echo(''); input.value=''; return; }
+  if (isStylelessMode) stylelessCommandModeActive = true;
   bootDone = true;            // <— add this line
   echo(raw, true);
   history.push(raw); hi = history.length;
   run(raw);
   input.value='';
+  focusInput();
 });
 
   input.addEventListener('keydown', (e) => {
@@ -171,25 +392,26 @@ window.addEventListener('load', ()=>{ out.scrollTop = 0; }, { once:true });
   /* Click-to-run actions */
   if (consoleRoot) {
     consoleRoot.addEventListener('click', (event) => {
-      const button = event.target.closest('button');
-      if (!button || !consoleRoot.contains(button)) return;
+      const actionEl = event.target.closest('[data-cmd], .js-play, .js-playat');
+      if (!actionEl || !consoleRoot.contains(actionEl)) return;
+      if (actionEl.tagName === 'A') event.preventDefault();
 
-      if (button.classList.contains('js-play')) {
-        const index = getWorkIndexForButton(button);
+      if (actionEl.classList.contains('js-play')) {
+        const index = getWorkIndexForButton(actionEl);
         if (index == null) return;
         runCommand(`play ${index}`);
         return;
       }
 
-      if (button.classList.contains('js-playat')) {
-        const index = getWorkIndexForButton(button);
+      if (actionEl.classList.contains('js-playat')) {
+        const index = getWorkIndexForButton(actionEl);
         if (index == null) return;
-        const seconds = ensureCueSeconds(button);
+        const seconds = ensureCueSeconds(actionEl);
         runCommand(`play ${index} ${seconds}`);
         return;
       }
 
-      const cmd = button.getAttribute('data-cmd');
+      const cmd = actionEl.getAttribute('data-cmd');
       if (!cmd) return;
       runCommand(cmd);
     });
@@ -217,7 +439,13 @@ window.addEventListener('load', ()=>{ out.scrollTop = 0; }, { once:true });
       case 'resume': resumeCmd(args[0]); break;
       case 'share': shareCmd(args[0], args[1]); break;
       case 'unlock': unlockCmd(); break;
-      case 'theme': themeCmd(args); break;
+      case 'theme':
+        if (!supportsTheme) {
+          appendLine('theme disabled in styleless mode', 'muted', true);
+          break;
+        }
+        themeCmd(args);
+        break;
       case 'clear': clearOut(); banner(); break;
       default:
         if(cmd){ appendLine(`error: unknown command "${cmd}"`,'err',true); }
@@ -300,13 +528,16 @@ function attachPageFollow(slug, audio){
       'share <n> [time]       Share/copy deep link (supports ?t=)',
       'unlock                 One-shot autoplay unlock',
       'clear                  Clear console',
+      ...(supportsTheme ? ['theme dark|light       Switch theme'] : []),
       '',
-      'aliases: h, ls, o, p, pa, st, cp, g, v, sp, rs, sh, ul, cls'
+      supportsTheme
+        ? 'aliases: h, ls, o, p, pa, st, cp, g, v, sp, rs, sh, ul, cls, th'
+        : 'aliases: h, ls, o, p, pa, st, cp, g, v, sp, rs, sh, ul, cls'
     ], 'muted', 12);
   }
 
   function list(isBoot=false){
-    section(' ');
+    if (!isStylelessMode) section(' ');
     const rows = Object.values(works).map((w, idx) => {
       const row = document.createElement('div');
       row.className = 'row';
@@ -326,7 +557,11 @@ function attachPageFollow(slug, audio){
       return row;
     });
 
-    rows.forEach((r,i) => setTimeout(() => { out.appendChild(r); revealChildren(r); scrollBottom(); }, i*30));
+    rows.forEach((r,i) => setTimeout(() => {
+      out.appendChild(r);
+      revealChildren(r);
+      if (!isStylelessMode) scrollBottom();
+    }, i*30));
     
   }
 
@@ -334,6 +569,13 @@ function attachPageFollow(slug, audio){
     const n = parseInt(nRaw,10);
     const w = works[n];
     if(!w){ return appendLine(`error: unknown work ${nRaw}`,'err',true); }
+    showInspectorForWork(w, { preferPdf: true });
+
+    if (isStylelessMode) {
+      appendLine(`open [${n}] ${w.title}`,'ok',true);
+      return;
+    }
+
     section(w.title);
 
     const revealQueue = [];
@@ -479,7 +721,7 @@ function pdfCmd(nRaw){
   const w = works[n];
   if(!w){ return appendLine(`error: unknown work ${nRaw}`,'err',true); }
   if(!w.pdf){ return appendLine(`error: no PDF available for work ${n}`,'err',true); }
-  showPdfPane(w.pdf, w.title || `Work ${n}`);
+  showInspectorForWork(w, { preferPdf: true });
 // If audio was already playing:
   //  • same work → do not restart
   //  • different work → switch to this work’s audio
@@ -497,6 +739,25 @@ const pdfPane   = worksConsole.querySelector('.wc-pdfpane');
 const pdfTitle  = worksConsole.querySelector('.wc-pdf-title');
 const pdfFrame  = worksConsole.querySelector('.wc-pdf-frame');
 const pdfCloseB = worksConsole.querySelector('.wc-pdf-close');
+let inspectorText = worksConsole.querySelector('.wc-note');
+const inspectorMount = (isStylelessMode && stylelessTopPane) ? stylelessTopPane : pdfPane;
+if (!inspectorText && inspectorMount) {
+  inspectorText = document.createElement('div');
+  inspectorText.className = 'wc-note';
+  if (isStylelessMode) {
+    inspectorText.style.maxHeight = 'none';
+    inspectorText.style.flex = '1 1 auto';
+    inspectorText.style.minHeight = '0';
+    inspectorText.style.overflowY = 'auto';
+  }
+  inspectorMount.appendChild(inspectorText);
+}
+if (inspectorText && inspectorMount && inspectorText.parentElement !== inspectorMount) {
+  inspectorMount.appendChild(inspectorText);
+}
+if (isStylelessMode && pdfPane) {
+  pdfPane.hidden = true;
+}
 // === PageFollow → PDF viewer wiring (split-pane iframe) ===
 let pendingPdfGoto = null;
 let currentPdfSlug = null;
@@ -580,10 +841,12 @@ function showPdfPane(rawUrl, title){
 
   // Strip any existing hash and boot the viewer already on the intended page
   const base = abs.split('#')[0];
-  worksConsole.classList.add('has-pdf');
+worksConsole.classList.add('has-pdf');
 pdfPane.removeAttribute('inert');                 // a11y: allow focus
 pdfPane.setAttribute('aria-hidden', 'false');
+pdfPane.hidden = false;
 pdfPane.classList.add('is-open');
+if (pdfFrame) pdfFrame.style.display = '';
 
 // Delay src until the pane is on its own composited layer
 requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -604,6 +867,72 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>{
   kickAlign(8);
 }
 
+function renderInspectorText(work){
+  if (!inspectorText || !work) return;
+  inspectorText.textContent = '';
+  inspectorText.scrollTop = 0;
+
+  const title = document.createElement('p');
+  const tStrong = document.createElement('strong');
+  tStrong.textContent = work.title || `Work ${work.id || ''}`;
+  title.appendChild(tStrong);
+  inspectorText.appendChild(title);
+
+  const oneliner = String(work.onelinerEffective ?? '').trim();
+  if (oneliner) {
+    const one = document.createElement('p');
+    const em = document.createElement('em');
+    em.textContent = oneliner;
+    one.appendChild(em);
+    inspectorText.appendChild(one);
+  }
+
+  const descriptionSource = typeof work.descriptionEffective === 'string'
+    ? work.descriptionEffective
+    : '';
+  const descParagraphs = descriptionSource
+    .split(/\n{2,}/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  if (!descParagraphs.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No description available.';
+    inspectorText.appendChild(empty);
+    return;
+  }
+
+  descParagraphs.forEach((text) => {
+    const p = document.createElement('p');
+    p.textContent = text;
+    inspectorText.appendChild(p);
+  });
+}
+
+function showInspectorForWork(work, options = {}){
+  const w = work || null;
+  if (!w || !pdfPane) return;
+  const preferPdf = options.preferPdf !== false;
+
+  if (preferPdf && w.pdf) {
+    showPdfPane(w.pdf, w.title || `Work ${w.id || ''}`);
+  } else {
+    worksConsole.classList.add('has-pdf');
+    pdfPane.removeAttribute('inert');
+    pdfPane.setAttribute('aria-hidden', 'false');
+    pdfPane.hidden = false;
+    pdfPane.classList.add('is-open');
+    if (pdfTitle) pdfTitle.textContent = String(w.title || `Work ${w.id || ''}`);
+    if (pdfFrame) {
+      pdfFrame.src = 'about:blank';
+      pdfFrame.style.display = 'none';
+    }
+    focusInput();
+  }
+
+  renderInspectorText(w);
+}
+
 function hidePdfPane(){
   pdfPane.classList.remove('is-open');
 pdfPane.setAttribute('inert','');                  // a11y: make non-focusable
@@ -611,6 +940,15 @@ pdfPane.setAttribute('aria-hidden', 'true');
 worksConsole.classList.remove('has-pdf');
 currentPdfSlug = null;
 delete worksConsole.dataset.pdfSlug;
+
+if (isStylelessMode) {
+  pdfPane.hidden = true;
+  pdfFrame.src = 'about:blank';
+  if (pdfFrame) pdfFrame.style.display = '';
+  if (inspectorText) inspectorText.textContent = '';
+  focusInput();
+  return;
+}
 
 // After the transform transition finishes, free the iframe
 const onEnd = (e)=>{
@@ -636,7 +974,10 @@ const w = works[n];
 
 // Close interactions
 if(pdfCloseB){
-  pdfCloseB.addEventListener('click', hidePdfPane);
+  pdfCloseB.addEventListener('click', (e) => {
+    if (pdfCloseB.tagName === 'A') e.preventDefault();
+    hidePdfPane();
+  });
   // ESC closes when pane is open
   document.addEventListener('keydown', (e)=>{
     if(e.key === 'Escape' && worksConsole.classList.contains('has-pdf')) hidePdfPane();
@@ -816,6 +1157,7 @@ function normalizePdfUrl(u){
 
   /* ===== UI helpers ===== */
   function banner(){
+    if (isStylelessMode) return;
     section('Praetorius – Interactive Portfolio v0.1');
     appendLine('Click an action or type a command.','muted',true);
     appendLine('Type help for more options','muted',true);
@@ -827,10 +1169,14 @@ function normalizePdfUrl(u){
     const ln = document.createElement('div');
     ln.className = 'line cmd-echo';
     ln.innerHTML = `<span class="prompt" style="color:var(--accent);font-weight:700">$</span><span class="sp"></span>${escapeHtml(s)}`;
-    out.appendChild(ln); reveal(ln); scrollBottom();
+    const target = commandOutputTarget();
+    target.appendChild(ln);
+    reveal(ln);
+    scrollTargetToBottom(target);
   }
 
   function section(titleText){
+    if (isStylelessMode && stylelessCommandModeActive) return;
     divider();
     const ln = el('div','line title');
     ln.textContent = titleText;
@@ -845,14 +1191,100 @@ function normalizePdfUrl(u){
   function appendLine(t, cls='', animate=false){
     const ln = el('div', 'line'+(cls?(' '+cls):''));
     ln.textContent = t;
-    out.appendChild(ln);
+    const target = commandOutputTarget();
+    target.appendChild(ln);
     if(animate) reveal(ln);
-    scrollBottom();
+    scrollTargetToBottom(target);
   }
 
-  function divider(){ const d = el('div','divider'); out.appendChild(d); }
+  function divider(){
+    if (isStylelessMode && stylelessCommandModeActive) return;
+    const d = el('div','divider');
+    out.appendChild(d);
+  }
+
+  function commandOutputTarget(){
+    if (isStylelessMode && stylelessCommandModeActive && stylelessCmdOut) {
+      if (stylelessCmdWrap) stylelessCmdWrap.hidden = false;
+      refreshStylelessRightPaneLayout();
+      return stylelessCmdOut;
+    }
+    return out;
+  }
+
+  function refreshStylelessRightPaneLayout(){
+    if (!isStylelessMode || !stylelessNoteEl || !stylelessCmdWrap || !stylelessTopPane) return;
+    const paneEl = stylelessTopPane.parentElement;
+    if (paneEl) {
+      if (stylelessTopPane.parentElement !== paneEl) paneEl.appendChild(stylelessTopPane);
+      if (stylelessCmdWrap.parentElement !== paneEl) paneEl.appendChild(stylelessCmdWrap);
+      if (paneEl.firstElementChild !== stylelessTopPane) paneEl.insertBefore(stylelessTopPane, paneEl.firstChild);
+      if (stylelessCmdWrap.previousElementSibling !== stylelessTopPane) paneEl.insertBefore(stylelessCmdWrap, stylelessTopPane.nextSibling);
+    }
+
+    const hasCommandOutput = stylelessCommandModeActive && !stylelessCmdWrap.hidden;
+    if (hasCommandOutput) {
+      stylelessCmdWrap.hidden = false;
+      stylelessNoteEl.style.flex = '1 1 auto';
+      stylelessNoteEl.style.minHeight = '0';
+      stylelessNoteEl.style.maxHeight = 'none';
+      stylelessNoteEl.style.overflowY = 'auto';
+      stylelessTopPane.style.flex = '1 1 auto';
+      stylelessTopPane.style.minHeight = '0';
+      stylelessTopPane.style.maxHeight = 'none';
+      stylelessTopPane.style.borderBottom = '1px solid';
+      stylelessCmdWrap.style.flex = `0 0 ${STYLELESS_CMD_PANE_HEIGHT}`;
+      stylelessCmdWrap.style.height = STYLELESS_CMD_PANE_HEIGHT;
+      stylelessCmdWrap.style.minHeight = '0';
+      stylelessCmdWrap.style.maxHeight = STYLELESS_CMD_PANE_HEIGHT;
+      stylelessCmdWrap.style.overflowY = 'hidden';
+      stylelessCmdWrap.style.borderTop = '1px solid';
+    } else {
+      stylelessCmdWrap.hidden = true;
+      stylelessNoteEl.style.flex = '1 1 auto';
+      stylelessNoteEl.style.minHeight = '0';
+      stylelessNoteEl.style.maxHeight = 'none';
+      stylelessNoteEl.style.overflowY = 'auto';
+      stylelessTopPane.style.flex = '1 1 auto';
+      stylelessTopPane.style.minHeight = '0';
+      stylelessTopPane.style.maxHeight = 'none';
+      stylelessTopPane.style.borderBottom = '';
+      stylelessCmdWrap.style.flex = `0 0 ${STYLELESS_CMD_PANE_HEIGHT}`;
+      stylelessCmdWrap.style.height = STYLELESS_CMD_PANE_HEIGHT;
+      stylelessCmdWrap.style.minHeight = '0';
+      stylelessCmdWrap.style.maxHeight = STYLELESS_CMD_PANE_HEIGHT;
+      stylelessCmdWrap.style.overflowY = 'hidden';
+      stylelessCmdWrap.style.borderTop = '1px solid';
+    }
+  }
+
+  function scrollTargetToBottom(target){
+    if (!target) return;
+    if (target === out) {
+      scrollBottom();
+      return;
+    }
+    target.scrollTop = target.scrollHeight;
+  }
 
   function btn(cmd, label, options = {}){
+    if (isStylelessMode) {
+      const a = document.createElement('a');
+      a.href = '#';
+      const extra = options.className ? ` ${options.className}` : '';
+      a.className = `act-link${extra}`;
+      if (cmd) a.setAttribute('data-cmd', cmd);
+      const aria = options.ariaLabel || (cmd ? `${label} (${cmd})` : label);
+      if (aria) a.setAttribute('aria-label', aria);
+      a.textContent = `[${label}]`;
+      const data = options.dataset || {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (value == null) return;
+        a.dataset[key] = String(value);
+      });
+      return a;
+    }
+
     const b = document.createElement('button');
     b.type = 'button';
     const extra = options.className ? ` ${options.className}` : '';
@@ -874,7 +1306,10 @@ function normalizePdfUrl(u){
   function actRow(children, workIndex){
     const r = el('div','actions');
     if (workIndex != null) r.dataset.workIndex = String(workIndex);
-    children.forEach(c => r.appendChild(c));
+    children.forEach((c, index) => {
+      if (isStylelessMode && index > 0) r.appendChild(document.createTextNode(' '));
+      r.appendChild(c);
+    });
     return r;
   }
 
@@ -1053,6 +1488,7 @@ function normalizePdfUrl(u){
   function runCommand(raw){
     const command = String(raw || '').trim();
     if (!command) return;
+    if (isStylelessMode) stylelessCommandModeActive = true;
     bootDone = true;
     echo(command, true);
     run(command);
@@ -1074,7 +1510,16 @@ function normalizePdfUrl(u){
   function reveal(node){ requestAnimationFrame(()=> node.classList.add('in')); }
   function revealChildren(node){ node.querySelectorAll('.line, .actions, .blk').forEach(n => reveal(n)); }
 
-  function clearOut(){ out.innerHTML=''; }
+  function clearOut(){
+    if (isStylelessMode) {
+      stylelessCommandModeActive = false;
+      if (stylelessCmdOut) stylelessCmdOut.innerHTML = '';
+      if (stylelessCmdWrap) stylelessCmdWrap.hidden = true;
+      refreshStylelessRightPaneLayout();
+      return;
+    }
+    out.innerHTML='';
+  }
 
   function time(s){
     if(s==null || s==='') return -1;
@@ -1319,11 +1764,13 @@ function clearHud(){
     if(sub==='dark' || sub==='light'){ applyTheme(sub); appendLine(`theme ${sub}`,'ok',true); }
     else { appendLine('usage: theme dark|light','muted',true); }
   }
-  if(themeBtn){ themeBtn.addEventListener('click', cycleTheme, {passive:true}); }
-  document.addEventListener('keydown', (e)=>{
-    if((e.altKey||e.metaKey) && (e.key==='d' || e.key==='D')){ e.preventDefault(); cycleTheme(); }
-  }, {passive:false});
-  applyTheme(readTheme());
+  if (supportsTheme) {
+    if(themeBtn){ themeBtn.addEventListener('click', cycleTheme, {passive:true}); }
+    document.addEventListener('keydown', (e)=>{
+      if((e.altKey||e.metaKey) && (e.key==='d' || e.key==='D')){ e.preventDefault(); cycleTheme(); }
+    }, {passive:false});
+    applyTheme(readTheme());
+  }
 /* ===== Align title/subtitle left edge with console column ===== */
   const titleWrap = document.querySelector('#works-title .wt-wrap');
   const groupRoot = document.getElementById('works-group');

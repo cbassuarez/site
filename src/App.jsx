@@ -485,13 +485,13 @@ function WorksPage() {
 
       <iframe
         title="Praetorius Works"
-        src="/works-console/index.html"
+        src="/works-console/index.html?nostyle=1&headless=1"
         style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
       />
       {isMobile ? (
         <p>
           <small>
-            mobile fallback: [ <a href="/works-console/index.html">open works console directly</a> ]
+            mobile fallback: [ <a href="/works-console/index.html?nostyle=1&headless=1">open works console directly</a> ]
           </small>
         </p>
       ) : null}
@@ -689,7 +689,7 @@ function HomePage() {
         <>
           <h3>navigation</h3>
           <p>
-            [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ]
+            [ <a href="/about">about</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ]
           </p>
 
           <h3>operator</h3>
@@ -818,6 +818,9 @@ function HomePage() {
                   </li>
                   <li>
                     <a href="/works">works</a>
+                  </li>
+                  <li>
+                    <a href="/labs/chunk-surfer/index.html">chunk surfer</a>
                   </li>
                 </ul>
 
@@ -979,7 +982,7 @@ function HomePage() {
                 ]
               </span>
             ))}{' '}
-            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/colophon">colophon</a> ]
           </small>
         </center>
       </div>
