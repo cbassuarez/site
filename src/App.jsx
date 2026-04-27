@@ -1325,7 +1325,11 @@ function TalkRecapPage() {
         <i>The Case for a Radical Constructivist Approach in Music and Aesthetic Theory</i>
       </p>
       <p>
-        Sebastian Suarez-Solis · Advisor: Tim Feeney
+        Sebastian Suarez-Solis
+        <br />
+        Advisor: Tim Feeney
+        <br />
+        Committee: Andrew Grueschow · Volker Straebel
         <br />
         California Institute of the Arts · DMA · October 2025
       </p>
