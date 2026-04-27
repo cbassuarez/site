@@ -1297,6 +1297,294 @@ function ContactPage() {
   );
 }
 
+function TalkRecapPage() {
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => document.head.removeChild(meta);
+  }, []);
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>dma — april 2026</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <h2>Concerning Human Understanding</h2>
+      <p>
+        <i>The Case for a Radical Constructivist Approach in Music and Aesthetic Theory</i>
+      </p>
+      <p>
+        Sebastian Suarez-Solis · Advisor: Tim Feeney
+        <br />
+        California Institute of the Arts · DMA · October 2025
+      </p>
+      <p>
+        Talk delivered April 2026 at CalArts. This page collects the materials,
+        references, and works named during the talk for attendees who would like
+        to revisit them.
+      </p>
+
+      <hr />
+
+      <h2>Epigraph</h2>
+      <blockquote>
+        <p>
+          "We have come to believe that the old hierarchies of power can be
+          replaced by self-organising networks ... Today we dream of systems
+          that can balance and stabilise themselves without the intervention of
+          authoritarian power. But in reality, this is the dream of the machines."
+        </p>
+        <p>
+          — Adam Curtis, <i>All Watched Over By Machines of Loving Grace</i> (BBC, 2011)
+        </p>
+      </blockquote>
+
+      <h3>Selected quotations</h3>
+      <blockquote>
+        <p>
+          A wholly objective cybernetic assessment of art and artmaking is not
+          necessarily pertinent to cybernetics nor artmaking.
+        </p>
+      </blockquote>
+      <blockquote>
+        <p>
+          To reference an artwork is already to subjectivize it.
+        </p>
+      </blockquote>
+      <p>
+        Keywords pursued throughout the paper: second-order cybernetics, eigenform,
+        immanence, self-organisation, cybernetic art, radical constructivism.
+      </p>
+
+      <hr />
+
+      <h2>Five projects</h2>
+
+      <h3>1. Concerning Human Understanding (paper)</h3>
+      <p>
+        Theoretical and historical framework for second-order cybernetics in
+        artistic research, drawing on Margaret Mead, Ernst von Glasersfeld,
+        Ranulph Glanville, and P. R. Masani, with case studies of Schöffer's
+        <i> CYSP 1</i> (1956), Kac and Nakamura's <i>Essay Concerning Human
+        Understanding</i> (1994), and a survey of work by Olafur Eliasson. The
+        paper argues for a constructivist cybernetics of art that takes the
+        observer's position as constitutive of the artistic event. A practicum,
+        <i> CONSTRUCTIONS</i> (2025), is incorporated as the author's own
+        contemporary case study.
+      </p>
+
+      <h3>2. LetGo — confessional cinema, directed live</h3>
+      <p>
+        Premiered at the California Institute of the Arts on Wednesday,
+        22 April 2026. A conducted, confessional cinema system pairing a single
+        projector surface with a field of NFC-identified audience phones. Two
+        principal visual streams: Super 8 drive-by footage of California power
+        infrastructure, and redacted-face footage of speaking subjects. Held
+        alongside the work: James Benning's durational landscape film and Agnès
+        Varda's <i>The Gleaners and I</i> (2000).
+      </p>
+
+      <h3>3. THE TUB</h3>
+      <p>
+        A Swift harness with a sampler-oriented audio engine and manifest-backed
+        routing across banks, instruments, chords, motifs, and spatial patterns.
+        The mode engine refuses synthetic test-tone fallback: real audio input
+        is required for the system to enter its operating mode at all.
+        Maintenance, failure, and environmental conditions are framed as
+        cybernetic participants in the work.
+      </p>
+
+      <h3>4. Praetorius</h3>
+      <p>
+        An artist-made tool for publishing score-centric works. Features include
+        PDF page-follow synchronized to media time, a works-set authoring wizard,
+        a paste-able Squarespace embed, and deep links with start-time anchors.
+        Available on npm: <code>npm i -g praetorius</code>. Operates as the
+        publication infrastructure that lets cybernetic and non-cybernetic works
+        share a single evidential surface.
+      </p>
+      <p>
+        Links:{' '}
+        <a href="https://www.npmjs.com/package/praetorius" target="_blank" rel="noreferrer">npm</a>{' '}·{' '}
+        <a href="https://github.com/cbassuarez/praetorius" target="_blank" rel="noreferrer">github</a>
+      </p>
+
+      <h3>5. cbassuarez.com</h3>
+      <p>
+        The site is treated as a cybernetic work in itself: visitor navigation
+        authors what is encountered; the operator's live activity (Spotify,
+        GitHub, Instagram, Bandcamp) is surfaced through the home page; an open
+        guestbook accumulates a timeline of passages. The labs page hosts an
+        ASCII MUD biome explorer where works in the world are reached through
+        movement through a 2D space.
+      </p>
+      <p>
+        Walk the site:{' '}
+        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
+      </p>
+
+      <hr />
+
+      <h2>Bibliography</h2>
+
+      <p>
+        American Society for Cybernetics, Heinz Von Foerster, and Margaret Mead.
+        <i> Purposive Systems: Proceedings of the First Annual Symposium of the
+        American Society for Cybernetics</i>. Spartan Books, 1968.
+      </p>
+
+      <p>
+        Curtis, Adam, dir. <i>All Watched Over by Machines of Loving Grace</i>.
+        BBC, 6 June 2011.{' '}
+        <a href="https://www.filmsforaction.org/watch/bbc-all-watched-over-by-machines-of-loving-grace/?part=1" target="_blank" rel="noreferrer">part 1</a> ·{' '}
+        <a href="https://www.filmsforaction.org/watch/bbc-all-watched-over-by-machines-of-loving-grace/?part=2" target="_blank" rel="noreferrer">part 2</a> ·{' '}
+        <a href="https://www.filmsforaction.org/watch/bbc-all-watched-over-by-machines-of-loving-grace/?part=3" target="_blank" rel="noreferrer">part 3</a>.
+      </p>
+
+      <p>
+        "Cybernetic Serendipity | Database of Digital Art." Accessed 11 January 2025.{' '}
+        <a href="http://dada.compart-bremen.de/item/exhibition/3" target="_blank" rel="noreferrer">compart-bremen.de</a>.
+      </p>
+
+      <p>
+        Eliasson, Olafur. Selected works:{' '}
+        <a href="https://olafureliasson.net/artwork/pluriverse-assembly-2021/" target="_blank" rel="noreferrer"><i>Pluriverse Assembly</i> (2021)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/room-for-one-colour-1997/" target="_blank" rel="noreferrer"><i>Room for One Colour</i> (1997)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/self-loop-2015/" target="_blank" rel="noreferrer"><i>Self-Loop</i> (2015)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/the-listening-dimension-orbit-1-2017/" target="_blank" rel="noreferrer"><i>The Listening Dimension</i> (orbits 1–3, 2017)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/the-living-lighthouse-2023/" target="_blank" rel="noreferrer"><i>The Living Lighthouse</i> (2023)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/the-unspeakable-openness-of-things-2018/" target="_blank" rel="noreferrer"><i>The Unspeakable Openness of Things</i> (2018)</a>,{' '}
+        <a href="https://olafureliasson.net/artwork/your-pluralistic-coming-together-2024/" target="_blank" rel="noreferrer"><i>Your Pluralistic Coming Together</i> (2024)</a>.
+      </p>
+
+      <p>
+        Foerster, Heinz Von. <i>Cybernetics of Cybernetics</i>.
+      </p>
+
+      <p>
+        Franchetto, Jade. "CYSP 1., Nicolas Schöffer, 1956." <i>unmondemoderne</i>, January 2021.{' '}
+        <a href="https://unmondemoderne.wordpress.com/2021/01/12/cysp-1-nicolas-schoffer-1956/" target="_blank" rel="noreferrer">link</a>.
+      </p>
+
+      <p>
+        Glanville, Ranulph, and CybernEthics Research. <i>The Importance of Being Ernst</i>.
+      </p>
+
+      <p>
+        Gur, Golan. "The Other Marxism: Georg Knepler and the Anthropology of Music."
+        <i> Musicologica Austriaca</i>, no. 2016 (May 2016).{' '}
+        <a href="https://www.musau.org/parts/neue-article-page/view/28" target="_blank" rel="noreferrer">link</a>.
+      </p>
+
+      <p>
+        Kac, Eduardo, and Ikuo Nakamura. <i>Essay Concerning Human Understanding</i>. 1994.{' '}
+        <a href="https://www.ekac.org/essay.html" target="_blank" rel="noreferrer">ekac.org/essay.html</a>.
+      </p>
+
+      <p>
+        Kauffman, Louis H. "EigenForm." <i>Kybernetes</i> 34, no. 1/2 (2005): 129–50.{' '}
+        <a href="https://doi.org/10.1108/03684920510575780" target="_blank" rel="noreferrer">doi</a>.
+      </p>
+
+      <p>
+        Kollias, Phivos-Angelos. "The Self-Organising Work of Music."{' '}
+        <i>Organised Sound</i> 16, no. 2 (2011): 192–99.{' '}
+        <a href="https://doi.org/10.1017/S1355771811000148" target="_blank" rel="noreferrer">doi</a>.
+      </p>
+
+      <p>
+        Lautenschlaeger, Graziele, and Anja Pratschke. "Electronic Art and
+        Second Order Cybernetic: From Art in Process to Process in Art."{' '}
+        <i>SIGraDi</i> 2008.
+      </p>
+
+      <p>
+        LeBlanc, Lindsay. "Nicolas Schöffer and the Scattered Origins of
+        Cybernetic Art History." Master's thesis, Concordia University, 2019.{' '}
+        <a href="https://spectrum.library.concordia.ca/id/eprint/985837/" target="_blank" rel="noreferrer">link</a>.
+      </p>
+
+      <p>
+        Maddox, Cain. <i>PROXIMATE</i>. Released 8 November 2024. macOS.{' '}
+        <a href="https://store.steampowered.com/app/2957800/PROXIMATE/" target="_blank" rel="noreferrer">steam</a>.
+      </p>
+
+      <p>
+        Mailman, Joshua Banks. "Cybernetic Phenomenology of Music, Embodied
+        Speculative Realism, and Aesthetics-Driven Techné for Spontaneous
+        Audio-Visual Expression." <i>Perspectives of New Music</i> 54, no. 1 (2016): 5.{' '}
+        <a href="https://doi.org/10.7757/persnewmusi.54.1.0005" target="_blank" rel="noreferrer">doi</a>.
+      </p>
+
+      <p>
+        Masani, P. R. "The Scientific Methodology in the Light of Cybernetics."{' '}
+        <i>Kybernetes</i> 23, no. 4 (1994): 1–132.{' '}
+        <a href="https://doi.org/10.1108/03684929410058713" target="_blank" rel="noreferrer">doi</a>.
+      </p>
+
+      <p>
+        Qureshi, Regula. <i>Music and Marx: Ideas, Practices, Politics</i>.
+        Routledge, 2014.
+      </p>
+
+      <p>
+        Schöffer, Nicolas. <i>CYSP 1</i>. 1956. Steel and durable aluminum,
+        mixed media, electronics.{' '}
+        <a href="http://dada.compart-bremen.de/item/artwork/670" target="_blank" rel="noreferrer">database of digital art</a>.
+      </p>
+
+      <p>
+        Scholte, Tom. "'Black Box' Theatre: Second-Order Cybernetics and
+        Naturalism in Rehearsal and Performance." In{' '}
+        <i>Series on Knots and Everything</i>, vol. 60. World Scientific, 2017.{' '}
+        <a href="https://doi.org/10.1142/9789813226265_0044" target="_blank" rel="noreferrer">doi</a>.
+      </p>
+
+      <p>
+        Scott, D. W. "Music as Semiotic Eigenbehavior."{' '}
+        <i>Constructivist Foundations</i> 12, no. 3 (2017): 342–52.
+      </p>
+
+      <p>
+        Shanken, Edward A. <i>Art in the Information Age: Cybernetics, Software,
+        Telematics and the Conceptual Contributions of Art and Technology to Art
+        History and Aesthetic Theory</i>. PhD diss., Duke University, 2001.{' '}
+        <a href="https://artexetra.wordpress.com/wp-content/uploads/2010/04/shanken_art_info_age_diss_2001.pdf" target="_blank" rel="noreferrer">pdf</a>.
+      </p>
+
+      <hr />
+
+      <h2>Contact</h2>
+      <p>
+        For follow-up about the talk or any of the works named —
+      </p>
+      <p>
+        Email: <a href="mailto:contact@cbassuarez.com">contact@cbassuarez.com</a>
+      </p>
+      <p>
+        Or: <a href="/contact">/contact</a>
+      </p>
+
+      <hr />
+
+      <p>
+        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+      </p>
+    </>
+  );
+}
+
 function ColophonPage() {
   return (
     <>
@@ -1379,6 +1667,7 @@ export default function App() {
   const isGuestbookPage = window.location.pathname.startsWith('/guestbook');
   const isContactPage = window.location.pathname.startsWith('/contact');
   const isColophonPage = window.location.pathname.startsWith('/colophon');
+  const isTalkRecapPage = window.location.pathname.startsWith('/dma-2026');
   const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
@@ -1399,6 +1688,8 @@ export default function App() {
     page = <ContactPage />;
   } else if (isColophonPage) {
     page = <ColophonPage />;
+  } else if (isTalkRecapPage) {
+    page = <TalkRecapPage />;
   }
 
   return (
