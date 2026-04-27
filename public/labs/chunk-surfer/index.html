@@ -33,15 +33,41 @@
     .t-chunk    {color:#ddd;font-weight:bold;}
     .t-chunk-on {color:#fff;font-weight:bold;}
     .t-trail    {color:#444;}
-    .t-key      {color:#ffe0a0;font-weight:bold;text-shadow:0 0 3px #ffe2a0,0 0 8px #ffcb55,0 0 18px rgba(255,196,80,0.95),0 0 36px rgba(255,180,60,0.65),0 0 64px rgba(255,160,40,0.45);}
-    .t-key-aura {color:rgba(255,196,80,0.55);text-shadow:0 0 6px rgba(255,180,80,0.55);}
+    /* HDR-feeling white: stack soft halos at multiple radii so the bloom
+       reads as luminous radiation rather than a flat shadow. The
+       translateY animation makes the glyph hover; using inline-block with
+       vertical-align:baseline preserves the row grid. */
+    .t-key {
+      display:inline-block;
+      vertical-align:baseline;
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:
+        0 0 2px #ffffff,
+        0 0 6px #ffffff,
+        0 0 14px rgba(255,255,255,0.95),
+        0 0 28px rgba(238,244,255,0.78),
+        0 0 56px rgba(210,224,255,0.55),
+        0 0 96px rgba(180,210,255,0.42);
+      animation: key-hover 2.0s ease-in-out infinite, key-pulse 1.6s ease-in-out infinite;
+      will-change: transform, filter;
+    }
+    @keyframes key-hover {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-3px); }
+    }
+    @keyframes key-pulse {
+      0%, 100% { filter: brightness(1.0); }
+      50%      { filter: brightness(1.35); }
+    }
+    .t-key-aura {color:rgba(255,255,255,0.55);text-shadow:0 0 6px rgba(255,255,255,0.6);}
     .t-door-core {color:#ffffff;font-weight:bold;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 9px rgba(228,242,255,0.55),0 0 22px rgba(180,200,255,0.45),0 0 48px rgba(140,180,255,0.35);}
     .t-door-aura {color:rgba(255,255,255,0.88);text-shadow:-1px 0 0 rgba(255,90,168,0.55),1px 0 0 rgba(120,236,255,0.55),0 0 8px rgba(238,244,255,0.45);}
     #keymeter{display:none;border-top:1px solid #2a2418;margin-top:6px;padding:6px 2px 2px;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.5;color:#888;letter-spacing:0.45em;}
     #keymeter .km-label{letter-spacing:0.18em;font-size:12px;color:#998060;margin-left:0.6em;opacity:0.85;}
     #keymeter .km-door {letter-spacing:0.18em;font-size:12px;color:#cfd6ee;margin-left:0.6em;text-shadow:0 0 6px rgba(200,220,255,0.5);}
-    .km-lit{color:#ffe0a0;font-weight:bold;text-shadow:0 0 4px rgba(255,196,80,0.85),0 0 12px rgba(255,170,60,0.55);}
-    .km-dim{color:#3a3022;}
+    .km-lit{color:#ffffff;font-weight:bold;text-shadow:0 0 4px #ffffff,0 0 12px rgba(238,244,255,0.85),0 0 22px rgba(200,220,255,0.55);}
+    .km-dim{color:#2a2e36;}
     /* Player after-image trail: four density tiers fade with age, with a
        cool blue-white halo on the freshest cells so the wake reads as
        luminous residue rather than a dirty path. */
@@ -1486,9 +1512,9 @@ function buildWorld(){
 // → ~9 cells/sec; diagonals slow that to ~7 cells/sec. Friction/void can
 // add up to ~30%, so we set the upper bound a little under the raw seconds
 // budget so the experience holds even when traversing rough terrain.
-const KEY_FIRST_MIN = 100;   // ~12s of travel
-const KEY_FIRST_MAX = 260;   // ~30s of travel
-const KEY_NEXT_MIN  = 220;   // ~25s of travel
+const KEY_FIRST_MIN = 220;   // ~25s of travel
+const KEY_FIRST_MAX = 380;   // ~45s of travel
+const KEY_NEXT_MIN  = 260;   // ~30s of travel
 const KEY_NEXT_MAX  = 540;   // ~60s of travel
 const DOOR_MIN_DIST = 500;
 const DOOR_MAX_DIST = 1100;
@@ -1528,6 +1554,45 @@ function spawnKeyNear(cx, cy, minDist, maxDist){
 function spawnDoor(){
   door = placeBeacon(px, py, DOOR_MIN_DIST, DOOR_MAX_DIST);
   revealAroundWithRadius(door.x, door.y, 6);
+}
+
+// Sensory feedback on pickup: brief shimmer chime layered over the world
+// audio, a localized reveal pulse so the surrounding fog flares open, the
+// shared gate-flash vignette, and a haptic tap on supporting devices.
+function playKeyPickupChime(isFinal){
+  if(!actx) return;
+  const t0 = actx.currentTime;
+  const out = actx.createGain();
+  out.gain.setValueAtTime(0, t0);
+  out.gain.linearRampToValueAtTime(isFinal ? 0.32 : 0.22, t0 + 0.01);
+  out.gain.exponentialRampToValueAtTime(0.0005, t0 + (isFinal ? 1.4 : 0.9));
+  out.connect(actx.destination);
+  // Bell-ish stack: fundamental + perfect fifth + octave + sparkle, with
+  // light detune so successive picks don't sound identical.
+  const detune = (Math.random()-0.5) * 12;
+  const partials = isFinal
+    ? [880, 1318.5, 1760, 2640]
+    : [988, 1480, 1976];
+  partials.forEach((freq, i) => {
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = i===0 ? 'sine' : 'triangle';
+    o.frequency.value = freq;
+    o.detune.value = detune + i*3;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(1/(i+1.5), t0 + 0.005 + i*0.012);
+    g.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.55 + i*0.18);
+    o.connect(g); g.connect(out);
+    o.start(t0);
+    o.stop(t0 + 1.6);
+  });
+}
+
+function onKeyPickup(isFinal){
+  pulseRevealRings(px, py, [2, 4, 7, 11]);
+  triggerGateFlash(isFinal ? 320 : 180, isFinal ? 520 : 280);
+  playKeyPickupChime(isFinal);
+  if(navigator.vibrate) navigator.vibrate(isFinal ? [40, 60, 80] : 35);
 }
 
 function stampChunk(c){
@@ -1906,7 +1971,9 @@ function step(dx,dy){
       keyMap.delete(kk);
       keysFound++;
       const remaining=keysTotal-keysFound;
-      if(remaining>0){
+      const isFinal = remaining===0;
+      onKeyPickup(isFinal);
+      if(!isFinal){
         spawnKeyNear(px, py, KEY_NEXT_MIN, KEY_NEXT_MAX);
         pushEvent(`// key acquired. ${keysFound}/${keysTotal} — another flickers into being.`);
       } else {
