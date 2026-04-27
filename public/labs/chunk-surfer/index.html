@@ -33,6 +33,15 @@
     .t-chunk    {color:#ddd;font-weight:bold;}
     .t-chunk-on {color:#fff;font-weight:bold;}
     .t-trail    {color:#444;}
+    .t-key      {color:#ffe0a0;font-weight:bold;text-shadow:0 0 3px #ffe2a0,0 0 8px #ffcb55,0 0 18px rgba(255,196,80,0.95),0 0 36px rgba(255,180,60,0.65),0 0 64px rgba(255,160,40,0.45);}
+    .t-key-aura {color:rgba(255,196,80,0.55);text-shadow:0 0 6px rgba(255,180,80,0.55);}
+    .t-door-core {color:#ffffff;font-weight:bold;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 9px rgba(228,242,255,0.55),0 0 22px rgba(180,200,255,0.45),0 0 48px rgba(140,180,255,0.35);}
+    .t-door-aura {color:rgba(255,255,255,0.88);text-shadow:-1px 0 0 rgba(255,90,168,0.55),1px 0 0 rgba(120,236,255,0.55),0 0 8px rgba(238,244,255,0.45);}
+    #keymeter{display:none;border-top:1px solid #2a2418;margin-top:6px;padding:6px 2px 2px;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.5;color:#888;letter-spacing:0.45em;}
+    #keymeter .km-label{letter-spacing:0.18em;font-size:12px;color:#998060;margin-left:0.6em;opacity:0.85;}
+    #keymeter .km-door {letter-spacing:0.18em;font-size:12px;color:#cfd6ee;margin-left:0.6em;text-shadow:0 0 6px rgba(200,220,255,0.5);}
+    .km-lit{color:#ffe0a0;font-weight:bold;text-shadow:0 0 4px rgba(255,196,80,0.85),0 0 12px rgba(255,170,60,0.55);}
+    .km-dim{color:#3a3022;}
     /* Player after-image trail: four density tiers fade with age, with a
        cool blue-white halo on the freshest cells so the wake reads as
        luminous residue rather than a dirty path. */
@@ -151,6 +160,7 @@
   </div>
   <div id="catalog"></div>
   <div id="event"></div>
+  <div id="keymeter"></div>
   <div id="status"></div>
 </div>
 
@@ -425,6 +435,10 @@ let allFilesLoaded=false;
 let lastVoidSinkMsgStep=-9999;
 let gateFlashTimer=null;
 let gateFlashUntilMs=0;
+let keyMap=new Map();   // "x,y" -> {x,y}
+let keysTotal=0;
+let keysFound=0;
+let door=null;          // {x,y} once spawned (after final key)
 let onboardingHoldLastMs=0;
 
 const WEIRD=[
@@ -1461,7 +1475,59 @@ function buildWorld(){
     if(Number.isFinite(rx)) px = rx;
     if(Number.isFinite(ry)) py = ry;
   }
+  keyMap = new Map();
+  keysFound = 0;
+  keysTotal = 0;
+  door = null;
   revealAround(px,py);
+}
+
+// Distance bands tuned to in-world travel time. MOVE_MS ≈ 90ms/cell straight
+// → ~9 cells/sec; diagonals slow that to ~7 cells/sec. Friction/void can
+// add up to ~30%, so we set the upper bound a little under the raw seconds
+// budget so the experience holds even when traversing rough terrain.
+const KEY_FIRST_MIN = 100;   // ~12s of travel
+const KEY_FIRST_MAX = 260;   // ~30s of travel
+const KEY_NEXT_MIN  = 220;   // ~25s of travel
+const KEY_NEXT_MAX  = 540;   // ~60s of travel
+const DOOR_MIN_DIST = 500;
+const DOOR_MAX_DIST = 1100;
+
+function placeBeacon(cx, cy, minDist, maxDist){
+  const angle = Math.random() * Math.PI * 2;
+  const dist  = minDist + Math.random() * (maxDist - minDist);
+  return {
+    x: Math.round(cx + Math.cos(angle) * dist),
+    y: Math.round(cy + Math.sin(angle) * dist),
+  };
+}
+
+// Called once when the player crosses out of the intro into the live world.
+// Picks a fuzzy 5–10 total target and seeds the first beacon close enough to
+// stumble into within the first ~30s of free walking.
+function initKeysForSession(){
+  if(keysTotal>0) return;  // already initialized for this session
+  keyMap = new Map();
+  keysFound = 0;
+  door = null;
+  keysTotal = 5 + Math.floor(Math.random() * 6); // 5..10 inclusive
+  spawnKeyNear(px, py, KEY_FIRST_MIN, KEY_FIRST_MAX);
+  pushEvent(`// ${keysTotal} keys hidden in this universe. find them all.`);
+}
+
+function spawnKeyNear(cx, cy, minDist, maxDist){
+  const p = placeBeacon(cx, cy, minDist, maxDist);
+  keyMap.set(`${p.x},${p.y}`, p);
+  // Pre-reveal a small halo so terrain context illuminates as the player
+  // approaches the beacon, instead of the key floating against pure fog.
+  revealAroundWithRadius(p.x, p.y, 5);
+}
+
+// Place a single door far from current player position, using the same
+// scatter mechanic as keys. Called once when the final key is collected.
+function spawnDoor(){
+  door = placeBeacon(px, py, DOOR_MIN_DIST, DOOR_MAX_DIST);
+  revealAroundWithRadius(door.x, door.y, 6);
 }
 
 function stampChunk(c){
@@ -1646,6 +1712,7 @@ function finalizeIntroTransition(targetPhase, reason='world'){
   worldBoundaryLatch = false;
   worldBoundaryFriction = 0;
   lastMoveAtMs = 0;
+  initKeysForSession();
 }
 function releaseIntoWorld(reason='world'){
   if(!isOnboardingActive()) return;
@@ -1833,6 +1900,22 @@ function step(dx,dy){
   revealAround(px,py);
   updateAudio();
 
+  if(keyMap.size>0){
+    const kk=`${px},${py}`;
+    if(keyMap.has(kk)){
+      keyMap.delete(kk);
+      keysFound++;
+      const remaining=keysTotal-keysFound;
+      if(remaining>0){
+        spawnKeyNear(px, py, KEY_NEXT_MIN, KEY_NEXT_MAX);
+        pushEvent(`// key acquired. ${keysFound}/${keysTotal} — another flickers into being.`);
+      } else {
+        spawnDoor();
+        pushEvent(`// final key acquired. a door materializes somewhere far.`);
+      }
+    }
+  }
+
   WEIRD.forEach(([t,m])=>{
     if(stepCount===t&&!weirdShown.has(t)){weirdShown.add(t);pushEvent(m);}
   });
@@ -1937,6 +2020,7 @@ const CATALOG_CTL_EL = document.getElementById('catalogCtl');
 const CATALOG_TOGGLE_BTN = document.getElementById('catalogToggleBtn');
 const ONBOARDING_TOGGLE_BTN = document.getElementById('onboardingToggleBtn');
 const STATUS_EL = document.getElementById('status');
+const KEYMETER_EL = document.getElementById('keymeter');
 introTitleEl = document.getElementById('introTitle');
 const INTRO_VIGNETTE_EL = document.getElementById('introVignette');
 
@@ -2149,6 +2233,26 @@ function renderMap(){
         row+=`<span class="${playerCls}">█</span>`;
         continue;
       }
+      // Beacons render *before* fog so keys and the door act as visible
+      // markers across the dark map, the way the player does.
+      if(!introNow){
+        if(keyMap.size>0 && keyMap.has(`${wx},${wy}`)){
+          row+=`<span class="t-key">⚷</span>`;
+          continue;
+        }
+        if(door){
+          const ddx=wx-door.x, ddy=wy-door.y;
+          if(ddx===0 && ddy===0){
+            row+=`<span class="t-door-core">█</span>`;
+            continue;
+          }
+          if((ddx*ddx + ddy*ddy) <= 2){
+            row+=`<span class="t-door-aura">·</span>`;
+            continue;
+          }
+        }
+      }
+
       const fv=fogGet(wx,wy);
       if(fv===0){
         row+=`<span class="t-fog">${fogGlyph(wx,wy)}</span>`;
@@ -2207,6 +2311,25 @@ function renderStatus(){
   const metaStr=`world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}`;
   const pad=Math.max(0,VIEW_W-chunkStr.length-metaStr.length);
   STATUS_EL.textContent=chunkStr+' '.repeat(pad)+metaStr;
+}
+
+function renderKeymeter(){
+  if(!KEYMETER_EL) return;
+  if(keysTotal===0 || isIntroActive()){
+    KEYMETER_EL.style.display='none';
+    return;
+  }
+  KEYMETER_EL.style.display='block';
+  let row='';
+  for(let i=0;i<keysTotal;i++){
+    row += i<keysFound
+      ? `<span class="km-lit">⚷</span>`
+      : `<span class="km-dim">⚷</span>`;
+  }
+  const tail = door
+    ? `<span class="km-door">— door active</span>`
+    : `<span class="km-label">${keysFound}/${keysTotal}</span>`;
+  KEYMETER_EL.innerHTML = `${row}${tail}`;
 }
 
 function renderCatalog(){
@@ -2299,7 +2422,7 @@ function loop(){
           }
         }
       }
-      renderMap(); renderCatalog(); renderStatus();
+      renderMap(); renderCatalog(); renderStatus(); renderKeymeter();
     }
     else renderBoot();
   }catch(err){
