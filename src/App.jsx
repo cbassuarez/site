@@ -1327,9 +1327,7 @@ function TalkRecapPage() {
       <p>
         Sebastian Suarez-Solis
         <br />
-        Advisor: Tim Feeney
-        <br />
-        Committee: Andrew Grueschow · Volker Straebel
+        Advisors: Tim Feeney · Andrew Grueschow · Volker Straebel
         <br />
         California Institute of the Arts · DMA · October 2025
       </p>
