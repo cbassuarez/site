@@ -29,10 +29,17 @@
     .t-feature  {color:#cce;font-weight:bold;} /* peaks / treasure / huts */
     .t-landmark {color:#fc8;font-weight:bold;} /* world center marker */
     /* entities */
-    .t-player   {color:#fff;font-weight:bold;}
+    .t-player   {color:#ffffff;font-weight:bold;text-shadow:0 0 3px #fff,0 0 8px #fff,0 0 18px rgba(255,255,255,0.9),0 0 36px rgba(220,232,255,0.65),0 0 64px rgba(180,200,255,0.4);}
     .t-chunk    {color:#ddd;font-weight:bold;}
     .t-chunk-on {color:#fff;font-weight:bold;}
     .t-trail    {color:#444;}
+    /* Player after-image trail: four density tiers fade with age, with a
+       cool blue-white halo on the freshest cells so the wake reads as
+       luminous residue rather than a dirty path. */
+    .t-trail-1 {color:rgba(220,234,255,0.62);text-shadow:0 0 6px rgba(200,224,255,0.55),0 0 14px rgba(160,200,255,0.35);}
+    .t-trail-2 {color:rgba(180,206,240,0.42);text-shadow:0 0 4px rgba(170,200,240,0.30);}
+    .t-trail-3 {color:rgba(140,168,210,0.26);}
+    .t-trail-4 {color:rgba(100,128,170,0.13);}
     .t-fog      {color:rgba(170,185,200,0.12);}
     .t-intro-trail {color:rgba(238,244,252,0.96);font-weight:bold;}
     .t-intro-halo  {color:rgba(185,195,210,0.32);}
@@ -161,7 +168,7 @@ const FADE_SEC     = 0.5;
 const FOG_R        = 16;
 const FULL_FIELD_VISIBLE = false;
 const TRAIL_LEN    = 100;
-const POLY_MAX     = 16;
+const POLY_MAX     = 24;
 const MOVE_MS      = 90;
 const RMS_TARGET   = 0.12;
 const ONBOARDING_PHASES = {
@@ -235,9 +242,11 @@ const WORLD_SCALE_X = 2.2;
 const WORLD_SCALE_Y = 2.2;
 const CHUNK_MIN_SEP = 4;
 
-// Audible radius (proximity falloff & candidate selection) — wider than any
-// terrain so multiple samples overlap audibly wherever you stand.
-const AUDIO_R = 52;
+// Audible radius (proximity falloff & candidate selection) — wide enough that
+// many samples overlap audibly wherever you stand. Big AUDIO_R + the cosine
+// falloff in proxFor() means many chunks contribute non-zero gain at once;
+// the per-chunk dedupe + POLY_MAX cap keeps total active voices bounded.
+const AUDIO_R = 110;
 const WORLD_TILE_SCALE_X = 2.8;
 const WORLD_TILE_SCALE_Y = 2.2;
 const WORLD_SPREAD_MIN = 0.2;
@@ -443,14 +452,25 @@ function ensureCtx(){
   if(!actx){
     try{
       actx=new(window.AudioContext||window.webkitAudioContext)();
-      // Master soft-limiter — keeps 16 simultaneous voices from clipping.
+      // Bus chain: light glue compressor → brick-wall safety limiter.
+      // Glue stage only catches the loudest peaks (high threshold, gentle
+      // ratio, slow attack) so the proximity dynamic range survives — close
+      // chunks should genuinely be louder than far ones. The limiter behind
+      // it handles anything that would otherwise clip the DAC.
       master=actx.createDynamicsCompressor();
-      master.threshold.setValueAtTime(-14, actx.currentTime);
-      master.knee.setValueAtTime(12, actx.currentTime);
-      master.ratio.setValueAtTime(4, actx.currentTime);
-      master.attack.setValueAtTime(0.005, actx.currentTime);
-      master.release.setValueAtTime(0.1, actx.currentTime);
-      master.connect(actx.destination);
+      master.threshold.setValueAtTime(-6, actx.currentTime);
+      master.knee.setValueAtTime(8, actx.currentTime);
+      master.ratio.setValueAtTime(2, actx.currentTime);
+      master.attack.setValueAtTime(0.030, actx.currentTime);
+      master.release.setValueAtTime(0.25, actx.currentTime);
+      const limiter=actx.createDynamicsCompressor();
+      limiter.threshold.setValueAtTime(-1.5, actx.currentTime);
+      limiter.knee.setValueAtTime(0, actx.currentTime);
+      limiter.ratio.setValueAtTime(20, actx.currentTime);
+      limiter.attack.setValueAtTime(0.001, actx.currentTime);
+      limiter.release.setValueAtTime(0.06, actx.currentTime);
+      master.connect(limiter);
+      limiter.connect(actx.destination);
     }catch(err){
       audioInitFailed=true;
       console.error('AudioContext init failed', err);
@@ -474,40 +494,44 @@ function killNode(s,g){
   try{s&&s.disconnect();}catch(_){}
   try{g&&g.disconnect();}catch(_){}
 }
-// Bake equal-power sin/cos fades into the first/last `fadeMs` of a buffer so
-// the loop seam — and a paired-source overlap — sums to a constant amplitude.
+// Bake a sin envelope into the first/last `fadeMs` of the buffer so that
+// data[0] and data[N-1] are both ~0 — native looping then transitions
+// silent → silent with no discontinuity, no pop. The same envelope is
+// mirrored on both ends (NOT sin/cos): the cos pairing was needed by the
+// retired dual-source crossfade design, but for a single looping source it
+// left data[N-1] at full amplitude, which clicked on every loop.
 function smoothBufferLoop(buffer, fadeMs=60){
   const sr=buffer.sampleRate;
   const N=buffer.length;
   const fadeSamples=Math.min(Math.floor(fadeMs*sr/1000), Math.floor(N/4));
+  if(fadeSamples<=0) return 0;
   for(let ch=0;ch<buffer.numberOfChannels;ch++){
     const data=buffer.getChannelData(ch);
     for(let i=0;i<fadeSamples;i++){
-      const t=i/fadeSamples;
-      const fIn =Math.sin(t*Math.PI*0.5);
-      const fOut=Math.cos(t*Math.PI*0.5);
-      data[i] *= fIn;
-      data[N-1-i] *= fOut;
+      const env=Math.sin(i/fadeSamples * Math.PI*0.5);  // 0 → 1
+      data[i]      *= env;   // fade-in:  data[0] = 0
+      data[N-1-i]  *= env;   // fade-out: data[N-1] = 0 (mirrored)
     }
   }
   return fadeSamples/sr;
 }
-// Proximity weight: quadratic falloff with hard cutoff at AUDIO_R.
+// Proximity weight: exponential decay — peaks sharply at d=0 (the chunk's
+// cell), drops dramatically over the next ~12 cells, then leaves a long
+// quiet tail audible out to AUDIO_R for navigation/follow-the-sound.
+// Half-power at ~8 cells, 1/e at ~12 cells, ~1.5% at 50 cells.
 function proxFor(d, R){
   if(d>=R) return 0;
-  const t=1-d/R;
-  return t*t;
+  return Math.exp(-d / 12);
 }
-// Combined voice gain: proximity × per-chunk baseline × biome × world × terrain-gate.
-// terrainGate enforces the "no audio in voids" rule on the *player's* cell;
-// each sample's contribution is governed by AUDIO_R, not its visual terrain.
+// Combined voice gain: proximity × per-chunk baseline × biome × world.
+// No terrain gate — proximity alone governs audibility, so wilderness/voids
+// still hear nearby chunks bleeding in. World membership and biome weight
+// scale contribution but never gate to zero, so blends are smooth.
 function voiceGain(chunk, d, ctx, emitterGain=1){
-  if(!ctx.onTerrain) return 0;
   const prox=proxFor(d, AUDIO_R);
   if(prox<=0) return 0;
   const bw=biomeWeightFor(ctx, chunk);
-  const ww=ctx.worldMembership[chunk.worldId]??0;
-  if(ww<=0) return 0;
+  const ww=Math.max(0.06, ctx.worldMembership[chunk.worldId]??0);
   return prox*(chunk.baseVol||1)*bw*ww*emitterGain;
 }
 // Hierarchical biome weight: same biome > different biome same world > different world.
@@ -627,12 +651,35 @@ function getCellAt(x,y){
   }
   return cell;
 }
-// In infinite tiled space, player membership is one-hot for the current tile's world.
+// Soft world membership: instead of one-hot, sample worldId in a small ring
+// around the player and weight by inverse distance. Near a world boundary you
+// get a fractional membership that lets foreign-world voices bleed audibly
+// instead of cutting at the seam — fixes the "all-one-world" stutter on
+// crossings.
+const WORLD_MEMBERSHIP_SAMPLES = (() => {
+  const out=[{dx:0, dy:0, w:1.0}];
+  // Two rings of 8 directions each, weighted inversely with distance.
+  const dirs=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+  for(const [dx,dy] of dirs){
+    out.push({dx:dx*6,  dy:dy*6,  w:0.55});
+    out.push({dx:dx*14, dy:dy*14, w:0.22});
+  }
+  return out;
+})();
 function worldMembership(x, y){
-  const cell=getCellAt(Math.round(x), Math.round(y));
   const out={};
   for(const w of worldsConfig) out[w.id]=0;
-  if(cell?.worldId) out[cell.worldId]=1;
+  let total=0;
+  for(const s of WORLD_MEMBERSHIP_SAMPLES){
+    const wid=worldIdAt(Math.round(x+s.dx), Math.round(y+s.dy));
+    if(wid && (wid in out)){
+      out[wid]+=s.w;
+      total+=s.w;
+    }
+  }
+  if(total>0){
+    for(const k in out) out[k]/=total;
+  }
   return out;
 }
 function playerContext(){
@@ -644,27 +691,96 @@ function playerContext(){
     worldMembership: worldMembership(px, py)
   };
 }
-// Each voice plays its sample through TWO buffer sources, offset by (dur - fade),
-// sharing one gain node. The buffer's baked sin/cos fades make A's fade-out and
-// B's fade-in equal-power-complementary, so the loop seam sums smoothly.
-function startVoice(chunkIdx, target){
+// Each voice runs TWO crossfading heads of the same buffer plus a slow
+// detune LFO. Periodically (every `cyclePeriod`) the silent head is
+// re-spawned from a fresh random offset and the heads crossfade over
+// `xfadeDur`. The combined effect: the loop seam is hidden by the
+// overlap, AND each iteration enters at a different point with a
+// slightly different pitch — the pattern never quite repeats.
+function startVoice(chunkIdx, target, initialPan=0){
   const c=chunks[chunkIdx]; if(!c?.buffer) return null;
   ensureCtx();
   const now=actx.currentTime;
   const dur=c.buffer.duration;
-  const fade=Math.max(0.02, c.loopFadeSec||0.06);
-  const stagger=Math.max(0, dur-fade);
-  const srcA=actx.createBufferSource();
-  const srcB=actx.createBufferSource();
-  srcA.buffer=c.buffer; srcB.buffer=c.buffer;
-  srcA.loop=looping;     srcB.loop=looping;
+
+  // Stereo panner so the user can localize chunks left/right and follow them.
+  const panner=actx.createStereoPanner();
+  panner.pan.setValueAtTime(Math.max(-1, Math.min(1, initialPan)), now);
+  panner.connect(master);
+
   const g=actx.createGain();
-  srcA.connect(g); srcB.connect(g); g.connect(master);
-  g.gain.setValueAtTime(0,now);
+  g.gain.setValueAtTime(0, now);
   g.gain.linearRampToValueAtTime(target, now+FADE_SEC);
-  srcA.start(now);
-  srcB.start(now+stagger);
-  return {srcA, srcB, gain:g, dur, startedAt:now, target};
+  g.connect(panner);
+
+  const headA=actx.createGain();
+  const headB=actx.createGain();
+  headA.connect(g); headB.connect(g);
+  headA.gain.setValueAtTime(1, now);
+  headB.gain.setValueAtTime(0, now);
+
+  // Slow detune LFO — ±10 cents over a 25s period. Same LFO modulates
+  // both heads so they drift together; combined with random restart
+  // offsets, no two iterations sound the same.
+  const lfo=actx.createOscillator();
+  lfo.frequency.setValueAtTime(1/25, now);
+  const lfoGain=actx.createGain();
+  lfoGain.gain.setValueAtTime(10, now);
+  lfo.connect(lfoGain);
+  lfo.start(now);
+
+  const v={
+    gain:g, headA, headB, lfo, lfoGain, panner,
+    srcA:null, srcB:null,
+    dur, startedAt:now, target,
+    swapTimer:null, alive:true, chunkIdx
+  };
+
+  function spawn(head, fromOffset){
+    const s=actx.createBufferSource();
+    s.buffer=c.buffer;
+    s.loop=looping;
+    lfoGain.connect(s.detune);
+    s.connect(head);
+    s.start(actx.currentTime+0.005, Math.max(0, Math.min(fromOffset, dur-0.05)));
+    return s;
+  }
+  function killSrc(src){
+    if(!src) return;
+    try{ src.stop(actx.currentTime+0.4); }catch(_){}
+    setTimeout(()=>{ try{src.disconnect();}catch(_){} }, 500);
+  }
+
+  // Head A starts at offset 0 (clean entry); Head B will spawn fresh on
+  // the first swap from a random offset.
+  v.srcA = spawn(headA, 0);
+
+  const xfadeDur = Math.max(0.5, Math.min(2.0, dur*0.6));
+  const cyclePeriod = Math.max(xfadeDur+0.4, dur);
+  let aActive=true;
+
+  function swap(){
+    if(!v.alive) return;
+    const t=actx.currentTime;
+    const incomingHead = aActive ? headB : headA;
+    const outgoingHead = aActive ? headA : headB;
+    const incomingKey  = aActive ? 'srcB' : 'srcA';
+    // Random restart offset within the buffer (avoid the very edges).
+    const offset = Math.random() * Math.max(0, dur-0.1);
+    killSrc(v[incomingKey]);
+    v[incomingKey] = spawn(incomingHead, offset);
+    incomingHead.gain.cancelScheduledValues(t);
+    incomingHead.gain.setValueAtTime(incomingHead.gain.value, t);
+    incomingHead.gain.linearRampToValueAtTime(1, t+xfadeDur);
+    outgoingHead.gain.cancelScheduledValues(t);
+    outgoingHead.gain.setValueAtTime(outgoingHead.gain.value, t);
+    outgoingHead.gain.linearRampToValueAtTime(0, t+xfadeDur);
+    aActive = !aActive;
+    v.swapTimer = setTimeout(swap, cyclePeriod*1000);
+  }
+  v.swapTimer = setTimeout(swap, cyclePeriod*1000);
+
+  return v;
 }
 function rampVoice(v, target){
   if(!v) return;
@@ -676,16 +792,22 @@ function rampVoice(v, target){
 }
 function stopVoice(v){
   if(!v) return;
+  v.alive=false;
+  if(v.swapTimer){ clearTimeout(v.swapTimer); v.swapTimer=null; }
   const now=actx.currentTime;
   v.gain.gain.cancelScheduledValues(now);
   v.gain.gain.setValueAtTime(v.gain.gain.value, now);
   v.gain.gain.linearRampToValueAtTime(0, now+FADE_SEC);
-  const {srcA, srcB, gain}=v;
   setTimeout(()=>{
-    try{srcA.stop();srcA.disconnect();}catch(_){}
-    try{srcB.stop();srcB.disconnect();}catch(_){}
-    try{gain.disconnect();}catch(_){}
-  }, (FADE_SEC+0.2)*1000);
+    try{ v.srcA && v.srcA.stop(); v.srcA && v.srcA.disconnect(); }catch(_){}
+    try{ v.srcB && v.srcB.stop(); v.srcB && v.srcB.disconnect(); }catch(_){}
+    try{ v.lfo  && v.lfo.stop();  v.lfo  && v.lfo.disconnect(); }catch(_){}
+    try{ v.lfoGain && v.lfoGain.disconnect(); }catch(_){}
+    try{ v.headA && v.headA.disconnect(); }catch(_){}
+    try{ v.headB && v.headB.disconnect(); }catch(_){}
+    try{ v.gain.disconnect(); }catch(_){}
+    try{ v.panner && v.panner.disconnect(); }catch(_){}
+  }, (FADE_SEC+0.3)*1000);
 }
 function stopAllVoices(){
   for(const [,v] of voices) stopVoice(v);
@@ -1332,11 +1454,12 @@ function buildWorld(){
   const hashedHome = worldTemplates.get(worldIdAt(0,0));
   const anyHome = worlds[0] || null;
   const home = preferredHome || hashedHome || anyHome;
-  if(home){
-    px=Math.round(home.region.cx);
-    py=Math.round(home.region.cy);
-  } else {
-    px=0; py=0;
+  px = py = 0;
+  if(home && home.region){
+    const rx=Math.round(home.region.cx);
+    const ry=Math.round(home.region.cy);
+    if(Number.isFinite(rx)) px = rx;
+    if(Number.isFinite(ry)) py = ry;
   }
   revealAround(px,py);
 }
@@ -1589,7 +1712,10 @@ function audibleCandidates(){
           let bestD=Infinity, bestG=0, bestX=ox+c.wx, bestY=oy+c.wy;
           for(const em of emitters){
             const vx=ox+em.x, vy=oy+em.y;
-            if(worldIdAt(vx,vy)!==c.worldId) continue;
+            // No worldIdAt-mismatch skip: chunks are audible from their tiled
+            // position regardless of which world the warped boundary assigns
+            // to that exact cell. Foreign-world contribution is governed by
+            // worldMembership in voiceGain instead — softer, blendable.
             const d=Math.hypot(px-vx, py-vy);
             if(d<bestD){
               bestD=d;
@@ -1605,9 +1731,19 @@ function audibleCandidates(){
       }
     }
   }
-  // Sort by gain (loudness) so biome/world weighting governs the top-N cut.
-  out.sort((a,b)=>b.g-a.g);
-  return { ctx, audible: out.slice(0,POLY_MAX) };
+  // Dedupe by chunk idx — the same chunk in different world tiles must NOT
+  // become multiple simultaneous voices. Two playbacks of the same buffer at
+  // independent phase start times produce comb-filter / Haas-like artifacts
+  // and double-summed amplitude (clipping). Keep only the loudest instance,
+  // and re-key by chunk so tile-crossings ramp instead of restarting.
+  const byIdx=new Map();
+  for(const e of out){
+    const cur=byIdx.get(e.idx);
+    if(!cur || e.g>cur.g) byIdx.set(e.idx, {...e, key:`c:${e.idx}`});
+  }
+  const deduped=[...byIdx.values()];
+  deduped.sort((a,b)=>b.g-a.g);
+  return { ctx, audible: deduped.slice(0,POLY_MAX) };
 }
 
 function updateAudio(){
@@ -1647,11 +1783,22 @@ function updateAudio(){
   for(const [voiceKey,v] of voices){
     if(!want.has(voiceKey)){ stopVoice(v); voices.delete(voiceKey); }
   }
-  for(const {key,idx,g} of audible){
+  for(const {key,idx,g,wx,wy} of audible){
+    // Stereo pan from chunk's relative X position. PAN_R sets how tight
+    // localization is — chunks beyond ±PAN_R cells are fully panned.
+    const PAN_R=18;
+    const pan=Math.max(-1, Math.min(1, (wx-px)/PAN_R));
     const existing=voices.get(key);
-    if(existing) rampVoice(existing,g);
-    else {
-      const v=startVoice(idx,g);
+    if(existing){
+      rampVoice(existing,g);
+      if(existing.panner){
+        const t=actx.currentTime;
+        existing.panner.pan.cancelScheduledValues(t);
+        existing.panner.pan.setValueAtTime(existing.panner.pan.value, t);
+        existing.panner.pan.linearRampToValueAtTime(pan, t+0.18);
+      }
+    } else {
+      const v=startVoice(idx,g,pan);
       if(v) voices.set(key,v);
     }
   }
@@ -1793,7 +1940,7 @@ const STATUS_EL = document.getElementById('status');
 introTitleEl = document.getElementById('introTitle');
 const INTRO_VIGNETTE_EL = document.getElementById('introVignette');
 
-const trailSet = new Set();
+const trailMap = new Map(); // "x,y" -> recency index (newer = higher)
 function wrapText(text, width=88){
   const words=String(text||'').split(/\s+/).filter(Boolean);
   const lines=[];
@@ -1977,9 +2124,14 @@ function renderMap(){
   // Guarantee player cell visibility even if fog map resets between frames.
   if(fogGet(px,py)===0) fogSet(px,py,2);
 
-  // Rebuild trail set
-  trailSet.clear();
-  trail.forEach(p=>trailSet.add(`${p.x},${p.y}`));
+  // Rebuild trail map: position → recency (0=oldest, n-1=newest). Newer
+  // positions overwrite older ones if the player crossed the same cell
+  // twice, so the freshest tier always wins.
+  trailMap.clear();
+  for(let i=0;i<trail.length;i++){
+    trailMap.set(`${trail[i].x},${trail[i].y}`, i);
+  }
+  const trailMaxIdx = Math.max(1, trail.length-1);
 
   const introNow = isIntroActive();
   const playerCls = 't-player';
@@ -1994,7 +2146,7 @@ function renderMap(){
       const wx=ox+vx;
       // Player must always render, regardless of transient fog state.
       if(wx===px&&wy===py){
-        row+=`<span class="${playerCls}">@</span>`;
+        row+=`<span class="${playerCls}">█</span>`;
         continue;
       }
       const fv=fogGet(wx,wy);
@@ -2017,9 +2169,15 @@ function renderMap(){
         continue;
       }
 
-      // Trail
-      if(trailSet.has(`${wx},${wy}`)){
-        row+=`<span class="t-trail">.</span>`;
+      // Trail: tier the after-image by recency. Freshest cells use a
+      // dense block with a luminous halo; oldest fade to a single dot.
+      const trailAge = trailMap.get(`${wx},${wy}`);
+      if(trailAge !== undefined){
+        const r = trailAge / trailMaxIdx;  // 0=oldest, 1=newest
+        if(r > 0.85)      row+=`<span class="t-trail-1">▓</span>`;
+        else if(r > 0.55) row+=`<span class="t-trail-2">▒</span>`;
+        else if(r > 0.25) row+=`<span class="t-trail-3">░</span>`;
+        else              row+=`<span class="t-trail-4">·</span>`;
         continue;
       }
 
