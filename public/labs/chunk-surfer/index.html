@@ -61,12 +61,62 @@
       50%      { filter: brightness(1.35); }
     }
     .t-key-aura {color:rgba(255,255,255,0.55);text-shadow:0 0 6px rgba(255,255,255,0.6);}
+    /* Edge-of-viewport alert: a periodic ! flash in the bearing direction
+       of the active beacon. Opacity is driven per-frame in JS (the map
+       innerHTML rebuilds every tick, which would otherwise restart any CSS
+       keyframe animation at 0% and leave the element invisible). */
+    .t-alert-key {
+      display:inline-block;
+      vertical-align:baseline;
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:0 0 3px #ffffff,0 0 9px #ffffff,0 0 18px rgba(238,244,255,0.85),0 0 36px rgba(200,220,255,0.6);
+    }
+    .t-alert-door {
+      display:inline-block;
+      vertical-align:baseline;
+      color:#e6ecff;
+      font-weight:bold;
+      text-shadow:0 0 3px rgba(255,255,255,0.95),0 0 9px rgba(220,235,255,0.65),0 0 18px rgba(180,210,255,0.45);
+    }
+    /* MUD-style sense line: a single italicised prose hint with bearing +
+       distance descriptor. The glyph itself reuses the key's own bloom so
+       it visually rhymes with the in-world beacon. */
+    #sense{
+      font-family:'Courier New',Courier,monospace;
+      font-size:12px;
+      line-height:1.5;
+      color:#7e7e7e;
+      white-space:pre;
+      min-height:1.5em;
+      margin-top:2px;
+    }
+    #sense .sense-prefix {color:#5a5a5a;}
+    #sense .sense-bearing {color:#aab2c4;}
+    #sense .sense-dist {color:#998a6b;font-style:italic;}
+    #sense .t-key-sense {
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:0 0 3px #ffffff,0 0 8px rgba(238,244,255,0.78),0 0 16px rgba(200,220,255,0.45);
+      animation: key-pulse 1.6s ease-in-out infinite;
+    }
+    #sense .t-door-sense {
+      color:#e6ecff;
+      font-weight:bold;
+      text-shadow:0 0 3px rgba(255,255,255,0.85),0 0 9px rgba(220,235,255,0.55);
+    }
     .t-door-core {color:#ffffff;font-weight:bold;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 9px rgba(228,242,255,0.55),0 0 22px rgba(180,200,255,0.45),0 0 48px rgba(140,180,255,0.35);}
     .t-door-aura {color:rgba(255,255,255,0.88);text-shadow:-1px 0 0 rgba(255,90,168,0.55),1px 0 0 rgba(120,236,255,0.55),0 0 8px rgba(238,244,255,0.45);}
     #keymeter{display:none;border-top:1px solid #2a2418;margin-top:6px;padding:6px 2px 2px;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.5;color:#888;letter-spacing:0.45em;}
     #keymeter .km-label{letter-spacing:0.18em;font-size:12px;color:#998060;margin-left:0.6em;opacity:0.85;}
     #keymeter .km-door {letter-spacing:0.18em;font-size:12px;color:#cfd6ee;margin-left:0.6em;text-shadow:0 0 6px rgba(200,220,255,0.5);}
     .km-lit{color:#ffffff;font-weight:bold;text-shadow:0 0 4px #ffffff,0 0 12px rgba(238,244,255,0.85),0 0 22px rgba(200,220,255,0.55);}
+    .km-active{color:#ffffff;font-weight:bold;text-shadow:0 0 3px #ffffff,0 0 8px rgba(238,244,255,0.7),0 0 16px rgba(200,220,255,0.45);animation: key-pulse 1.6s ease-in-out infinite;}
+    .km-pending{color:#5d6373;letter-spacing:0.1em;animation: km-pending-pulse 2.2s ease-in-out infinite;}
+    @keyframes km-pending-pulse {
+      0%, 100% { opacity: 0.35; }
+      50%      { opacity: 0.85; }
+    }
     .km-dim{color:#2a2e36;}
     /* Player after-image trail: four density tiers fade with age, with a
        cool blue-white halo on the freshest cells so the wake reads as
@@ -186,6 +236,7 @@
   </div>
   <div id="catalog"></div>
   <div id="event"></div>
+  <div id="sense"></div>
   <div id="keymeter"></div>
   <div id="status"></div>
 </div>
@@ -461,10 +512,12 @@ let allFilesLoaded=false;
 let lastVoidSinkMsgStep=-9999;
 let gateFlashTimer=null;
 let gateFlashUntilMs=0;
-let keyMap=new Map();   // "x,y" -> {x,y}
+let keyMap=new Map();   // "x,y" -> {x,y}; holds at most one active key at a time
 let keysTotal=0;
 let keysFound=0;
 let door=null;          // {x,y} once spawned (after final key)
+let nextSpawnAt=0;      // ms timestamp for next scheduled key spawn (0 = none)
+let depth=0;            // 0 = overworld; each door descent increments by 1
 let onboardingHoldLastMs=0;
 
 const WEIRD=[
@@ -669,6 +722,9 @@ function worldBoundaryDistance(x, y, worldId, maxDist){
   return maxDist + 1;
 }
 function getCellAt(x,y){
+  // Deeper levels are intentionally void — no chunks, biomes, or world
+  // boundaries materialise. Render falls through to fog/empty space.
+  if(depth > 0) return null;
   const {tx,ty,lx,ly}=tileCoordFor(x,y);
   const worldId=worldIdAt(x,y);
   const tpl=worldTemplates.get(worldId);
@@ -1508,16 +1564,20 @@ function buildWorld(){
   revealAround(px,py);
 }
 
-// Distance bands tuned to in-world travel time. MOVE_MS ≈ 90ms/cell straight
-// → ~9 cells/sec; diagonals slow that to ~7 cells/sec. Friction/void can
-// add up to ~30%, so we set the upper bound a little under the raw seconds
-// budget so the experience holds even when traversing rough terrain.
-const KEY_FIRST_MIN = 220;   // ~25s of travel
-const KEY_FIRST_MAX = 380;   // ~45s of travel
-const KEY_NEXT_MIN  = 260;   // ~30s of travel
-const KEY_NEXT_MAX  = 540;   // ~60s of travel
+// Placement distance band — once a key is *allowed* to spawn, it lands
+// close enough to be findable within ~minute of walking from where the
+// player is at that moment, but not literally underfoot.
+const KEY_PLACEMENT_MIN = 90;
+const KEY_PLACEMENT_MAX = 220;
 const DOOR_MIN_DIST = 500;
 const DOOR_MAX_DIST = 1100;
+// Time-based pacing. The first key materialises 15–30s after you land in
+// the live world; subsequent keys arrive 30–60s after each pickup. The
+// gating is what gives the universe its rhythm — keys aren't predeposited.
+const KEY_FIRST_DELAY_MIN_MS = 15_000;
+const KEY_FIRST_DELAY_MAX_MS = 30_000;
+const KEY_NEXT_DELAY_MIN_MS  = 30_000;
+const KEY_NEXT_DELAY_MAX_MS  = 60_000;
 
 function placeBeacon(cx, cy, minDist, maxDist){
   const angle = Math.random() * Math.PI * 2;
@@ -1528,17 +1588,38 @@ function placeBeacon(cx, cy, minDist, maxDist){
   };
 }
 
-// Called once when the player crosses out of the intro into the live world.
-// Picks a fuzzy 5–10 total target and seeds the first beacon close enough to
-// stumble into within the first ~30s of free walking.
+// Called once when the player crosses out of the intro into the live
+// world. Picks a fuzzy 2–4 total target and schedules — but does not
+// place — the first key. Placement happens later in maybeSpawnScheduledKey
+// so the beacon lands relative to where the player has wandered to.
 function initKeysForSession(){
   if(keysTotal>0) return;  // already initialized for this session
   keyMap = new Map();
   keysFound = 0;
   door = null;
-  keysTotal = 5 + Math.floor(Math.random() * 6); // 5..10 inclusive
-  spawnKeyNear(px, py, KEY_FIRST_MIN, KEY_FIRST_MAX);
-  pushEvent(`// ${keysTotal} keys hidden in this universe. find them all.`);
+  nextSpawnAt = 0;
+  keysTotal = 2 + Math.floor(Math.random() * 3); // 2..4 inclusive
+  scheduleNextKey(KEY_FIRST_DELAY_MIN_MS, KEY_FIRST_DELAY_MAX_MS);
+  pushEvent(`// ${keysTotal} keys await discovery. listen for them.`);
+}
+
+function scheduleNextKey(minDelayMs, maxDelayMs){
+  const delay = minDelayMs + Math.random() * (maxDelayMs - minDelayMs);
+  nextSpawnAt = Date.now() + delay;
+}
+
+// Per-frame check from the main loop. When the scheduled time passes and
+// the world has no active key, we materialise one near the player's
+// current position — so the new beacon is always within reasonable reach
+// of wherever you've wandered while waiting.
+function maybeSpawnScheduledKey(){
+  if(nextSpawnAt === 0) return;
+  if(Date.now() < nextSpawnAt) return;
+  if(keyMap.size > 0) return;            // a beacon already exists
+  if(keysFound >= keysTotal) return;     // nothing left to spawn
+  spawnKeyNear(px, py, KEY_PLACEMENT_MIN, KEY_PLACEMENT_MAX);
+  nextSpawnAt = 0;
+  pushEvent('// you sense a new presence in the static.');
 }
 
 function spawnKeyNear(cx, cy, minDist, maxDist){
@@ -1554,6 +1635,41 @@ function spawnKeyNear(cx, cy, minDist, maxDist){
 function spawnDoor(){
   door = placeBeacon(px, py, DOOR_MIN_DIST, DOOR_MAX_DIST);
   revealAroundWithRadius(door.x, door.y, 6);
+}
+
+// Step through the door: stop the overworld, drop the player into a
+// blank void layer one level deeper. State that belongs to the previous
+// level (beacons, fog, trail, voice routing) is wiped so the new level
+// reads as a clean slate.
+function descendThroughDoor(){
+  triggerGateFlash(420, 720);
+  pulseRevealRings(px, py, [3, 6, 10, 16]);
+  if(navigator.vibrate) navigator.vibrate([60, 80, 100, 140]);
+
+  depth++;
+  stopAllVoices();
+  stopWorldLayerVoice();
+  silenceAmbientDrone();
+
+  px = 0; py = 0;
+  trail = [];
+  fog = new Map();
+  keyMap = new Map();
+  keysFound = 0;
+  keysTotal = 0;
+  door = null;
+  nextSpawnAt = 0;
+  voidFatigue = 0;
+  worldBoundaryLatch = false;
+  worldBoundaryFriction = 0;
+  lastMoveAtMs = 0;
+  curPlayerCtx = null;
+  curChunkIdx = -1;
+  curChunkKey = '';
+
+  revealAroundWithRadius(px, py, 6);
+  pushEvent(`// you have descended. depth: ${depth}.`);
+  pushEvent(`// the void widens. nothing answers — yet.`);
 }
 
 // Sensory feedback on pickup: brief shimmer chime layered over the world
@@ -1879,6 +1995,17 @@ function audibleCandidates(){
 }
 
 function updateAudio(){
+  if(depth > 0){
+    // Void layer: shut down all chunk voices and the world drone. The
+    // ambient pad is silenced too so the deeper level reads as a held
+    // breath. Mirrors the onboarding gate's structure.
+    curPlayerCtx = { onTerrain:false, biomeId:null, worldId:null, worldMembership:{} };
+    if(curChunkKey){ curChunkKey=''; curChunkIdx=-1; }
+    if(voices.size>0) stopAllVoices();
+    stopWorldLayerVoice();
+    silenceAmbientDrone();
+    return;
+  }
   if(isOnboardingActive()){
     const worldId=INTRO_SCENE.worldId;
     const membership={};
@@ -1974,13 +2101,18 @@ function step(dx,dy){
       const isFinal = remaining===0;
       onKeyPickup(isFinal);
       if(!isFinal){
-        spawnKeyNear(px, py, KEY_NEXT_MIN, KEY_NEXT_MAX);
-        pushEvent(`// key acquired. ${keysFound}/${keysTotal} — another flickers into being.`);
+        scheduleNextKey(KEY_NEXT_DELAY_MIN_MS, KEY_NEXT_DELAY_MAX_MS);
+        pushEvent(`// key acquired. ${keysFound}/${keysTotal} — another forms, slowly.`);
       } else {
         spawnDoor();
         pushEvent(`// final key acquired. a door materializes somewhere far.`);
       }
     }
+  }
+
+  if(door && px===door.x && py===door.y){
+    descendThroughDoor();
+    return;
   }
 
   WEIRD.forEach(([t,m])=>{
@@ -2088,6 +2220,7 @@ const CATALOG_TOGGLE_BTN = document.getElementById('catalogToggleBtn');
 const ONBOARDING_TOGGLE_BTN = document.getElementById('onboardingToggleBtn');
 const STATUS_EL = document.getElementById('status');
 const KEYMETER_EL = document.getElementById('keymeter');
+const SENSE_EL = document.getElementById('sense');
 introTitleEl = document.getElementById('introTitle');
 const INTRO_VIGNETTE_EL = document.getElementById('introVignette');
 
@@ -2267,6 +2400,29 @@ function revealAroundWithRadius(x,y,radius){
   fogSet(x,y,2);
 }
 
+// Cast a ray from the player toward an off-screen target and return the
+// (rounded, clamped) cell where it exits the inner viewport rectangle.
+// Used to position the periodic ! alert in the beacon's bearing direction.
+function projectToViewportEdge(targetX, targetY, ox, oy){
+  const dx = targetX - px;
+  const dy = targetY - py;
+  if(dx===0 && dy===0) return null;
+  const xMin = ox + 1, xMax = ox + VIEW_W - 2;
+  const yMin = oy + 1, yMax = oy + VIEW_H - 2;
+  const ts = [];
+  if(dx > 0) ts.push((xMax - px) / dx);
+  if(dx < 0) ts.push((xMin - px) / dx);
+  if(dy > 0) ts.push((yMax - py) / dy);
+  if(dy < 0) ts.push((yMin - py) / dy);
+  const positiveTs = ts.filter(t => t > 0 && Number.isFinite(t));
+  if(positiveTs.length === 0) return null;
+  const t = Math.min(...positiveTs);
+  return {
+    x: clamp(Math.round(px + t * dx), xMin, xMax),
+    y: clamp(Math.round(py + t * dy), yMin, yMax),
+  };
+}
+
 function renderMap(){
   computeViewDims();
   const halfC=Math.floor(VIEW_W/2), halfR=Math.floor(VIEW_H/2);
@@ -2286,6 +2442,39 @@ function renderMap(){
 
   const introNow = isIntroActive();
   const playerCls = 't-player';
+
+  // Pre-compute a single edge-alert cell for the closest off-screen beacon.
+  // Keys take priority; fall back to the door once all keys are picked.
+  let edgeAlert = null;
+  if(!introNow){
+    const inViewport = (x,y) => x>=ox && x<ox+VIEW_W && y>=oy && y<oy+VIEW_H;
+    let target=null, kind=null, minD=Infinity;
+    for(const k of keyMap.values()){
+      if(inViewport(k.x, k.y)) continue;
+      const d = Math.hypot(k.x-px, k.y-py);
+      if(d < minD){ minD=d; target=k; kind='key'; }
+    }
+    if(!target && door && !inViewport(door.x, door.y)){
+      target = door; kind='door';
+    }
+    if(target){
+      const e = projectToViewportEdge(target.x, target.y, ox, oy);
+      if(e){
+        // Sine-pulse opacity, ~1.6s period, with a baseline of 0.25 so the
+        // glyph never fully disappears (the rebuild-each-frame DOM means we
+        // can't rely on CSS keyframes for this).
+        const period = kind==='door' ? 2000 : 1600;
+        const phase = (Date.now() % period) / period;          // 0..1
+        const pulse = 0.5 - 0.5 * Math.cos(phase * Math.PI*2); // 0..1 sine
+        const opacity = (0.25 + pulse * 0.75).toFixed(3);
+        edgeAlert = {
+          x:e.x, y:e.y,
+          cls: kind==='door' ? 't-alert-door' : 't-alert-key',
+          opacity,
+        };
+      }
+    }
+  }
 
   // Build DOM structure: one span per row (faster than one per cell)
   // Use innerHTML with span classes for color
@@ -2317,6 +2506,10 @@ function renderMap(){
             row+=`<span class="t-door-aura">·</span>`;
             continue;
           }
+        }
+        if(edgeAlert && edgeAlert.x===wx && edgeAlert.y===wy){
+          row+=`<span class="${edgeAlert.cls}" style="opacity:${edgeAlert.opacity}">!</span>`;
+          continue;
         }
       }
 
@@ -2375,9 +2568,75 @@ function renderStatus(){
   const wId=curPlayerCtx?.worldId || '—';
   const bId=curPlayerCtx?.biomeId ? curPlayerCtx.biomeId.split(':').slice(-1)[0] : '—';
   const introMeta=isIntroActive()?`  intro:${Math.round(introProgress()*100)}%`: '';
-  const metaStr=`world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}`;
+  const metaStr = depth > 0
+    ? `depth:${depth}  void  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}`
+    : `world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}`;
   const pad=Math.max(0,VIEW_W-chunkStr.length-metaStr.length);
   STATUS_EL.textContent=chunkStr+' '.repeat(pad)+metaStr;
+}
+
+// Compass bearing for a vector in world coordinates. World y grows
+// downward, so we negate dy to match cardinal intuition (north = up).
+function bearingName(dx, dy){
+  const angle = Math.atan2(-dy, dx);                // 0 = east, π/2 = north
+  const deg   = (angle * 180/Math.PI + 360) % 360;
+  const dirs  = ['east','northeast','north','northwest','west','southwest','south','southeast'];
+  return dirs[Math.round(deg/45) % 8];
+}
+
+// MUD-style proximity descriptor + the verb that matches it. Tuned around
+// our beacon distance bands so the wording escalates as you close in.
+function distanceDescriptor(d){
+  if(d <  18) return {label:'right beside you', verb:'pulses'};
+  if(d <  60) return {label:'very close',       verb:'shimmers'};
+  if(d < 140) return {label:'nearby',           verb:'flickers'};
+  if(d < 280) return {label:'far off',          verb:'glimmers'};
+  if(d < 520) return {label:'very far',         verb:'whispers'};
+  return            {label:'somewhere distant', verb:'whispers'};
+}
+
+function renderSense(){
+  if(!SENSE_EL) return;
+  if(isIntroActive() || keysTotal===0){
+    SENSE_EL.innerHTML='';
+    return;
+  }
+  // Pick the nearest active beacon. Keys outrank the door so the current
+  // objective always wins; once all keys are picked the door takes over.
+  let target=null, kind=null, minD=Infinity;
+  for(const k of keyMap.values()){
+    const dx=k.x-px, dy=k.y-py;
+    const d=Math.hypot(dx,dy);
+    if(d<minD){ minD=d; target=k; kind='key'; }
+  }
+  if(!target && door){
+    const dx=door.x-px, dy=door.y-py;
+    minD=Math.hypot(dx,dy); target=door; kind='door';
+  }
+  if(!target){
+    // No active beacon yet — usually the gap between pickup and next spawn.
+    if(nextSpawnAt > 0 && keysFound < keysTotal){
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `<span class="sense-dist">silence. another presence is forming.</span>`;
+    } else {
+      SENSE_EL.innerHTML = '';
+    }
+    return;
+  }
+  const dx=target.x-px, dy=target.y-py;
+  const bearing=bearingName(dx,dy);
+  const dd=distanceDescriptor(minD);
+  const noun = kind==='door' ? 'door'  : 'key';
+  const glyph = kind==='door' ? '█'    : '⚷';
+  const cls   = kind==='door' ? 't-door-sense' : 't-key-sense';
+  // Prose deliberately mirrors the sparse cadence of the existing event
+  // lines ("// release: …") so it reads as part of the world voice.
+  SENSE_EL.innerHTML =
+    `<span class="sense-prefix">// sense:</span> a faint ${noun} ` +
+    `<span class="${cls}">${glyph}</span> ${dd.verb} to the ` +
+    `<span class="sense-bearing">${bearing}</span> — ` +
+    `<span class="sense-dist">${dd.label}</span>.`;
 }
 
 function renderKeymeter(){
@@ -2387,11 +2646,18 @@ function renderKeymeter(){
     return;
   }
   KEYMETER_EL.style.display='block';
+  // Progressive reveal: only render slots for what currently exists in the
+  // world (found + active). Future picks are hinted by a single pending
+  // ellipsis when a spawn is scheduled, never as N dim slots — that would
+  // wrongly imply all keys are already out there.
   let row='';
-  for(let i=0;i<keysTotal;i++){
-    row += i<keysFound
-      ? `<span class="km-lit">⚷</span>`
-      : `<span class="km-dim">⚷</span>`;
+  for(let i=0;i<keysFound;i++){
+    row += `<span class="km-lit">⚷</span>`;
+  }
+  if(keyMap.size > 0){
+    row += `<span class="km-active">⚷</span>`;
+  } else if(nextSpawnAt > 0 && keysFound < keysTotal){
+    row += `<span class="km-pending">…</span>`;
   }
   const tail = door
     ? `<span class="km-door">— door active</span>`
@@ -2468,6 +2734,8 @@ function renderBoot(){
   CATALOG_EL.style.display='none';
   STATUS_EL.textContent='';
   document.getElementById('event').textContent='';
+  if(SENSE_EL) SENSE_EL.innerHTML='';
+  if(KEYMETER_EL){ KEYMETER_EL.innerHTML=''; KEYMETER_EL.style.display='none'; }
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
@@ -2489,7 +2757,8 @@ function loop(){
           }
         }
       }
-      renderMap(); renderCatalog(); renderStatus(); renderKeymeter();
+      maybeSpawnScheduledKey();
+      renderMap(); renderCatalog(); renderStatus(); renderSense(); renderKeymeter();
     }
     else renderBoot();
   }catch(err){
