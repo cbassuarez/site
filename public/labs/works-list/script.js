@@ -13,7 +13,7 @@
       "description": "Every other performance, this piece is entirely improvised. Every other performance, the performers follow the through-composed score. Structured quartet writing and permissioned noise passages are interleaved so form keeps sliding between rigor, mischief, and collapse.",
       "audio": "/audio/works-list/soundnoisemusic.mp3",
       "pdf": "/scores/works-list/string-quartet-2-soundnoisemusic-score.pdf",
-      "cover": null,
+      "cover": "",
       "media": {
         "kind": "score"
       },
@@ -31,9 +31,9 @@
       "title": "LetGo Letting Go",
       "oneliner": "conducted confessional cinema for projector + phone field",
       "description": "A conducted, confessional cinema system split across one projector surface and a field of NFC-identified phone participants. The Swift harness remains the timeline source of truth while backend sync, drift correction, and per-device overlays let meaning emerge from synchronized multi-device participation.",
-      "audio": null,
-      "pdf": null,
-      "cover": null,
+      "audio": "",
+      "pdf": "",
+      "cover": "",
       "media": {
         "kind": "youtube",
         "youtubeUrl": "https://www.youtube.com/watch?v=fV3o2fRln8A",
@@ -53,7 +53,7 @@
       "description": "transcription/recreation of track 1 on Amplifications (2024) album.",
       "audio": "/audio/works-list/amplifications-marimbaideefixe.mp3",
       "pdf": "/scores/works-list/amplifications-marimbaideefixe-score.pdf",
-      "cover": null,
+      "cover": "",
       "media": {
         "kind": "score"
       },
@@ -115,12 +115,15 @@
       "attribution": {
         "enabled": true
       }
+    },
+    "presentation": {
+      "scorePdfModeDefault": "interactive"
     }
   },
   "source": "user",
   "seeded": false,
   "count": 3,
-  "schemaVersion": "0.2.12",
+  "schemaVersion": "0.2.14",
   "warnings": []
 };
   var hasWindow = typeof window !== 'undefined';
@@ -226,9 +229,57 @@
   function praeChoosePdfViewer(input){
     var url = String(input || '').trim();
     if (!url) return '';
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url) && !/^\/\//.test(url)) {
+      try { url = new URL(url, location.href).toString(); } catch (_) {}
+    }
     var m = url.match(/https?:\/\/(?:drive|docs)\.google\.com\/file\/d\/([^/]+)\//);
     var file = m ? ('https://drive.google.com/uc?export=download&id=' + m[1]) : url;
     return 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(file) + '#page=1&zoom=page-width&toolbar=0&sidebar=0';
+  }
+
+  function praeNormalizeScorePdfMode(value, allowInherit){
+    var raw = String(value || '').trim().toLowerCase();
+    if (allowInherit && raw === 'inherit') return 'inherit';
+    if (raw === 'clean') return 'clean';
+    return 'interactive';
+  }
+
+  function praeResolveScorePdfMode(work, options){
+    var w = work && typeof work === 'object' ? work : {};
+    var score = w.pageFollow || w.score || null;
+    var cfg = options && options.config ? options.config : ((window.PRAE && window.PRAE.config) ? window.PRAE.config : {});
+    var projectDefault = praeNormalizeScorePdfMode(cfg && cfg.presentation ? cfg.presentation.scorePdfModeDefault : 'interactive', false);
+    var override = score && score.pdfMode != null
+      ? praeNormalizeScorePdfMode(score.pdfMode, true)
+      : 'inherit';
+    return override === 'inherit' ? projectDefault : override;
+  }
+
+  function praeApplyPdfFramePolicy(frame, work, options){
+    if (!frame) return 'interactive';
+    var opts = options || {};
+    var mode = opts.mode
+      ? praeNormalizeScorePdfMode(opts.mode, false)
+      : praeResolveScorePdfMode(work, opts);
+    var clean = mode === 'clean';
+    frame.setAttribute('data-prae-score-pdf-mode', mode);
+    if (clean) {
+      frame.setAttribute('tabindex', '-1');
+      frame.setAttribute('aria-disabled', 'true');
+      frame.style.pointerEvents = 'none';
+    } else {
+      frame.removeAttribute('tabindex');
+      frame.removeAttribute('aria-disabled');
+      frame.style.pointerEvents = '';
+    }
+    var container = opts.container;
+    if (container && typeof container.setAttribute === 'function') {
+      container.setAttribute('data-prae-score-pdf-mode', mode);
+      if (container.classList && typeof container.classList.toggle === 'function') {
+        container.classList.toggle('prae-score-pdf-clean', clean);
+      }
+    }
+    return mode;
   }
 
   function praeResolveWorkMedia(work){
@@ -524,6 +575,9 @@
     normalizeCoverUrl: praeNormalizeCoverUrl,
     setEmbedFrameMode: praeSetEmbedFrameMode,
     choosePdfViewer: praeChoosePdfViewer,
+    normalizeScorePdfMode: praeNormalizeScorePdfMode,
+    resolveScorePdfMode: praeResolveScorePdfMode,
+    applyPdfFramePolicy: praeApplyPdfFramePolicy,
     pauseAllAudio: praePauseAllAudio,
     emitPdfGoto: praeEmitPdfGoto,
     printedPageForTime: praePrintedPageForTime,
@@ -539,7 +593,10 @@
   window.PRAE.config.theme = data.config ? data.config.theme : "dark";
   window.PRAE.config.site  = data.config ? data.config.site  : {"firstName":"","lastName":"","fullName":"Seb Suarez","copyrightName":"","listLabel":"Labs Works List","subtitle":"three representative works","updated":{"mode":"auto","value":""},"links":[{"label":"Home","href":"/","external":false},{"label":"Works","href":"/works","external":false},{"label":"Contact","href":"/contact","external":false}]};
   window.PRAE.config.appearance = data.config ? data.config.appearance : {"theme":{"palette":"orange-blue-white-silver","monoBaseOklch":"oklch(0.62 0.09 250)"},"cursor":{"preset":"system"},"effects":{"hover":"balanced-neo","button":"balanced-neo"}};
+  window.PRAE.config.presentation = data.config ? data.config.presentation : {"scorePdfModeDefault":"interactive"};
   window.PRAE.config.branding = data.config ? data.config.branding : {"attribution":{"enabled":true}};
+  window.PRAE.config.presentation = window.PRAE.config.presentation || {};
+  window.PRAE.config.presentation.scorePdfModeDefault = praeNormalizeScorePdfMode(window.PRAE.config.presentation.scorePdfModeDefault, false);
   window.PRAE.warnings = Array.isArray(data.warnings) ? data.warnings : [];
 
   function praeNormalizeBranding(input){

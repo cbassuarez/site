@@ -291,6 +291,13 @@ function resolveWorkMedia(work) {
   };
 }
 
+function resolveScorePdfMode(work) {
+  if (praeMedia && typeof praeMedia.resolveScorePdfMode === 'function') {
+    try { return praeMedia.resolveScorePdfMode(work || {}); } catch (_) {}
+  }
+  return 'interactive';
+}
+
 function hasPlayableMedia(work) {
   const media = resolveWorkMedia(work);
   return media.kind === 'youtube' || !!media.audioUrl;
@@ -306,6 +313,15 @@ function normalizePdfUrl(url) {
   return url;
 }
 
+function getPdfSourceForWork(work) {
+  const media = resolveWorkMedia(work);
+  return normalizePdfUrl(media.pdfUrl || work?.pdf || '');
+}
+
+function hasPdfForWork(work) {
+  return !!getPdfSourceForWork(work);
+}
+
 function choosePdfViewer(url) {
   if (praeMedia && typeof praeMedia.choosePdfViewer === 'function') {
     try {
@@ -313,9 +329,34 @@ function choosePdfViewer(url) {
       if (chosen) return chosen;
     } catch (_) {}
   }
-  const match = String(url).match(/https?:\/\/(?:drive|docs)\.google\.com\/file\/d\/([^/]+)\//);
-  const file = match ? `https://drive.google.com/uc?export=download&id=${match[1]}` : url;
+  let resolved = String(url || '').trim();
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(resolved) && !/^\/\//.test(resolved)) {
+    try { resolved = new URL(resolved, location.href).toString(); } catch (_) {}
+  }
+  const match = resolved.match(/https?:\/\/(?:drive|docs)\.google\.com\/file\/d\/([^/]+)\//);
+  const file = match ? `https://drive.google.com/uc?export=download&id=${match[1]}` : resolved;
   return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(file)}#page=1&zoom=page-width&toolbar=0&sidebar=0`;
+}
+
+function applyPdfFramePolicy(frame, work, options = {}) {
+  if (!frame) return 'interactive';
+  if (praeMedia && typeof praeMedia.applyPdfFramePolicy === 'function') {
+    try {
+      return praeMedia.applyPdfFramePolicy(frame, work || {}, options);
+    } catch (_) {}
+  }
+  const mode = options.mode === 'clean'
+    ? 'clean'
+    : (options.mode === 'interactive' ? 'interactive' : resolveScorePdfMode(work));
+  const clean = mode === 'clean';
+  frame.setAttribute('data-prae-score-pdf-mode', mode);
+  frame.style.pointerEvents = clean ? 'none' : '';
+  if (clean) frame.setAttribute('tabindex', '-1');
+  else frame.removeAttribute('tabindex');
+  if (options.container && typeof options.container.setAttribute === 'function') {
+    options.container.setAttribute('data-prae-score-pdf-mode', mode);
+  }
+  return mode;
 }
 
 function ensureAudioFor(work) {
@@ -587,8 +628,8 @@ function openPdfFor(id) {
   const meta = findWorkById(id);
   if (!meta) return;
   const work = meta.data;
-  if (!work.pdf) return;
-  const raw = normalizePdfUrl(work.pdf);
+  const raw = getPdfSourceForWork(work);
+  if (!raw) return;
   const viewerUrl = choosePdfViewer(raw);
   const shell = state.pdf.shell;
   const pane = state.pdf.pane;
@@ -600,6 +641,7 @@ function openPdfFor(id) {
   }
   state.pdf.restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   state.pdf.currentSlug = work.slug || null;
+  setActiveTab('score');
   let initPage = 1;
   try {
     if (state.pageFollow.slug && state.pageFollow.slug === state.pdf.currentSlug) {
@@ -610,10 +652,10 @@ function openPdfFor(id) {
   } catch (_) {}
   if (title) title.textContent = String(work.title || 'Score');
   setEmbedFrameMode(frame, 'pdf');
+  applyPdfFramePolicy(frame, work, { container: pane });
   shell?.classList.add('has-pdf');
+  pane.removeAttribute('hidden');
   pane.setAttribute('aria-hidden', 'false');
-  state.pdf.backdrop?.removeAttribute('hidden');
-  document.documentElement.classList.add('ct-scroll-lock');
   frame.src = 'about:blank';
   requestAnimationFrame(() => {
     state.pdf.viewerReady = false;
@@ -636,12 +678,12 @@ function showYouTubePane(work, media) {
   state.pdf.currentSlug = work.slug || null;
   if (state.pdf.title) state.pdf.title.textContent = String(work.title || 'YouTube');
   setEmbedFrameMode(frame, 'youtube');
+  applyPdfFramePolicy(frame, work, { mode: 'interactive', container: pane });
   shell.classList.add('has-pdf');
+  pane.removeAttribute('hidden');
   pane.setAttribute('aria-hidden', 'false');
-  state.pdf.backdrop?.removeAttribute('hidden');
-  document.documentElement.classList.add('ct-scroll-lock');
   state.pdf.viewerReady = false;
-  frame.src = media?.youtubeEmbedUrl || media?.youtubeUrl || 'about:blank';
+  frame.src = 'about:blank';
 }
 
 function hidePdfPane() {
@@ -651,8 +693,7 @@ function hidePdfPane() {
   }
   shell?.classList.remove('has-pdf');
   pane?.setAttribute('aria-hidden', 'true');
-  state.pdf.backdrop?.setAttribute('hidden', '');
-  document.documentElement.classList.remove('ct-scroll-lock');
+  pane?.setAttribute('hidden', '');
   if (frame) frame.src = 'about:blank';
   state.pdf.currentSlug = null;
   state.pdf.viewerReady = false;
@@ -962,7 +1003,7 @@ function renderPanels() {
       detailsList.className = 'ct-details-list';
       const rows = [
         ['Playback', hasPlayableMedia(work) ? 'Available' : 'Unavailable'],
-        ['Score PDF', work.pdf ? 'Available' : 'Unavailable'],
+        ['Score PDF', hasPdfForWork(work) ? 'Available' : 'Unavailable'],
         ['Cue Points', String(Array.isArray(work.cues) ? work.cues.length : 0)]
       ];
       rows.forEach(([label, value]) => {
@@ -1086,7 +1127,7 @@ function renderPanels() {
   if (scorePanel) {
     if (!work) {
       scorePanel.innerHTML = `<div class="ct-empty">Select a work to view scores.</div>`;
-    } else if (!work.pdf) {
+    } else if (!hasPdfForWork(work)) {
       scorePanel.innerHTML = `<div class="ct-empty">No score available.</div>`;
     } else {
       scorePanel.innerHTML = '';
@@ -1108,6 +1149,12 @@ function renderPanels() {
       });
       wrapper.appendChild(openBtn);
       scorePanel.appendChild(wrapper);
+      if (resolveScorePdfMode(work) === 'clean') {
+        const note = document.createElement('p');
+        note.className = 'ct-muted';
+        note.textContent = 'Clean mode: viewer is locked; page changes follow cues/playback only.';
+        scorePanel.appendChild(note);
+      }
     }
   }
 }
@@ -1233,7 +1280,7 @@ function renderSummary() {
   const cards = [
     { key: 'total', title: 'Total Works', value: String(works.length) },
     { key: 'audio', title: 'Playable', value: String(works.filter((w) => hasPlayableMedia(w)).length) },
-    { key: 'pdf', title: 'With Scores', value: String(works.filter((w) => !!w.pdf).length) }
+    { key: 'pdf', title: 'With Scores', value: String(works.filter((w) => hasPdfForWork(w)).length) }
   ];
   let durationSum = 0;
   for (const work of works) {
@@ -1336,7 +1383,7 @@ function renderWorksList() {
     setActionButton(pdfBtn, 'document', 'PDF');
     pdfBtn.dataset.act = 'pdf';
     pdfBtn.dataset.id = String(work.id);
-    if (!work.pdf) pdfBtn.disabled = true;
+    if (!hasPdfForWork(work)) pdfBtn.disabled = true;
     const openBtn = document.createElement('button');
     openBtn.type = 'button';
     openBtn.className = 'work-action';
@@ -1454,7 +1501,7 @@ function renderActionRail() {
     </div>
     <div class="ct-rail-actions">
       <button type="button" class="ct-rail-btn" data-act="play" data-id="${work.id}" ${hasPlayableMedia(work) ? '' : 'disabled'}>${icon('play')}<span>Play</span></button>
-      <button type="button" class="ct-rail-btn" data-act="pdf" data-id="${work.id}" ${work.pdf ? '' : 'disabled'}>${icon('document')}<span>Score</span></button>
+      <button type="button" class="ct-rail-btn" data-act="pdf" data-id="${work.id}" ${hasPdfForWork(work) ? '' : 'disabled'}>${icon('document')}<span>Score</span></button>
       <button type="button" class="ct-rail-btn" data-act="copy" data-id="${work.id}">${icon('link')}<span>Copy Link</span></button>
       <button type="button" class="ct-rail-btn" data-act="open-window" data-id="${work.id}">${icon('arrowUpRight')}<span>New Tab</span></button>
     </div>
@@ -1579,31 +1626,13 @@ function bindPdfEvents() {
   state.pdf.close = document.querySelector('.ct-pdf-close');
   state.pdf.frame = document.querySelector('.ct-pdf-frame');
   state.pdf.backdrop = document.querySelector('[data-pdf-backdrop]');
+  if (state.pdf.pane && state.pdf.pane.getAttribute('aria-hidden') !== 'false') {
+    state.pdf.pane.setAttribute('hidden', '');
+  }
   if (state.pdf.close) {
     state.pdf.close.innerHTML = icon('xMark');
   }
   state.pdf.close?.addEventListener('click', hidePdfPane);
-  state.pdf.backdrop?.addEventListener('click', hidePdfPane);
-  if (state.pdf.pane) {
-    state.pdf.focusHandler = (event) => {
-      if (event.key !== 'Tab' || state.pdf.pane?.getAttribute('aria-hidden') === 'true') return;
-      const selectors = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-      const focusable = Array.from(state.pdf.pane.querySelectorAll(selectors)).filter((el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    state.pdf.pane.addEventListener('keydown', state.pdf.focusHandler);
-  }
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hidePdfPane();
   }, { passive: true });

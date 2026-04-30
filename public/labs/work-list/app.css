@@ -903,45 +903,28 @@ html.ct-scroll-lock body {
   transform: translateY(0);
 }
 
-.ct-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(6, 18, 36, 0.52);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--ct-dur-fast) var(--ct-ease);
-  z-index: 180;
-}
-
-.ct-shell.has-pdf .ct-backdrop {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .ct-pdfpane {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -46%) scale(0.97);
-  width: min(1040px, 94vw);
-  height: min(88vh, 900px);
   border: 2px solid var(--ct-border-strong);
   border-radius: var(--ct-radius-lg);
   background: color-mix(in srgb, var(--ct-surface) 96%, white 4%);
   box-shadow: var(--ct-shadow-soft);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  min-height: 0;
+  max-height: 0;
   opacity: 0;
+  transform: translateY(-8px);
   pointer-events: none;
-  z-index: 220;
   overflow: hidden;
-  transition: opacity var(--ct-dur-med) var(--ct-ease), transform var(--ct-dur-med) var(--ct-ease);
+  transition: opacity var(--ct-dur-med) var(--ct-ease), transform var(--ct-dur-med) var(--ct-ease), max-height var(--ct-dur-med) var(--ct-ease);
 }
 
 .ct-shell.has-pdf .ct-pdfpane {
   opacity: 1;
+  max-height: clamp(320px, 48vh, 700px);
   pointer-events: auto;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translateY(0);
 }
 
 .ct-pdfbar {
