@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import TmaydLabsPage from './tmayd/TmaydLabsPage';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
@@ -492,6 +493,39 @@ function WorksPage() {
         <p>
           <small>
             mobile fallback: [ <a href="/works-console/index.html?nostyle=1&headless=1">open works console directly</a> ]
+          </small>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function LabsWorksListPage() {
+  const isMobile = useIsMobile();
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>labs / works list</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <iframe
+        title="Praetorius Labs Works List"
+        src="/labs/works-list/index.html"
+        style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
+      />
+      {isMobile ? (
+        <p>
+          <small>
+            mobile fallback: [ <a href="/labs/works-list/index.html">open works list directly</a> ]
           </small>
         </p>
       ) : null}
@@ -1631,18 +1665,6 @@ function NotFoundPage() {
   );
 }
 
-function LegacyWorksRedirect() {
-  useEffect(() => {
-    window.location.replace('/works');
-  }, []);
-
-  return (
-    <p>
-      redirecting to <a href="/works">/works</a>...
-    </p>
-  );
-}
-
 function LegacyFeedHashRedirect() {
   useEffect(() => {
     window.location.replace('/feed');
@@ -1670,14 +1692,17 @@ export default function App() {
   const isContactPage = window.location.pathname.startsWith('/contact');
   const isColophonPage = window.location.pathname.startsWith('/colophon');
   const isTalkRecapPage = window.location.pathname.startsWith('/dma-2026');
-  const isLegacyWorksPage = /^\/labs\/works-list\/?$/i.test(pathname);
+  const isLabsWorksListPage = /^\/labs\/works?-list\/?$/i.test(pathname);
+  const isTmaydLabsPage = pathname.startsWith('/labs/tell-me-about-your-day');
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
   let page = pathname === '/' ? <HomePage /> : <NotFoundPage />;
-  if (isLegacyWorksPage) {
-    page = <LegacyWorksRedirect />;
+  if (isLabsWorksListPage) {
+    page = <LabsWorksListPage />;
   } else if (isLegacyFeedHash) {
     page = <LegacyFeedHashRedirect />;
+  } else if (isTmaydLabsPage) {
+    page = <TmaydLabsPage pathname={pathname} />;
   } else if (isAboutPage) {
     page = <AboutPage />;
   } else if (isWorksPage) {

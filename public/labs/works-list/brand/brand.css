@@ -1,0 +1,266 @@
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('./fonts/instrument-serif-400-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/space-grotesk-400-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/space-grotesk-700-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('./fonts/ibm-plex-mono-400-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --prae-font-display: 'Instrument Serif', 'Times New Roman', serif;
+  --prae-font-sans: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  --prae-font-mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  --prae-brand-ink: #0b1e3c;
+  --prae-brand-ink-soft: #4a5e7d;
+  --prae-brand-paper: #f4f8ff;
+  --prae-brand-paper-dark: #0d1a31;
+  --prae-brand-border: #9db2cf;
+  --prae-brand-accent: #2f7df0;
+  --prae-brand-accent-warm: #ff8f2f;
+  --prae-brand-radius: 2px;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--prae-font-sans);
+}
+
+.prae-brand-lockup,
+.prae-brand-powered,
+.prae-brand-callout,
+.prae-brand-footer,
+.prae-brand-wordmark {
+  color: var(--prae-brand-ink);
+}
+
+.prae-brand-lockup,
+.prae-brand-powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.46rem;
+}
+
+.prae-brand-mark {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.prae-brand-wordmark {
+  font-family: var(--prae-font-display);
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.prae-brand-powered {
+  border: 1px solid color-mix(in srgb, var(--prae-brand-border) 86%, transparent);
+  background: color-mix(in srgb, var(--prae-brand-paper) 88%, transparent);
+  border-radius: var(--prae-brand-radius);
+  padding: 0.32rem 0.52rem;
+  text-decoration: none;
+  min-height: 32px;
+}
+
+.prae-brand-powered:hover,
+.prae-brand-powered:focus-visible {
+  border-color: color-mix(in srgb, var(--prae-brand-accent) 45%, var(--prae-brand-border));
+  background: color-mix(in srgb, var(--prae-brand-paper) 72%, white);
+}
+
+.prae-brand-powered-prefix {
+  font-family: var(--prae-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--prae-brand-ink-soft);
+}
+
+.prae-brand-callouts {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.prae-brand-callout {
+  border: 1px solid color-mix(in srgb, var(--prae-brand-border) 86%, transparent);
+  background: color-mix(in srgb, var(--prae-brand-paper) 88%, transparent);
+  border-radius: var(--prae-brand-radius);
+  padding: 0.24rem 0.46rem;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  text-decoration: none;
+  font-family: var(--prae-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.prae-brand-callout:hover,
+.prae-brand-callout:focus-visible {
+  border-color: color-mix(in srgb, var(--prae-brand-accent) 45%, var(--prae-brand-border));
+}
+
+.prae-brand-callout-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding: 0.14rem 0.35rem;
+  border-radius: 1px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.prae-brand-callout--npm .prae-brand-callout-label {
+  background: #cb3837;
+  color: #fff;
+}
+
+.prae-brand-callout--github .prae-brand-callout-label {
+  background: var(--prae-brand-ink);
+  color: #fff;
+}
+
+.prae-brand-callout-hint {
+  color: var(--prae-brand-ink-soft);
+}
+
+.prae-brand-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.72rem;
+  align-items: center;
+  width: 100%;
+}
+
+.prae-brand-footer-main {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.prae-brand-owner-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.38rem;
+  row-gap: 0.22rem;
+  font-family: var(--prae-font-mono);
+  font-size: 0.74rem;
+}
+
+.prae-brand-owner {
+  color: var(--prae-brand-ink);
+}
+
+.prae-brand-updated {
+  color: var(--prae-brand-ink-soft);
+}
+
+.prae-brand-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.48rem;
+  min-width: 0;
+}
+
+.prae-brand-link {
+  font-family: var(--prae-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: color-mix(in srgb, var(--prae-brand-ink-soft) 82%, var(--prae-brand-ink));
+  border-bottom: 1px solid transparent;
+}
+
+.prae-brand-link:hover,
+.prae-brand-link:focus-visible {
+  color: var(--prae-brand-ink);
+  border-color: currentColor;
+}
+
+.prae-brand-footer-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+[data-theme='dark'] .prae-brand-powered,
+[data-theme='dark'] .prae-brand-callout {
+  background: color-mix(in srgb, var(--prae-brand-paper-dark) 84%, #0a1222 16%);
+  border-color: color-mix(in srgb, var(--prae-brand-border) 52%, #35527b 48%);
+  color: #f4f8ff;
+}
+
+[data-theme='dark'] .prae-brand-powered-prefix,
+[data-theme='dark'] .prae-brand-callout-hint,
+[data-theme='dark'] .prae-brand-link,
+[data-theme='dark'] .prae-brand-updated {
+  color: #b9c9df;
+}
+
+[data-theme='dark'] .prae-brand-wordmark,
+[data-theme='dark'] .prae-brand-owner,
+[data-theme='dark'] .prae-brand-lockup,
+[data-theme='dark'] .prae-brand-powered,
+[data-theme='dark'] .prae-brand-callout,
+[data-theme='dark'] .prae-brand-link:hover,
+[data-theme='dark'] .prae-brand-link:focus-visible {
+  color: #f4f8ff;
+}
+
+[data-theme='dark'] .prae-brand-mark {
+  color: #f4f8ff;
+}
+
+@media (max-width: 860px) {
+  .prae-brand-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .prae-brand-footer-meta {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prae-brand-powered,
+  .prae-brand-callout,
+  .prae-brand-link {
+    transition: none !important;
+  }
+}

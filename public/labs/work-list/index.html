@@ -1,0 +1,79 @@
+<!doctype html>
+<html data-skin="cards-tabs" data-ui-runtime="vanilla" data-theme="dark" data-palette="mono-bw" data-cursor="system" data-hover-effect="balanced-neo" data-button-effect="balanced-neo" data-brand-system="praetorius-v1" data-brand-attribution="on" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Praetorius - Cards Tabs Gallery</title>
+  <meta name="prae-data-source" content="user">
+</head>
+<body class="prae-theme-dark prae-theme-dark" data-theme="dark" data-prae-banner>
+  <header class="ct-header" role="banner">
+    <div class="ct-header-left">
+      <div class="ct-brand">
+        <span class="ct-title" data-site-title>Praetorius</span>
+        <span class="ct-subtitle" data-site-subtitle>Neo-Brutal Gallery</span>
+      </div>
+      <nav id="prae-nav" class="ct-nav" aria-label="Site"></nav>
+    </div>
+    <div class="ct-header-right">
+      <button id="wc-theme-toggle" class="ct-theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle theme" title="Toggle theme">
+        <span class="sr-only">Toggle theme</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="ct-shell" role="main">
+    <section class="ct-stage" aria-label="Portfolio stage">
+      <div class="ct-stage-copy">
+        <p class="ct-stage-kicker">Cards-Tabs 2026</p>
+        <h1 class="ct-stage-title">Selected Works</h1>
+        <p class="ct-stage-sub">Choose a work from the board to inspect details, cues, score, and playback controls.</p>
+      </div>
+      <aside id="ct-summary" class="ct-summary" aria-label="Portfolio summary"></aside>
+    </section>
+
+    <div class="ct-grid">
+      <section class="ct-column ct-column-left" aria-label="Works board">
+        <section id="works-console" class="ct-works" aria-label="Works list"></section>
+      </section>
+
+      <aside class="ct-column ct-column-right" aria-label="Inspector">
+        <section id="ct-tabs" class="ct-tabs" aria-label="Work details">
+          <div class="ct-tablist" role="tablist" aria-label="Work detail tabs">
+            <button type="button" class="ct-tab" id="ct-tab-details" role="tab" data-tab="details" aria-selected="true" aria-controls="ct-panel-details" tabindex="0">Details</button>
+            <button type="button" class="ct-tab" id="ct-tab-cues" role="tab" data-tab="cues" aria-selected="false" aria-controls="ct-panel-cues" tabindex="-1">Cues</button>
+            <button type="button" class="ct-tab" id="ct-tab-playback" role="tab" data-tab="playback" aria-selected="false" aria-controls="ct-panel-playback" tabindex="-1">Playback</button>
+            <button type="button" class="ct-tab" id="ct-tab-score" role="tab" data-tab="score" aria-selected="false" aria-controls="ct-panel-score" tabindex="-1">Score</button>
+            <span class="ct-tab-indicator" aria-hidden="true"></span>
+          </div>
+          <div class="ct-tabpanels">
+            <article id="ct-panel-details" class="ct-panel" role="tabpanel" tabindex="0" aria-labelledby="ct-tab-details"></article>
+            <article id="ct-panel-cues" class="ct-panel" role="tabpanel" tabindex="0" aria-labelledby="ct-tab-cues" hidden></article>
+            <article id="ct-panel-playback" class="ct-panel" role="tabpanel" tabindex="0" aria-labelledby="ct-tab-playback" hidden></article>
+            <article id="ct-panel-score" class="ct-panel" role="tabpanel" tabindex="0" aria-labelledby="ct-tab-score" hidden></article>
+          </div>
+        </section>
+
+        <aside id="ct-action-rail" class="ct-action-rail" aria-label="Action rail"></aside>
+      </aside>
+    </div>
+
+    <div class="ct-backdrop" data-pdf-backdrop hidden></div>
+    <aside class="ct-pdfpane vb-pdfpane" aria-label="Score PDF" aria-hidden="true" role="dialog" aria-modal="true">
+      <header class="ct-pdfbar">
+        <div class="ct-pdf-title vb-pdf-title" aria-live="polite"></div>
+        <button type="button" class="ct-pdf-close vb-pdf-close" aria-label="Close PDF"></button>
+      </header>
+      <iframe class="ct-pdf-frame vb-pdf-frame" title="Score PDF" loading="lazy" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+    </aside>
+  </main>
+
+  <footer id="prae-footer" class="ct-footer" role="contentinfo"></footer>
+<link rel="stylesheet" href="./brand/brand.css">
+<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./app.css">
+<script id="prae-data" data-source="user" data-count="3">window.__PRAE_DATA__ = {"works":[{"id":1,"slug":"string-quartet-2-soundnoisemusic","title":"String Quartet No. 2 \"soundnoisemusic\"","oneliner":"string quartet","description":"Every other performance, this piece is entirely improvised. Every other performance, the performers follow the through-composed score. Structured quartet writing and permissioned noise passages are interleaved so form keeps sliding between rigor, mischief, and collapse.","audio":"/audio/works-list/soundnoisemusic.mp3","pdf":"/scores/works-list/string-quartet-2-soundnoisemusic-score.pdf","cover":null,"media":{"kind":"score"},"cues":[],"audioUrl":"/audio/works-list/soundnoisemusic.mp3","pdfUrl":"/scores/works-list/string-quartet-2-soundnoisemusic-score.pdf","audioId":"wc-a1","one":"string quartet","onelinerEffective":"string quartet","descriptionEffective":"Every other performance, this piece is entirely improvised. Every other performance, the performers follow the through-composed score. Structured quartet writing and permissioned noise passages are interleaved so form keeps sliding between rigor, mischief, and collapse."},{"id":2,"slug":"let-go-letting-go","title":"LetGo Letting Go","oneliner":"conducted confessional cinema for projector + phone field","description":"A conducted, confessional cinema system split across one projector surface and a field of NFC-identified phone participants. The Swift harness remains the timeline source of truth while backend sync, drift correction, and per-device overlays let meaning emerge from synchronized multi-device participation.","audio":null,"pdf":null,"cover":null,"media":{"kind":"youtube","youtubeUrl":"https://www.youtube.com/watch?v=fV3o2fRln8A","startAtSec":0},"cues":[],"audioId":"wc-a2","one":"conducted confessional cinema for projector + phone field","onelinerEffective":"conducted confessional cinema for projector + phone field","descriptionEffective":"A conducted, confessional cinema system split across one projector surface and a field of NFC-identified phone participants. The Swift harness remains the timeline source of truth while backend sync, drift correction, and per-device overlays let meaning emerge from synchronized multi-device participation."},{"id":3,"slug":"amplifications-i-marimbaideefixe","title":"AMPLIFICATIONS: I. marimbaideefixe","oneliner":"for solo piano-amplified marimba","description":"transcription/recreation of track 1 on Amplifications (2024) album.","audio":"/audio/works-list/amplifications-marimbaideefixe.mp3","pdf":"/scores/works-list/amplifications-marimbaideefixe-score.pdf","cover":null,"media":{"kind":"score"},"cues":[],"audioUrl":"/audio/works-list/amplifications-marimbaideefixe.mp3","pdfUrl":"/scores/works-list/amplifications-marimbaideefixe-score.pdf","audioId":"wc-a3","one":"for solo piano-amplified marimba","onelinerEffective":"for solo piano-amplified marimba","descriptionEffective":"transcription/recreation of track 1 on Amplifications (2024) album."}],"pageFollowMaps":{},"config":{"theme":"dark","site":{"firstName":"","lastName":"","fullName":"Seb Suarez","copyrightName":"","listLabel":"Labs Works List","subtitle":"three representative works","updated":{"mode":"auto","value":""},"links":[{"label":"Home","href":"/","external":false},{"label":"Works","href":"/works","external":false},{"label":"Contact","href":"/contact","external":false}]},"appearance":{"theme":{"palette":"mono-bw","monoBaseOklch":"oklch(0.62 0.09 250)"},"cursor":{"preset":"system"},"effects":{"hover":"balanced-neo","button":"balanced-neo"}},"branding":{"attribution":{"enabled":true}}},"source":"user","seeded":false,"count":3,"schemaVersion":"0.2.12","warnings":[]};</script>
+<script src="./script.js" defer></script>
+<script type="module" src="./app.js" defer></script>
+</body>
+</html>

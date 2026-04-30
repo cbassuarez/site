@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 120" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Praetorius Horizontal Lockup</title>
+  <g transform="translate(0 8)">
+    <g stroke="#0b1e3c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="52" cy="52" r="34"/>
+      <circle cx="52" cy="52" r="8" fill="#0b1e3c"/>
+      <path d="M52 20c11 9 18 18 22 31"/>
+      <path d="M52 20c11 9 18 18 22 31" transform="rotate(60 52 52)"/>
+      <path d="M52 20c11 9 18 18 22 31" transform="rotate(120 52 52)"/>
+      <path d="M52 20c11 9 18 18 22 31" transform="rotate(180 52 52)"/>
+      <path d="M52 20c11 9 18 18 22 31" transform="rotate(240 52 52)"/>
+      <path d="M52 20c11 9 18 18 22 31" transform="rotate(300 52 52)"/>
+    </g>
+  </g>
+  <text x="132" y="76" font-size="72" font-family="'Instrument Serif', serif" fill="#0b1e3c" letter-spacing="0.8">Praetorius</text>
+</svg>

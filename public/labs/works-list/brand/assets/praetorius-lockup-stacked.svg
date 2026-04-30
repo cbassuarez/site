@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 240" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Praetorius Stacked Lockup</title>
+  <g transform="translate(146 16)" stroke="#0b1e3c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="64" r="44"/>
+    <circle cx="64" cy="64" r="10" fill="#0b1e3c"/>
+    <path d="M64 26c14 12 24 24 28 40"/>
+    <path d="M64 26c14 12 24 24 28 40" transform="rotate(60 64 64)"/>
+    <path d="M64 26c14 12 24 24 28 40" transform="rotate(120 64 64)"/>
+    <path d="M64 26c14 12 24 24 28 40" transform="rotate(180 64 64)"/>
+    <path d="M64 26c14 12 24 24 28 40" transform="rotate(240 64 64)"/>
+    <path d="M64 26c14 12 24 24 28 40" transform="rotate(300 64 64)"/>
+  </g>
+  <text x="58" y="212" font-size="74" font-family="'Instrument Serif', serif" fill="#0b1e3c" letter-spacing="0.8">Praetorius</text>
+</svg>

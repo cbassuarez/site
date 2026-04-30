@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 120" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Powered by Praetorius</title>
+  <rect x="1" y="1" width="538" height="118" rx="8" stroke="#9db2cf" fill="#f4f8ff"/>
+  <text x="30" y="50" font-size="24" font-family="'IBM Plex Mono', monospace" fill="#4a5e7d" letter-spacing="1.4">POWERED BY</text>
+  <g transform="translate(32 56)">
+    <g stroke="#0b1e3c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="26" cy="26" r="18"/>
+      <circle cx="26" cy="26" r="4" fill="#0b1e3c"/>
+      <path d="M26 10c6 5 10 10 12 17"/>
+      <path d="M26 10c6 5 10 10 12 17" transform="rotate(60 26 26)"/>
+      <path d="M26 10c6 5 10 10 12 17" transform="rotate(120 26 26)"/>
+      <path d="M26 10c6 5 10 10 12 17" transform="rotate(180 26 26)"/>
+      <path d="M26 10c6 5 10 10 12 17" transform="rotate(240 26 26)"/>
+      <path d="M26 10c6 5 10 10 12 17" transform="rotate(300 26 26)"/>
+    </g>
+  </g>
+  <text x="100" y="95" font-size="52" font-family="'Instrument Serif', serif" fill="#0b1e3c">Praetorius</text>
+</svg>

@@ -1,0 +1,69 @@
+{
+  "id": "praetorius-brand-system",
+  "version": "1.0.0",
+  "released": "2026-04-26",
+  "glyph": "orbit-iris",
+  "tokens": {
+    "colors": {
+      "ink": "#0b1e3c",
+      "inkSoft": "#4a5e7d",
+      "paper": "#f4f8ff",
+      "paperDark": "#0d1a31",
+      "accent": "#2f7df0",
+      "accentWarm": "#ff8f2f",
+      "silver": "#d7dfed"
+    },
+    "fonts": {
+      "display": "Instrument Serif",
+      "sans": "Space Grotesk",
+      "mono": "IBM Plex Mono"
+    },
+    "clearSpace": {
+      "mark": "0.5x",
+      "lockupHorizontal": "0.5x",
+      "lockupStacked": "0.5x"
+    },
+    "minSizePx": {
+      "mark": 20,
+      "wordmark": 88,
+      "poweredBy": 126,
+      "badge": 96
+    }
+  },
+  "assets": {
+    "mark": "assets/praetorius-mark.svg",
+    "wordmark": "assets/praetorius-wordmark.svg",
+    "lockupHorizontal": "assets/praetorius-lockup-horizontal.svg",
+    "lockupStacked": "assets/praetorius-lockup-stacked.svg",
+    "poweredBy": "assets/powered-by-praetorius.svg",
+    "badges": {
+      "npm": {
+        "light": "assets/badges/npm-light.svg",
+        "dark": "assets/badges/npm-dark.svg",
+        "mono": "assets/badges/npm-mono.svg",
+        "inverse": "assets/badges/npm-inverse.svg"
+      },
+      "github": {
+        "light": "assets/badges/github-light.svg",
+        "dark": "assets/badges/github-dark.svg",
+        "mono": "assets/badges/github-mono.svg",
+        "inverse": "assets/badges/github-inverse.svg"
+      }
+    }
+  },
+  "usage": {
+    "allowedBackgrounds": ["light", "dark", "neutral", "photo-with-overlay"],
+    "rules": [
+      "Do not stretch or skew lockups.",
+      "Do not separate mark and wordmark from canonical lockup ratios.",
+      "Use contrast-safe pairings (WCAG 2.1 AA or better for text lockups).",
+      "Keep clear-space around lockups per manifest tokens."
+    ],
+    "preferredFooterOrder": [
+      "site identity",
+      "site links",
+      "powered by praetorius",
+      "official npm and github callouts"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 64" role="img" aria-labelledby="title">
+  <title id="title">npm badge light</title>
+  <rect width="268" height="64" rx="6" fill="#f4f8ff" stroke="#9db2cf"/>
+  <rect x="8" y="12" width="54" height="40" rx="4" fill="#cb3837"/>
+  <text x="35" y="38" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="16" fill="#fff">npm</text>
+  <text x="74" y="38" font-family="'IBM Plex Mono', monospace" font-size="16" fill="#0b1e3c">praetorius</text>
+</svg>

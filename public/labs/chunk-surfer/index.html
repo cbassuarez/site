@@ -11,6 +11,55 @@
     #wrap{display:flex;flex-direction:column;height:100vh;padding:10px 14px;position:relative;}
     #map{flex:1;overflow:hidden;font-family:'Courier New',Courier,monospace;font-size:13px;line-height:1.38;white-space:pre;letter-spacing:0;background:transparent;transition:background 360ms ease-out;}
     #map.flash{background:rgba(230,236,245,0.85);transition:background 80ms linear;}
+    #map.hush-hit{
+      filter:contrast(2.2) brightness(1.85) saturate(0.2);
+      transform:translate3d(0,0,0);
+      animation:hush-hit-glitch 210ms steps(3,end);
+    }
+    @keyframes hush-hit-glitch{
+      0%   { transform:translate(0,0) skewX(0deg); }
+      25%  { transform:translate(-2px,1px) skewX(-2deg); }
+      55%  { transform:translate(2px,-1px) skewX(2deg); }
+      100% { transform:translate(0,0) skewX(0deg); }
+    }
+    #hushJump{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index:6;
+      opacity:0;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0, rgba(255,255,255,0.58) 14%, rgba(0,0,0,0.98) 48%, rgba(0,0,0,1) 100%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.14) 0, rgba(255,255,255,0.14) 2px, rgba(0,0,0,0.84) 2px, rgba(0,0,0,0.84) 4px);
+      mix-blend-mode:screen;
+    }
+    #hushJump.active{
+      opacity:1;
+      animation:hush-jump-rupture 430ms steps(6,end);
+    }
+    #hushJump.blink{
+      opacity:1;
+      animation:hush-blink-rupture 220ms steps(4,end);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.18) 0, rgba(0,0,0,0.98) 48%, rgba(0,0,0,1) 100%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 2px, rgba(0,0,0,0.86) 2px, rgba(0,0,0,0.86) 5px);
+      mix-blend-mode:normal;
+    }
+    @keyframes hush-jump-rupture{
+      0%   { opacity:0; transform:scale(1.15); filter:contrast(2.5) invert(0); }
+      12%  { opacity:1; transform:scale(1.0); filter:contrast(3.2) invert(0.8); }
+      34%  { opacity:0.25; transform:scale(1.03); filter:contrast(2.8) invert(0); }
+      54%  { opacity:1; transform:scale(0.99); filter:contrast(3.4) invert(1); }
+      78%  { opacity:0.48; transform:scale(1.01); filter:contrast(2.0) invert(0.2); }
+      100% { opacity:0; transform:scale(1); filter:contrast(1.0) invert(0); }
+    }
+    @keyframes hush-blink-rupture{
+      0%   { opacity:0.0; filter:contrast(1.1) blur(0px); }
+      22%  { opacity:0.95; filter:contrast(2.1) blur(1px); }
+      45%  { opacity:0.45; filter:contrast(1.6) blur(0px); }
+      68%  { opacity:0.88; filter:contrast(2.5) blur(1.6px); }
+      100% { opacity:0.0; filter:contrast(1.0) blur(0px); }
+    }
     #catalog{display:none;border-top:1px solid #222;margin-top:6px;padding-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;color:#8d8d8d;min-height:6.2em;}
     #catalogCtl{margin-top:6px;font-family:'Courier New',Courier,monospace;font-size:12px;}
     #catalogCtl button{font:inherit;color:#999;background:#111;border:1px solid #333;padding:2px 8px;cursor:pointer;}
@@ -107,9 +156,112 @@
     }
     .t-door-core {color:#ffffff;font-weight:bold;text-shadow:0 0 2px rgba(255,255,255,0.95),0 0 9px rgba(228,242,255,0.55),0 0 22px rgba(180,200,255,0.45),0 0 48px rgba(140,180,255,0.35);}
     .t-door-aura {color:rgba(255,255,255,0.88);text-shadow:-1px 0 0 rgba(255,90,168,0.55),1px 0 0 rgba(120,236,255,0.55),0 0 8px rgba(238,244,255,0.45);}
+    #sense .t-hush-sense {
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:0 0 3px rgba(255,255,255,0.95),0 0 10px rgba(240,246,255,0.88),0 0 20px rgba(185,212,255,0.58);
+    }
+    #sense .t-eye-sense {
+      color:#d8e6ff;
+      text-shadow:0 0 8px rgba(196,220,255,0.45);
+    }
+    .t-eye{
+      color:rgba(230,236,245,0.84);
+      text-shadow:0 0 5px rgba(255,255,255,0.42),0 0 12px rgba(222,238,255,0.28);
+    }
+    .t-eye-near{
+      color:#ffffff;
+      text-shadow:0 0 4px rgba(255,255,255,0.95),0 0 12px rgba(255,255,255,0.86),0 0 26px rgba(205,220,255,0.72);
+      font-weight:bold;
+    }
+    .t-eye-ping{
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:0 0 3px rgba(255,255,255,0.95),0 0 9px rgba(255,255,255,0.85),0 0 20px rgba(200,220,255,0.62);
+    }
+    .t-hush{
+      color:rgba(255,255,255,0.98);
+      font-weight:bold;
+      text-shadow:0 0 3px rgba(255,255,255,0.95),0 0 11px rgba(255,255,255,0.82),0 0 28px rgba(210,226,255,0.66),0 0 56px rgba(150,172,220,0.45);
+    }
+    .t-hush-core{
+      color:#f4f6fb;
+      font-weight:bold;
+      text-shadow:
+        -1px 0 0 rgba(255,120,120,0.4),
+        1px 0 0 rgba(165,210,255,0.4),
+        0 0 4px rgba(255,255,255,0.82),
+        0 0 16px rgba(214,228,255,0.58),
+        0 0 38px rgba(130,156,205,0.42);
+    }
+    .t-hush-edge{
+      color:rgba(210,218,232,0.82);
+      text-shadow:
+        0 0 3px rgba(214,224,244,0.38),
+        0 0 11px rgba(138,164,204,0.34);
+    }
+    .t-hush-aura{
+      color:rgba(156,170,192,0.3);
+      text-shadow:0 0 7px rgba(156,182,222,0.28);
+    }
+    .t-statue{
+      color:rgba(226,232,242,0.78);
+      text-shadow:0 0 4px rgba(205,215,235,0.35),0 0 11px rgba(170,190,222,0.24);
+    }
+    .t-statue-lurch{
+      color:#ffffff;
+      font-weight:bold;
+      text-shadow:0 0 4px rgba(255,255,255,0.88),0 0 12px rgba(220,234,255,0.78),0 0 24px rgba(175,206,255,0.62);
+    }
+    .t-sw2-rite{
+      color:rgba(196,206,224,0.36);
+      text-shadow:0 0 4px rgba(178,196,228,0.2);
+    }
+    .t-sw2-hub{
+      color:rgba(224,232,246,0.84);
+      text-shadow:0 0 4px rgba(220,230,248,0.42);
+    }
+    .t-sw2-anchor{
+      color:rgba(204,214,230,0.74);
+      text-shadow:0 0 5px rgba(196,210,232,0.32);
+    }
+    .t-sw2-adversary{
+      color:rgba(238,242,250,0.88);
+      text-shadow:0 0 6px rgba(222,234,252,0.44),0 0 14px rgba(178,196,228,0.26);
+    }
+    .t-sw2-adversary-dim{
+      color:rgba(182,192,208,0.52);
+      text-shadow:0 0 3px rgba(168,182,205,0.22);
+    }
+    .t-sw2-adversary-dark{
+      color:rgba(245,248,255,0.96);
+      font-weight:bold;
+      text-shadow:0 0 4px rgba(255,255,255,0.92),0 0 15px rgba(218,232,255,0.6),0 0 28px rgba(168,196,242,0.34);
+    }
+    .t-sw2-adversary-aura{
+      color:rgba(220,230,246,0.36);
+      text-shadow:0 0 7px rgba(192,210,242,0.28);
+    }
+    .t-sw2-mass{
+      color:rgba(160,172,194,0.3);
+      text-shadow:0 0 9px rgba(150,176,218,0.18);
+    }
+    .t-sw2-gate{
+      color:#f5f9ff;
+      font-weight:bold;
+      text-shadow:
+        0 0 3px rgba(255,255,255,0.95),
+        0 0 12px rgba(220,236,255,0.8),
+        0 0 26px rgba(162,194,242,0.58);
+    }
+    .t-sw2-gate-aura{
+      color:rgba(225,236,252,0.58);
+      text-shadow:0 0 8px rgba(188,214,248,0.36);
+    }
     #keymeter{display:none;border-top:1px solid #2a2418;margin-top:6px;padding:6px 2px 2px;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.5;color:#888;letter-spacing:0.45em;}
     #keymeter .km-label{letter-spacing:0.18em;font-size:12px;color:#998060;margin-left:0.6em;opacity:0.85;}
     #keymeter .km-door {letter-spacing:0.18em;font-size:12px;color:#cfd6ee;margin-left:0.6em;text-shadow:0 0 6px rgba(200,220,255,0.5);}
+    #keymeter .km-danger {letter-spacing:0.18em;font-size:12px;color:#ffd8d8;margin-left:0.6em;text-shadow:0 0 5px rgba(255,180,180,0.65);}
     .km-lit{color:#ffffff;font-weight:bold;text-shadow:0 0 4px #ffffff,0 0 12px rgba(238,244,255,0.85),0 0 22px rgba(200,220,255,0.55);}
     .km-active{color:#ffffff;font-weight:bold;text-shadow:0 0 3px #ffffff,0 0 8px rgba(238,244,255,0.7),0 0 16px rgba(200,220,255,0.45);animation: key-pulse 1.6s ease-in-out infinite;}
     .km-pending{color:#5d6373;letter-spacing:0.1em;animation: km-pending-pulse 2.2s ease-in-out infinite;}
@@ -230,9 +382,12 @@
   </div>
   <div id="map"></div>
   <div id="introVignette"></div>
+  <div id="hushJump"></div>
   <div id="catalogCtl">
     <button id="catalogToggleBtn" type="button">catalog [c]</button>
     <button id="onboardingToggleBtn" type="button">onboarding [o] (on)</button>
+    <button id="subWorld2Btn" type="button">sub world 2</button>
+    <button id="debugKeysBtn" type="button">debug: grant keys</button>
   </div>
   <div id="catalog"></div>
   <div id="event"></div>
@@ -508,6 +663,8 @@ let voidFatigue=0;             // 0..1, increases while trudging wilderness
 let worldBoundaryLatch=false;   // hysteresis latch for seam resistance
 let worldBoundaryFriction=0;    // 0..1 smoothed seam resistance
 let lastMoveAtMs=0;            // throttles tap/hold movement uniformly
+let lastStepDx=0;
+let lastStepDy=0;
 let allFilesLoaded=false;
 let lastVoidSinkMsgStep=-9999;
 let gateFlashTimer=null;
@@ -519,6 +676,133 @@ let door=null;          // {x,y} once spawned (after final key)
 let nextSpawnAt=0;      // ms timestamp for next scheduled key spawn (0 = none)
 let depth=0;            // 0 = overworld; each door descent increments by 1
 let onboardingHoldLastMs=0;
+let subWorld1Start={x:0,y:0};
+let subWorld2Start={x:0,y:0};
+let subWorld2HasKeys=false;
+
+const HORROR_SEQUENCE = {
+  OFF: 'off',
+  HORROR_ONSET: 'horror_onset',
+  CHASE_PRESSURE: 'chase_pressure',
+  DOOR_SWARM: 'statue_corridor',
+  DESCENT_RUPTURE: 'descent_rupture',
+};
+const HUSH_TUNE = {
+  chaseSpeedRatio: 0.85,
+  surgeMinRatio: 1.12,
+  surgeMaxRatio: 1.82,
+  catchDistance: 0.78,
+  onsetMs: 1100,
+  maxEyes: 56,
+};
+const SW2_PHASE = {
+  OFF: 'off',
+  BOOT_SILENCE: 'sw2_boot_silence',
+  AREA_LOOP: 'sw2_area_loop',
+  FINAL_DARK: 'sw2_final_dark',
+  POST_DOOR: 'sw2_post_door',
+};
+const SW2_TUNE = {
+  bootSilenceMs: 2000,
+  areaCount: 3,
+  areaDist: 16,
+  areaEnterRadius: 8,
+  grabMinRadius: 1.8,
+  grabMaxRadius: 3.8,
+  killRadiusBase: 1.05,
+  killRadiusFailStep: 0.18,
+  hubDepositRadius: 2.2,
+  approachFreshMs: 320,
+  revealMs: 2200,
+  darknessStep: 0.15,
+  darknessMax: 0.9,
+  finalDoorDist: 22,
+  finalCatchRadius: 1.2,
+  finalDriftSpeed: 0.34,
+  finalLossCooldownMs: 1400,
+  finalVisionRadius: 26,
+  debugFastAreas: 2,
+  punctuationMinMs: 1400,
+  punctuationMaxMs: 2600,
+};
+const SW2_AUDIO_URL = '/labs/chunk-surfer/audio/hapax-recording.mp3';
+let horrorPhase=HORROR_SEQUENCE.OFF;
+let horrorStartMs=0;
+let horrorLastTickMs=0;
+let hush={
+  active:false,
+  x:0,
+  y:0,
+  vx:0,
+  vy:0,
+};
+let hushEyes=[]; // [{x,y,phase,lastPingAt,nextPingAt}]
+let hushPingHeat=0;
+let lastHushEventMs=0;
+let nextDoorSwarmPulseMs=0;
+let doorSwarmStartMs=0;
+let doorSwarmArmMs=0;
+let doorSwarmRadius=0;
+let doorSwarmCenter=null;
+let hushHitTimer=null;
+let hushJumpTimer=null;
+let hushPunishLockUntilMs=0;
+let doorRevealCutscene=false;
+let doorRevealStartedMs=0;
+let doorRevealEndsMs=0;
+let doorRevealTriggered=false;
+let doorRevealHushTarget=null;
+let hushLockedUntilMs=0;
+let hushLastDist=Infinity;
+let hushLastAdvanceTowardMs=0;
+let hushLastRetreatMs=0;
+let hushBlinkActive=false;
+let hushBlinkEndsMs=0;
+let hushBlinkNextAtMs=0;
+let hushBlinkStress=0;
+let hushBlinkNextLurchMs=0;
+let hushBlinkLurchesRemaining=0;
+let corridorStatues=[]; // [{t,side,wobble,pulse,x,y,lurch}]
+let sw2={
+  active:false,
+  phase:SW2_PHASE.OFF,
+  phaseStartedMs:0,
+  startedAtMs:0,
+  hubX:0,
+  hubY:0,
+  areas:[],
+  currentAreaIdx:0,
+  heldItem:false,
+  heldFromArea:-1,
+  completedCount:0,
+  failCount:0,
+  darkness:0,
+  doorActive:false,
+  doorX:0,
+  doorY:0,
+  doorArmedAt:0,
+  firstLineShown:false,
+  finalLineShown:false,
+  punctuationAtMs:0,
+  caught:false,
+  driverEnergy:0,
+  lastLossMs:0,
+  charge:0,
+};
+let sw2Audio={
+  loaded:false,
+  loading:false,
+  buffer:null,
+  envelope:null,
+  bedSrc:null,
+  bedGain:null,
+  stretchSrc:null,
+  stretchGain:null,
+  startedAt:0,
+  drive:0,
+  paulMix:0,
+  punctAtMs:0,
+};
 
 const WEIRD=[
   [50, '// echo detected in the distance.'],
@@ -1588,16 +1872,1148 @@ function placeBeacon(cx, cy, minDist, maxDist){
   };
 }
 
+function isHorrorActive(){
+  return horrorPhase!==HORROR_SEQUENCE.OFF;
+}
+
+function hushDistance(){
+  if(!hush.active) return Infinity;
+  return Math.hypot(hush.x-px, hush.y-py);
+}
+
+function setSubWorld1Checkpoint(x, y){
+  subWorld1Start={x:Math.round(x), y:Math.round(y)};
+}
+
+function resetSw2State(){
+  sw2.active=false;
+  sw2.phase=SW2_PHASE.OFF;
+  sw2.phaseStartedMs=0;
+  sw2.startedAtMs=0;
+  sw2.hubX=0;
+  sw2.hubY=0;
+  sw2.areas=[];
+  sw2.currentAreaIdx=0;
+  sw2.heldItem=false;
+  sw2.heldFromArea=-1;
+  sw2.completedCount=0;
+  sw2.failCount=0;
+  sw2.darkness=0;
+  sw2.doorActive=false;
+  sw2.doorX=0;
+  sw2.doorY=0;
+  sw2.doorArmedAt=0;
+  sw2.firstLineShown=false;
+  sw2.finalLineShown=false;
+  sw2.punctuationAtMs=0;
+  sw2.caught=false;
+  sw2.driverEnergy=0;
+  sw2.lastLossMs=0;
+  sw2.charge=0;
+}
+
+function stopSw2AudioLayer(){
+  if(sw2Audio.bedSrc){
+    try{ sw2Audio.bedSrc.stop(); }catch(_){}
+    try{ sw2Audio.bedSrc.disconnect(); }catch(_){}
+    sw2Audio.bedSrc=null;
+  }
+  if(sw2Audio.stretchSrc){
+    try{ sw2Audio.stretchSrc.stop(); }catch(_){}
+    try{ sw2Audio.stretchSrc.disconnect(); }catch(_){}
+    sw2Audio.stretchSrc=null;
+  }
+  if(sw2Audio.bedGain){
+    try{ sw2Audio.bedGain.disconnect(); }catch(_){}
+    sw2Audio.bedGain=null;
+  }
+  if(sw2Audio.stretchGain){
+    try{ sw2Audio.stretchGain.disconnect(); }catch(_){}
+    sw2Audio.stretchGain=null;
+  }
+  sw2Audio.startedAt=0;
+}
+
+function buildSw2Envelope(buffer, bins=1024){
+  const data=buffer.getChannelData(0);
+  const out=new Float32Array(bins);
+  const step=Math.max(1, Math.floor(data.length/bins));
+  for(let i=0;i<bins;i++){
+    const start=i*step;
+    const end=Math.min(data.length, start+step);
+    let sum=0;
+    for(let j=start;j<end;j++) sum += Math.abs(data[j]);
+    out[i]=sum/Math.max(1, end-start);
+  }
+  return out;
+}
+
+async function loadSw2DriverAudio(){
+  if(sw2Audio.loaded || sw2Audio.loading) return;
+  sw2Audio.loading=true;
+  try{
+    ensureCtx();
+    const res=await fetch(SW2_AUDIO_URL);
+    if(!res.ok) throw new Error(`audio fetch ${res.status}`);
+    const ab=await res.arrayBuffer();
+    const buffer=await actx.decodeAudioData(ab.slice(0));
+    sw2Audio.buffer=buffer;
+    sw2Audio.envelope=buildSw2Envelope(buffer, 1536);
+    sw2Audio.loaded=true;
+  }catch(err){
+    console.warn('sw2 audio driver unavailable', err);
+  }finally{
+    sw2Audio.loading=false;
+  }
+}
+
+function startSw2AudioLayer(){
+  if(!sw2Audio.loaded || !sw2Audio.buffer || !actx || sw2Audio.bedSrc) return;
+  const now=actx.currentTime;
+  const dur=Math.max(0.01, sw2Audio.buffer.duration);
+  const q=dur*0.25;
+  // Bed loop: first quarter only (Fa/Ha air + key-click world).
+  const bed=actx.createBufferSource();
+  bed.buffer=sw2Audio.buffer;
+  bed.loop=true;
+  bed.loopStart=0;
+  bed.loopEnd=Math.max(0.05, q);
+  const bedGain=actx.createGain();
+  bedGain.gain.setValueAtTime(0.0001, now);
+  bedGain.gain.exponentialRampToValueAtTime(0.2, now+0.6);
+  bed.connect(bedGain);
+  bedGain.connect(master || actx.destination);
+  bed.start(now, Math.random()*Math.max(0.01, q-0.02));
+  sw2Audio.bedSrc=bed;
+  sw2Audio.bedGain=bedGain;
+
+  // Paulstretch-like ghost layer (off by default, mixed in after "loss" events).
+  const stretch=actx.createBufferSource();
+  stretch.buffer=sw2Audio.buffer;
+  stretch.loop=true;
+  stretch.loopStart=0;
+  stretch.loopEnd=Math.max(0.05, q);
+  stretch.playbackRate.setValueAtTime(0.22, now);
+  const stretchGain=actx.createGain();
+  stretchGain.gain.setValueAtTime(0.0001, now);
+  stretch.connect(stretchGain);
+  stretchGain.connect(master || actx.destination);
+  stretch.start(now, Math.random()*Math.max(0.01, q-0.02));
+  sw2Audio.stretchSrc=stretch;
+  sw2Audio.stretchGain=stretchGain;
+  sw2Audio.paulMix=0;
+  sw2Audio.startedAt=now;
+}
+
+function sw2AudioDriveLevel(nowMs, dt){
+  if(!sw2Audio.loaded || !sw2Audio.buffer || !sw2Audio.envelope){
+    sw2Audio.drive = clamp(sw2Audio.drive + ((0.35 + 0.25*Math.sin(nowMs*0.0017)) - sw2Audio.drive)*0.08, 0, 1);
+    return sw2Audio.drive;
+  }
+  const dur=Math.max(0.001, sw2Audio.buffer.duration);
+  const srcTime = sw2Audio.bedSrc && actx
+    ? (actx.currentTime - sw2Audio.startedAt)
+    : ((nowMs - sw2.startedAtMs)/1000);
+  const wrapped=((srcTime%dur)+dur)%dur;
+  const idx=Math.floor((wrapped/dur) * sw2Audio.envelope.length) % sw2Audio.envelope.length;
+  const raw=sw2Audio.envelope[idx] || 0;
+  const target=clamp((raw-0.04)/0.22, 0, 1);
+  sw2Audio.drive=clamp(sw2Audio.drive + (target-sw2Audio.drive)*Math.min(1, dt*7.5), 0, 1);
+  return sw2Audio.drive;
+}
+
+function setSw2PaulstretchMix(mixPct){
+  const pct=clamp(mixPct, 0, 1);
+  sw2Audio.paulMix=pct;
+  if(!actx) return;
+  const now=actx.currentTime;
+  if(sw2Audio.stretchGain){
+    sw2Audio.stretchGain.gain.cancelScheduledValues(now);
+    sw2Audio.stretchGain.gain.setValueAtTime(sw2Audio.stretchGain.gain.value, now);
+    sw2Audio.stretchGain.gain.linearRampToValueAtTime(0.0001 + pct*0.24, now+0.4);
+  }
+  if(sw2Audio.bedGain){
+    sw2Audio.bedGain.gain.cancelScheduledValues(now);
+    sw2Audio.bedGain.gain.setValueAtTime(sw2Audio.bedGain.gain.value, now);
+    sw2Audio.bedGain.gain.linearRampToValueAtTime(0.15 + (1-pct)*0.08, now+0.4);
+  }
+}
+
+function playSw2Punctuation(intensity=0.5){
+  if(!sw2Audio.loaded || !sw2Audio.buffer || !actx) return;
+  const now=performance.now();
+  if(now < sw2Audio.punctAtMs) return;
+  sw2Audio.punctAtMs = now + SW2_TUNE.punctuationMinMs + Math.random()*(SW2_TUNE.punctuationMaxMs-SW2_TUNE.punctuationMinMs);
+  const t0=actx.currentTime + 0.01;
+  const dur=Math.max(0.01, sw2Audio.buffer.duration);
+  const start=dur*0.25;
+  const end=dur*0.75; // discard last quarter
+  const seg=Math.min(2.8, 0.8 + intensity*2.1);
+  const s=Math.max(start, Math.min(end-seg-0.02, start + Math.random()*Math.max(0.01, (end-start-seg))));
+  const src=actx.createBufferSource();
+  src.buffer=sw2Audio.buffer;
+  src.playbackRate.setValueAtTime(0.88 + Math.random()*0.35, t0);
+  const g=actx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.07 + intensity*0.14, t0+0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+seg);
+  src.connect(g);
+  g.connect(master || actx.destination);
+  src.start(t0, s, seg);
+  src.stop(t0+seg+0.02);
+}
+
+function setSw2Phase(phase, msg=''){
+  sw2.phase=phase;
+  sw2.phaseStartedMs=performance.now();
+  if(msg) pushEvent(msg);
+}
+
+function makeSw2Areas(hx, hy){
+  const out=[];
+  for(let i=0;i<SW2_TUNE.areaCount;i++){
+    const a=(-Math.PI/2) + i*((Math.PI*2)/SW2_TUNE.areaCount);
+    const anchorX=hx + Math.round(Math.cos(a)*SW2_TUNE.areaDist);
+    const anchorY=hy + Math.round(Math.sin(a)*SW2_TUNE.areaDist);
+    const ox=Math.round(Math.cos(a+Math.PI*0.5) * 1.6);
+    const oy=Math.round(Math.sin(a+Math.PI*0.5) * 1.6);
+    out.push({
+      idx:i,
+      x:anchorX,
+      y:anchorY,
+      threatX:anchorX+ox,
+      threatY:anchorY+oy,
+      driftX:0,
+      driftY:0,
+      caughtLockUntilMs:0,
+      revealUntilMs:0,
+      wasInside:false,
+      grabbed:false,
+      complete:false,
+    });
+  }
+  return out;
+}
+
+function currentSw2Area(){
+  if(!sw2.areas || sw2.areas.length===0) return null;
+  return sw2.areas[sw2.currentAreaIdx] || null;
+}
+
+function sw2ProgressPct(){
+  const heldBonus=sw2.heldItem ? 0.5 : 0;
+  return clamp(((sw2.completedCount + heldBonus)/Math.max(1, SW2_TUNE.areaCount))*100, 0, 100);
+}
+
+function sw2KillRadius(){
+  return SW2_TUNE.killRadiusBase + Math.min(1.0, sw2.failCount*SW2_TUNE.killRadiusFailStep);
+}
+
+function nextIncompleteSw2AreaIndex(){
+  if(!sw2.areas || sw2.areas.length===0) return -1;
+  for(let i=0;i<sw2.areas.length;i++){
+    if(!sw2.areas[i].complete) return i;
+  }
+  return -1;
+}
+
+function triggerSw2Loss(nowMs=performance.now(), intensity=0.66){
+  if((nowMs-sw2.lastLossMs) < SW2_TUNE.finalLossCooldownMs){
+    return false;
+  }
+  sw2.lastLossMs=nowMs;
+  playHushRupture();
+  sw2.failCount++;
+  sw2.darkness=clamp(sw2.darkness + SW2_TUNE.darknessStep, 0, SW2_TUNE.darknessMax);
+  setSw2PaulstretchMix(Math.min(0.9, sw2.failCount*0.15));
+  playSw2Punctuation(0.62 + intensity*0.42);
+  hushPunishLockUntilMs=nowMs+420;
+  return true;
+}
+
+function startSw2FinalDark(nowMs){
+  sw2.doorActive=true;
+  sw2.doorX=sw2.hubX;
+  sw2.doorY=sw2.hubY - SW2_TUNE.finalDoorDist;
+  sw2.doorArmedAt=nowMs + 420;
+  sw2.darkness=Math.max(sw2.darkness, 0.78);
+  sw2.charge=100;
+  for(const area of sw2.areas){
+    area.revealUntilMs=nowMs + 999999;
+    area.caughtLockUntilMs=nowMs+500;
+  }
+  setSw2Phase(SW2_PHASE.FINAL_DARK);
+  playSw2Punctuation(0.9);
+}
+
+function startSubWorld2Sequence(startProgressAreas=0, isDebug=false){
+  resetHorrorState();
+  ensureCtx();
+  const now=performance.now();
+  horrorPhase=HORROR_SEQUENCE.CHASE_PRESSURE;
+  horrorStartMs=now;
+  horrorLastTickMs=now;
+  sw2.active=true;
+  sw2.startedAtMs=now;
+  sw2.hubX=subWorld2Start.x;
+  sw2.hubY=subWorld2Start.y;
+  sw2.areas=makeSw2Areas(sw2.hubX, sw2.hubY);
+  sw2.currentAreaIdx=0;
+  sw2.completedCount=0;
+  sw2.heldItem=false;
+  sw2.heldFromArea=-1;
+  sw2.failCount=0;
+  sw2.darkness=0;
+  sw2.doorActive=false;
+  sw2.caught=false;
+  sw2.charge=0;
+  sw2.firstLineShown=false;
+  sw2.finalLineShown=false;
+  sw2.lastLossMs=0;
+  sw2.punctuationAtMs=now + 1200;
+  if(startProgressAreas>0){
+    const fast=Math.min(SW2_TUNE.areaCount, Math.floor(startProgressAreas));
+    for(let i=0;i<fast;i++){
+      sw2.areas[i].grabbed=true;
+      sw2.areas[i].complete=true;
+    }
+    sw2.completedCount=fast;
+    sw2.currentAreaIdx=Math.min(sw2.areas.length-1, Math.max(0, fast));
+    if(sw2.completedCount>=SW2_TUNE.areaCount){
+      startSw2FinalDark(now);
+    }
+  }
+  if(isDebug){
+    sw2.firstLineShown=true; // keep normal run at 2 lines; debug avoids extra narrative.
+  }
+  if(sw2.phase!==SW2_PHASE.FINAL_DARK){
+    setSw2Phase(SW2_PHASE.BOOT_SILENCE, isDebug ? '// debug: dropped into sub world 2.' : '');
+  }
+  hush.active=false;
+  hushEyes=[];
+  setSw2PaulstretchMix(0);
+  if(sw2Audio.loaded){
+    startSw2AudioLayer();
+  } else {
+    loadSw2DriverAudio().then(()=>startSw2AudioLayer());
+  }
+}
+
+function completeSubWorld2Rite(){
+  triggerGateFlash(240, 540);
+  if(navigator.vibrate) navigator.vibrate([32, 56, 90]);
+  subWorld2HasKeys=true;
+  sw2.darkness=clamp(sw2.darkness + 0.08, 0, 0.98);
+  sw2.charge=100;
+  setSw2Phase(SW2_PHASE.POST_DOOR);
+  sw2.doorActive=true;
+  if(!sw2.finalLineShown){
+    pushEvent('// you carry it with you now.');
+    sw2.finalLineShown=true;
+  }
+}
+
+function maybeCrossSw2Gate(nowMs){
+  if(!sw2.active || !sw2.doorActive || sw2.phase!==SW2_PHASE.FINAL_DARK) return false;
+  if(px!==sw2.doorX || py!==sw2.doorY) return false;
+  const movingRecently=(nowMs-lastMoveAtMs) <= Math.max(100, currentMoveIntervalMs()*1.35);
+  if(nowMs>=sw2.doorArmedAt && movingRecently){
+    completeSubWorld2Rite();
+    return true;
+  }
+  return false;
+}
+
+function resetHorrorState(){
+  horrorPhase=HORROR_SEQUENCE.OFF;
+  horrorStartMs=0;
+  horrorLastTickMs=0;
+  hush.active=false;
+  hush.vx=0;
+  hush.vy=0;
+  hushPingHeat=0;
+  hushEyes=[];
+  lastHushEventMs=0;
+  nextDoorSwarmPulseMs=0;
+  doorSwarmStartMs=0;
+  doorSwarmArmMs=0;
+  doorSwarmRadius=0;
+  doorSwarmCenter=null;
+  doorRevealCutscene=false;
+  doorRevealStartedMs=0;
+  doorRevealEndsMs=0;
+  doorRevealTriggered=false;
+  doorRevealHushTarget=null;
+  hushLockedUntilMs=0;
+  hushLastDist=Infinity;
+  hushLastAdvanceTowardMs=0;
+  hushLastRetreatMs=0;
+  hushBlinkActive=false;
+  hushBlinkEndsMs=0;
+  hushBlinkNextAtMs=0;
+  hushBlinkStress=0;
+  hushBlinkNextLurchMs=0;
+  hushBlinkLurchesRemaining=0;
+  corridorStatues=[];
+  resetSw2State();
+  stopSw2AudioLayer();
+  if(hushHitTimer!==null){
+    clearTimeout(hushHitTimer);
+    hushHitTimer=null;
+  }
+  if(hushJumpTimer!==null){
+    clearTimeout(hushJumpTimer);
+    hushJumpTimer=null;
+  }
+  if(MAP_EL) MAP_EL.classList.remove('hush-hit');
+  if(HUSH_JUMP_EL){
+    HUSH_JUMP_EL.classList.remove('active');
+    HUSH_JUMP_EL.classList.remove('blink');
+  }
+}
+
+function playHushRupture(){
+  triggerGateFlash(100, 260);
+  setTimeout(()=>triggerGateFlash(80, 180), 70);
+  setTimeout(()=>triggerGateFlash(60, 130), 145);
+  if(MAP_EL){
+    MAP_EL.classList.remove('hush-hit');
+    // Force style flush so rapid repeated hits still retrigger animation.
+    void MAP_EL.offsetWidth;
+    MAP_EL.classList.add('hush-hit');
+    if(hushHitTimer!==null) clearTimeout(hushHitTimer);
+    hushHitTimer=setTimeout(()=>{
+      if(MAP_EL) MAP_EL.classList.remove('hush-hit');
+      hushHitTimer=null;
+    }, 240);
+  }
+  if(HUSH_JUMP_EL){
+    HUSH_JUMP_EL.classList.remove('active');
+    void HUSH_JUMP_EL.offsetWidth;
+    HUSH_JUMP_EL.classList.add('active');
+    if(hushJumpTimer!==null) clearTimeout(hushJumpTimer);
+    hushJumpTimer=setTimeout(()=>{
+      if(HUSH_JUMP_EL) HUSH_JUMP_EL.classList.remove('active');
+      hushJumpTimer=null;
+    }, 460);
+  }
+  if(navigator.vibrate) navigator.vibrate([14, 24, 170, 34, 220, 18, 160]);
+  if(!actx) return;
+  const t0=actx.currentTime;
+  const out=actx.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(1.0, t0+0.003);
+  out.gain.exponentialRampToValueAtTime(0.0001, t0+0.55);
+  out.connect(actx.destination);
+
+  const nbuf=actx.createBuffer(1, Math.max(1, Math.floor(actx.sampleRate*0.46)), actx.sampleRate);
+  const nd=nbuf.getChannelData(0);
+  for(let i=0;i<nd.length;i++){
+    const env=1-(i/nd.length);
+    nd[i]=(Math.random()*2-1) * env * (0.7 + Math.random()*0.6);
+  }
+  const nsrc=actx.createBufferSource();
+  const nf=actx.createBiquadFilter();
+  nf.type='bandpass';
+  nf.frequency.setValueAtTime(1700, t0);
+  nf.frequency.exponentialRampToValueAtTime(380, t0+0.42);
+  nf.Q.setValueAtTime(5.6, t0);
+  nsrc.buffer=nbuf;
+  nsrc.connect(nf); nf.connect(out);
+  nsrc.start(t0); nsrc.stop(t0+0.48);
+
+  const bass=actx.createOscillator();
+  const bg=actx.createGain();
+  bass.type='triangle';
+  bass.frequency.setValueAtTime(88, t0);
+  bass.frequency.exponentialRampToValueAtTime(26, t0+0.52);
+  bg.gain.setValueAtTime(0.0001, t0);
+  bg.gain.exponentialRampToValueAtTime(0.48, t0+0.008);
+  bg.gain.exponentialRampToValueAtTime(0.0001, t0+0.46);
+  bass.connect(bg); bg.connect(out);
+  bass.start(t0); bass.stop(t0+0.55);
+
+  const stab=actx.createOscillator();
+  const sg=actx.createGain();
+  stab.type='square';
+  stab.frequency.setValueAtTime(21, t0);
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(0.24, t0+0.03);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t0+0.5);
+  stab.connect(sg); sg.connect(out);
+  stab.start(t0); stab.stop(t0+0.56);
+}
+
+function spawnHushBehindPlayer(){
+  let dx=door?door.x-px:0;
+  let dy=door?door.y-py:0;
+  let len=Math.hypot(dx,dy);
+  if(len<0.001){
+    const a=Math.random()*Math.PI*2;
+    dx=Math.cos(a);
+    dy=Math.sin(a);
+    len=1;
+  }
+  const nx=dx/len;
+  const ny=dy/len;
+  const rx=-ny;
+  const ry=nx;
+  const back=24 + Math.random()*9;
+  const lateral=(Math.random()-0.5)*14;
+  hush.x=px - nx*back + rx*lateral;
+  hush.y=py - ny*back + ry*lateral;
+  hush.vx=0;
+  hush.vy=0;
+  hush.active=true;
+}
+
+function startHorrorSequence(){
+  if(depth!==0 || !door || isOnboardingActive()) return;
+  resetHorrorState();
+  horrorPhase=HORROR_SEQUENCE.HORROR_ONSET;
+  const now=performance.now();
+  horrorStartMs=now;
+  horrorLastTickMs=now;
+  hushBlinkNextAtMs=now + 1200 + Math.random()*600;
+  spawnHushBehindPlayer();
+  hushLastDist=hushDistance();
+  pushEvent('// final key acquired. the hush heard it.');
+}
+
+function startDoorSwarm(){
+  if(!door) return;
+  if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM || horrorPhase===HORROR_SEQUENCE.DESCENT_RUPTURE) return;
+  const now=performance.now();
+  doorRevealCutscene=false;
+  horrorPhase=HORROR_SEQUENCE.DOOR_SWARM;
+  doorSwarmStartMs=now;
+  doorSwarmArmMs=now+900;
+  doorSwarmRadius=0;
+  doorSwarmCenter={x:door.x, y:door.y};
+  nextDoorSwarmPulseMs=now+180;
+  hushEyes = [];
+  corridorStatues=[];
+  const rows=9;
+  for(let r=0;r<rows;r++){
+    const t=(r+1)/(rows+1);
+    corridorStatues.push({t, side:-1, wobble:(Math.random()-0.5), pulse:Math.random()*Math.PI*2, x:px, y:py, lurch:0});
+    corridorStatues.push({t, side:1, wobble:(Math.random()-0.5), pulse:Math.random()*Math.PI*2, x:px, y:py, lurch:0});
+    if((r%3)===1){
+      corridorStatues.push({t:t+0.03, side:0, wobble:(Math.random()-0.5)*0.6, pulse:Math.random()*Math.PI*2, x:px, y:py, lurch:0});
+    }
+  }
+  hushBlinkNextAtMs=now + 980;
+  hushBlinkStress=Math.max(hushBlinkStress, 0.62);
+  hushLockedUntilMs=Math.max(hushLockedUntilMs, now+920);
+  if((now-lastHushEventMs)>900){
+    pushEvent('// corridor of statues forms. keep advancing.');
+    lastHushEventMs=now;
+  }
+}
+
+function canDescendThroughSwarm(nowMs=performance.now()){
+  if(horrorPhase!==HORROR_SEQUENCE.DOOR_SWARM) return true;
+  const movingRecently=(nowMs-lastMoveAtMs) < Math.max(84, currentMoveIntervalMs()*1.2);
+  return nowMs>=doorSwarmArmMs && movingRecently && !hushBlinkActive;
+}
+
+function isDoorInViewportNow(){
+  if(!door || depth!==0 || isOnboardingActive()) return false;
+  if(VIEW_W===0 || VIEW_H===0) computeViewDims();
+  const halfC=Math.floor(VIEW_W/2), halfR=Math.floor(VIEW_H/2);
+  const ox=px-halfC, oy=py-halfR;
+  return door.x>=ox && door.x<ox+VIEW_W && door.y>=oy && door.y<oy+VIEW_H;
+}
+
+function startDoorRevealCutscene(nowMs=performance.now()){
+  if(doorRevealTriggered || !door) return;
+  doorRevealTriggered=true;
+  doorRevealCutscene=true;
+  doorRevealStartedMs=nowMs;
+  doorRevealEndsMs=nowMs+2450;
+  let dx=door.x-px, dy=door.y-py;
+  let len=Math.hypot(dx,dy);
+  if(len<0.0001){
+    const a=Math.random()*Math.PI*2;
+    dx=Math.cos(a); dy=Math.sin(a); len=1;
+  }
+  const nx=dx/len, ny=dy/len;
+  const rx=-ny, ry=nx;
+  doorRevealHushTarget={
+    x:px - nx*(36+Math.random()*8) + rx*((Math.random()-0.5)*8),
+    y:py - ny*(36+Math.random()*8) + ry*((Math.random()-0.5)*8),
+  };
+  hushLockedUntilMs=Math.max(hushLockedUntilMs, nowMs+1000);
+  hushPingHeat=Math.max(hushPingHeat, 0.5);
+  triggerGateFlash(220, 520);
+  if(navigator.vibrate) navigator.vibrate([24, 72, 36, 96]);
+  pushEvent('// the door sees you. the hush recoils.');
+}
+
+function spawnPeripheralEye(nowMs){
+  const a=Math.random()*Math.PI*2;
+  const r=18+Math.random()*26;
+  hushEyes.push({
+    x:px+Math.cos(a)*r,
+    y:py+Math.sin(a)*r,
+    phase:Math.random()*Math.PI*2,
+    lastPingAt:0,
+    nextPingAt:nowMs + 700 + Math.random()*1900,
+  });
+}
+
+function isHushLocked(nowMs=performance.now()){
+  return nowMs < hushLockedUntilMs;
+}
+
+function lockHushForMercy(nowMs=performance.now(), bonusMs=0){
+  const hold=1050 + Math.random()*450 + bonusMs;
+  hushLockedUntilMs=Math.max(hushLockedUntilMs, nowMs+hold);
+}
+
+function maybeLockHushFromInputKey(key, nowMs=performance.now()){
+  if(!isHorrorActive() || !hush.active || depth>1 || isOnboardingActive() || doorRevealCutscene) return false;
+  let dx=0, dy=0;
+  if(key==='ArrowUp' || key==='w' || key==='W') dy=-1;
+  else if(key==='ArrowDown' || key==='s' || key==='S') dy=1;
+  else if(key==='ArrowLeft' || key==='a' || key==='A') dx=-1;
+  else if(key==='ArrowRight' || key==='d' || key==='D') dx=1;
+  else return false;
+
+  const toHushX=hush.x-px;
+  const toHushY=hush.y-py;
+  const towardDot=(dx*toHushX) + (dy*toHushY);
+  const reversal=(dx===-lastStepDx && dy===-lastStepDy && (dx!==0 || dy!==0));
+  const qualifies = towardDot>0.01 || (reversal && hushDistance()<52);
+  if(!qualifies) return false;
+
+  const hold=3000 + Math.random()*1000; // explicit 3–4s confrontation freeze
+  hushLockedUntilMs=Math.max(hushLockedUntilMs, nowMs+hold);
+  const minSafe=HUSH_TUNE.catchDistance + 0.9;
+  const d=Math.max(0.0001, hushDistance());
+  if(d<minSafe){
+    const ux=(hush.x-px)/d;
+    const uy=(hush.y-py)/d;
+    hush.x=px + ux*minSafe;
+    hush.y=py + uy*minSafe;
+  }
+  hushLastAdvanceTowardMs=nowMs;
+  hushPingHeat=clamp(hushPingHeat-0.26, 0, 2.4);
+  if(hushBlinkActive) stopStressBlink();
+  hushBlinkNextAtMs=Math.max(hushBlinkNextAtMs, nowMs+hold+220);
+  if((nowMs-lastHushEventMs)>1200){
+    pushEvent('// you face it. the hush stalls.');
+    lastHushEventMs=nowMs;
+  }
+  return true;
+}
+
+function registerHushApproachStep(prevDist, newDist, moveDx=0, moveDy=0, toHushX=0, toHushY=0, nowMs=performance.now()){
+  if(!isHorrorActive() || !hush.active || depth>1) return;
+  if(!Number.isFinite(prevDist) || !Number.isFinite(newDist)) return;
+  const delta=prevDist-newDist;
+  const towardDot=(moveDx*toHushX) + (moveDy*toHushY);
+  const steppedToward=towardDot>0.01;
+  if(steppedToward || delta>0.02){
+    hushLastAdvanceTowardMs=nowMs;
+    lockHushForMercy(nowMs);
+    hushPingHeat=clamp(hushPingHeat-0.04, 0, 2.4);
+  } else if(delta<-0.02 && towardDot<=0){
+    hushLastRetreatMs=nowMs;
+  }
+  hushLastDist=newDist;
+}
+
+function computeHushStress(){
+  const d=hushDistance();
+  if(depth===1 && sw2.active){
+    const progress=sw2ProgressPct()/100;
+    const darkness=clamp(sw2.darkness, 0, 1);
+    const fail=clamp(sw2.failCount/6, 0, 1);
+    return clamp(0.22 + progress*0.36 + darkness*0.32 + fail*0.28, 0, 1);
+  }
+  const prox=clamp(1-(d/32), 0, 1);
+  const ping=clamp(hushPingHeat/2.4, 0, 1);
+  const phaseBump=horrorPhase===HORROR_SEQUENCE.DOOR_SWARM ? 0.22 : horrorPhase===HORROR_SEQUENCE.CHASE_PRESSURE ? 0.14 : 0.08;
+  const doorBump=door ? clamp(1-(Math.hypot(door.x-px, door.y-py)/52), 0, 1)*0.2 : 0;
+  return clamp((prox*0.46) + (ping*0.28) + phaseBump + doorBump, 0, 1);
+}
+
+function stopStressBlink(){
+  hushBlinkActive=false;
+  hushBlinkEndsMs=0;
+  hushBlinkLurchesRemaining=0;
+  if(HUSH_JUMP_EL) HUSH_JUMP_EL.classList.remove('blink');
+}
+
+function startStressBlink(nowMs, stress){
+  hushBlinkActive=true;
+  hushBlinkStress=stress;
+  hushBlinkEndsMs=nowMs + (80 + stress*120);
+  hushBlinkLurchesRemaining=1 + Math.floor(stress*1.6);
+  hushBlinkNextLurchMs=nowMs + 44;
+  hushBlinkNextAtMs=nowMs + Math.max(720, (1950 - stress*820) + Math.random()*650);
+  if(HUSH_JUMP_EL){
+    HUSH_JUMP_EL.classList.remove('blink');
+    void HUSH_JUMP_EL.offsetWidth;
+    HUSH_JUMP_EL.classList.add('blink');
+  }
+  triggerGateFlash(70 + stress*80, 150 + stress*200);
+  if(navigator.vibrate) navigator.vibrate([10, 26, 52, 32]);
+  if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM && corridorStatues.length>0){
+    for(const s of corridorStatues){
+      s.lurch=Math.max(s.lurch, 0.8 + Math.random()*1.2);
+    }
+  }
+}
+
+function updateStatueCorridor(nowMs, dt){
+  if(!door || corridorStatues.length===0) return;
+  const dx=door.x-px;
+  const dy=door.y-py;
+  const len=Math.max(0.001, Math.hypot(dx,dy));
+  const nx=dx/len, ny=dy/len;
+  const rx=-ny, ry=nx;
+  const maxAlong=Math.max(8, Math.min(28, len*0.88));
+  const lockHeld=isHushLocked(nowMs);
+  for(const s of corridorStatues){
+    const along=1.6 + s.t*maxAlong;
+    const latMag=1.8 + s.t*2.6 + s.wobble*0.8;
+    const lat=s.side===0 ? 0 : s.side*latMag;
+    const targetX=px + nx*along + rx*lat;
+    const targetY=py + ny*along + ry*lat;
+    if(!hushBlinkActive){
+      s.lurch=Math.max(0, s.lurch - dt*(lockHeld ? 5.2 : 3.4));
+    }
+    const pulse=(lockHeld && !hushBlinkActive) ? 0 : 0.22*Math.sin(nowMs*0.003 + s.pulse);
+    const surge=(lockHeld && !hushBlinkActive) ? 0 : (s.lurch + pulse);
+    const lureX=targetX + nx*surge;
+    const lureY=targetY + ny*surge;
+    const ease=hushBlinkActive ? 0.33 : (lockHeld ? 0.08 : 0.16);
+    s.x += (lureX - s.x) * ease;
+    s.y += (lureY - s.y) * ease;
+  }
+  if(nowMs>=nextDoorSwarmPulseMs){
+    nextDoorSwarmPulseMs=nowMs + 220 + Math.random()*180;
+    hushPingHeat=clamp(hushPingHeat + 0.14, 0, 2.4);
+  }
+}
+
+function updateSpyEyes(nowMs, dt){
+  if(!isHorrorActive() || depth>1) return;
+  if(depth===1){
+    // Sub World 2 avoids the "swarm toy" read: no floating eye crowd.
+    hushEyes=[];
+    return;
+  }
+  if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+    updateStatueCorridor(nowMs, dt);
+    return;
+  }
+  const aliveSec=Math.max(0, (nowMs-horrorStartMs)/1000);
+  const targetCount=Math.min(HUSH_TUNE.maxEyes, Math.floor(7 + aliveSec*2.25));
+  while(hushEyes.length<targetCount) spawnPeripheralEye(nowMs);
+  if(hushEyes.length>targetCount+4) hushEyes.length=targetCount+4;
+
+  if(doorRevealCutscene && door){
+    const dx=door.x-px;
+    const dy=door.y-py;
+    const len=Math.max(0.001, Math.hypot(dx,dy));
+    const nx=dx/len, ny=dy/len;
+    const rx=-ny, ry=nx;
+    const eyeCount=Math.max(12, Math.min(26, hushEyes.length));
+    for(let i=0;i<eyeCount;i++){
+      const t=(i+1)/(eyeCount+1);
+      const lateral=((i%2===0)?1:-1) * (1.2 + ((i%4)*0.55));
+      const anchorX=px + nx*(2 + t*Math.min(18, len*0.6));
+      const anchorY=py + ny*(2 + t*Math.min(18, len*0.6));
+      const eye=hushEyes[i];
+      eye.x += (anchorX + rx*lateral - eye.x) * 0.14;
+      eye.y += (anchorY + ry*lateral - eye.y) * 0.14;
+      if((i%3)===0 && (nowMs-eye.lastPingAt)>260){
+        eye.lastPingAt=nowMs;
+      }
+    }
+  }
+
+  for(const eye of hushEyes){
+    const dx=px-eye.x;
+    const dy=py-eye.y;
+    const d=Math.hypot(dx,dy) || 0.001;
+    const ux=dx/d;
+    const uy=dy/d;
+    // Eyes hover at middle distance, drifting in an orbit while constantly
+    // biasing toward the player.
+    const settle=(d>30?1:(d<9?-1:0.28));
+    eye.x += ux * settle * dt * 6.4;
+    eye.y += uy * settle * dt * 6.4;
+    const tx=-uy, ty=ux;
+    const orbitSpeed=2.8 + 1.2*Math.sin(nowMs*0.0018 + eye.phase);
+    eye.x += tx * orbitSpeed * dt;
+    eye.y += ty * orbitSpeed * dt;
+
+    if(nowMs>=eye.nextPingAt){
+      eye.lastPingAt=nowMs;
+      eye.nextPingAt=nowMs + 560 + Math.random()*1300;
+      hushPingHeat=clamp(hushPingHeat + 0.3, 0, 2.2);
+      if((nowMs-lastHushEventMs) > 1700){
+        pushEvent('// watcher blink. your location relayed.');
+        lastHushEventMs=nowMs;
+      }
+    }
+    if(d<7.5){
+      hushPingHeat=clamp(hushPingHeat + dt*0.45, 0, 2.3);
+    }
+  }
+  hushEyes = hushEyes.filter((eye)=>Math.hypot(eye.x-px, eye.y-py) < 76);
+}
+
+function updateSubWorld2RiteTick(nowMs, dt){
+  if(depth!==1 || !sw2.active) return;
+  const drive=sw2AudioDriveLevel(nowMs, dt);
+  sw2.driverEnergy=drive;
+  sw2.caught=(nowMs-sw2.lastLossMs) < 900;
+  sw2.charge=sw2ProgressPct();
+
+  if(sw2.phase===SW2_PHASE.BOOT_SILENCE && (nowMs-sw2.phaseStartedMs)>=SW2_TUNE.bootSilenceMs){
+    setSw2Phase(SW2_PHASE.AREA_LOOP);
+    return;
+  }
+  if(sw2.phase===SW2_PHASE.BOOT_SILENCE) return;
+
+  if(sw2.phase===SW2_PHASE.POST_DOOR){
+    sw2.darkness=clamp(sw2.darkness + dt*0.012, 0, 0.98);
+    return;
+  }
+
+  const movingRecently=(nowMs-lastMoveAtMs)<=SW2_TUNE.approachFreshMs;
+  const hubDist=Math.hypot(px-sw2.hubX, py-sw2.hubY);
+  const killRadius=sw2KillRadius();
+  const processThreat=(area, lossRadius, allowGrab)=>{
+    const dToArea=Math.hypot(px-area.x, py-area.y);
+    if(dToArea<=SW2_TUNE.areaEnterRadius){
+      if(!area.wasInside){
+        area.wasInside=true;
+        area.revealUntilMs=nowMs + SW2_TUNE.revealMs;
+      } else {
+        area.revealUntilMs=Math.max(area.revealUntilMs, nowMs+220);
+      }
+    }
+    const dThreat=Math.hypot(px-area.threatX, py-area.threatY);
+    if(!area.complete && nowMs>=area.caughtLockUntilMs && dThreat<=lossRadius){
+      const intensity=clamp((lossRadius+0.6-dThreat)/(lossRadius+0.6), 0.35, 1);
+      if(triggerSw2Loss(nowMs, intensity)){
+        area.caughtLockUntilMs=nowMs + SW2_TUNE.finalLossCooldownMs;
+        const bx=(area.threatX-px) || (Math.random()<0.5?-1:1);
+        const by=(area.threatY-py) || (Math.random()<0.5?-1:1);
+        const bl=Math.max(0.001, Math.hypot(bx, by));
+        const push=2.3 + Math.random()*1.2;
+        area.threatX=px + (bx/bl)*push;
+        area.threatY=py + (by/bl)*push;
+      }
+    }
+    if(!allowGrab || sw2.heldItem || area.grabbed || area.complete) return;
+    if(!movingRecently) return;
+    if(dThreat>=SW2_TUNE.grabMinRadius && dThreat<=SW2_TUNE.grabMaxRadius){
+      area.grabbed=true;
+      sw2.heldItem=true;
+      sw2.heldFromArea=area.idx;
+      area.revealUntilMs=Math.max(area.revealUntilMs, nowMs + SW2_TUNE.revealMs);
+      if(!sw2.firstLineShown){
+        pushEvent('// take it from their hands. bring it back.');
+        sw2.firstLineShown=true;
+      }
+      playSw2Punctuation(0.54 + drive*0.22);
+    }
+  };
+
+  if(sw2.phase===SW2_PHASE.AREA_LOOP){
+    let area=currentSw2Area();
+    if((!area || area.complete) && !sw2.heldItem){
+      const nextIdx=nextIncompleteSw2AreaIndex();
+      if(nextIdx>=0){
+        sw2.currentAreaIdx=nextIdx;
+        area=currentSw2Area();
+      }
+    }
+    if(area){
+      processThreat(area, killRadius, true);
+    }
+    if(sw2.heldItem && hubDist<=SW2_TUNE.hubDepositRadius && movingRecently){
+      const src=sw2.areas[sw2.heldFromArea];
+      if(src && !src.complete){
+        src.complete=true;
+        src.revealUntilMs=Math.max(src.revealUntilMs, nowMs+1100);
+        sw2.completedCount++;
+      }
+      sw2.heldItem=false;
+      sw2.heldFromArea=-1;
+      const nextIdx=nextIncompleteSw2AreaIndex();
+      if(nextIdx>=0){
+        sw2.currentAreaIdx=nextIdx;
+      }
+      sw2.charge=sw2ProgressPct();
+      playSw2Punctuation(0.46 + drive*0.2);
+      if(sw2.completedCount>=SW2_TUNE.areaCount){
+        startSw2FinalDark(nowMs);
+        return;
+      }
+    }
+    return;
+  }
+
+  if(sw2.phase===SW2_PHASE.FINAL_DARK){
+    sw2.darkness=clamp(Math.max(sw2.darkness, 0.82) + dt*0.02, 0, 0.97);
+    for(const area of sw2.areas){
+      const dx=px-area.threatX;
+      const dy=py-area.threatY;
+      const d=Math.max(0.0001, Math.hypot(dx,dy));
+      const ux=dx/d;
+      const uy=dy/d;
+      const jitter=Math.sin((nowMs*0.0018) + area.idx*1.9) * 0.14;
+      const tx=-uy, ty=ux;
+      const speed=SW2_TUNE.finalDriftSpeed * (0.72 + sw2.failCount*0.08 + drive*0.34);
+      area.threatX += (ux*speed + tx*jitter) * dt;
+      area.threatY += (uy*speed + ty*jitter) * dt;
+      if(nowMs>=area.caughtLockUntilMs && d<=SW2_TUNE.finalCatchRadius){
+        if(triggerSw2Loss(nowMs, 1)){
+          area.caughtLockUntilMs=nowMs + SW2_TUNE.finalLossCooldownMs;
+          const push=3 + Math.random()*1.4;
+          area.threatX=px - ux*push;
+          area.threatY=py - uy*push;
+          sw2.caught=true;
+        }
+      }
+    }
+    sw2.charge=sw2ProgressPct();
+  }
+}
+
+function hushTargetPoint(isMoving){
+  if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+    return {x:px, y:py};
+  }
+  if(isMoving && trail.length>5){
+    const idx=Math.max(0, trail.length-5);
+    return {x:trail[idx].x, y:trail[idx].y};
+  }
+  return {x:px, y:py};
+}
+
+function updateHushMotion(nowMs, dt){
+  if(!hush.active || depth>1) return;
+  const stepMs=Math.max(44, currentMoveIntervalMs());
+  const playerSpeed=1000/stepMs; // cells/sec
+  if(depth===1){
+    return;
+  }
+  if(doorRevealCutscene){
+    let tx=doorRevealHushTarget?.x ?? hush.x;
+    let ty=doorRevealHushTarget?.y ?? hush.y;
+    if(door){
+      const dx=door.x-px, dy=door.y-py;
+      const len=Math.max(0.001, Math.hypot(dx,dy));
+      const nx=dx/len, ny=dy/len;
+      tx=px - nx*42;
+      ty=py - ny*42;
+      doorRevealHushTarget={x:tx, y:ty};
+    }
+    const dx=tx-hush.x, dy=ty-hush.y;
+    const d=Math.hypot(dx,dy);
+    if(d>0.0001){
+      const ux=dx/d, uy=dy/d;
+      const retreatSpeed=playerSpeed*0.92;
+      hush.x += ux*retreatSpeed*dt;
+      hush.y += uy*retreatSpeed*dt;
+      hush.vx=ux*retreatSpeed;
+      hush.vy=uy*retreatSpeed;
+    }
+    return;
+  }
+  if(isHushLocked(nowMs)) return;
+  if(hushBlinkActive){
+    while(hushBlinkLurchesRemaining>0 && nowMs>=hushBlinkNextLurchMs){
+      const targetX=px;
+      const targetY=py;
+      const dx=targetX-hush.x;
+      const dy=targetY-hush.y;
+      const d=Math.max(0.0001, Math.hypot(dx,dy));
+      const ux=dx/d, uy=dy/d;
+      const lurchDist=0.45 + hushBlinkStress*0.9 + (horrorPhase===HORROR_SEQUENCE.DOOR_SWARM ? 0.25 : 0);
+      hush.x += ux*lurchDist;
+      hush.y += uy*lurchDist;
+      hush.vx=ux*lurchDist*8;
+      hush.vy=uy*lurchDist*8;
+      hushBlinkLurchesRemaining--;
+      hushBlinkNextLurchMs = nowMs + 95 + Math.random()*140;
+    }
+    return;
+  }
+
+  const stress=computeHushStress();
+  let speed=playerSpeed * (0.14 + stress*0.14);
+  if(horrorPhase===HORROR_SEQUENCE.HORROR_ONSET) speed*=0.62;
+  if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM) speed*=0.72;
+  const target=hushTargetPoint(false);
+  const dx=target.x-hush.x;
+  const dy=target.y-hush.y;
+  const d=Math.hypot(dx,dy);
+  if(d<0.0001) return;
+  const ux=dx/d;
+  const uy=dy/d;
+  hush.x += ux*speed*dt;
+  hush.y += uy*speed*dt;
+  hush.vx=ux*speed;
+  hush.vy=uy*speed;
+  hushPingHeat=clamp(hushPingHeat - dt*0.44, 0, 2.0);
+}
+
+function resetSubWorld1AfterHush(msg='// the hush catches you. keys scatter back into the field.'){
+  onboardingPhase=ONBOARDING_PHASES.WORLD_LIVE;
+  depth=0;
+  const cp=subWorld1Start || {x:0,y:0};
+  px=cp.x;
+  py=cp.y;
+  lastStepDx=0;
+  lastStepDy=0;
+  trail=[];
+  fog=new Map();
+  keyMap=new Map();
+  keysFound=0;
+  keysTotal=0;
+  door=null;
+  nextSpawnAt=0;
+  voidFatigue=0;
+  worldBoundaryLatch=false;
+  worldBoundaryFriction=0;
+  curChunkKey='';
+  curChunkIdx=-1;
+  resetHorrorState();
+  revealAroundWithRadius(px, py, Math.max(FOG_R, 9));
+  initKeysForSession();
+  updateAudio();
+  hushPunishLockUntilMs=performance.now()+560;
+  pushEvent(msg);
+}
+
+function resetSubWorld2AfterHush(msg='// the hush tears through you. you wake at the start of this depth.'){
+  depth=1;
+  px=subWorld2Start.x;
+  py=subWorld2Start.y;
+  lastStepDx=0;
+  lastStepDy=0;
+  trail=[];
+  fog=new Map();
+  keyMap=new Map();
+  keysFound=0;
+  keysTotal=0;
+  door=null;
+  nextSpawnAt=0;
+  voidFatigue=0;
+  worldBoundaryLatch=false;
+  worldBoundaryFriction=0;
+  curChunkKey='';
+  curChunkIdx=-1;
+  resetHorrorState();
+  revealAroundWithRadius(px, py, 7);
+  updateAudio();
+  hushPunishLockUntilMs=performance.now()+560;
+  startSubWorld2Sequence();
+  pushEvent(msg);
+}
+
+function punishByHush(){
+  const now=performance.now();
+  if(now<hushPunishLockUntilMs) return;
+  hushPunishLockUntilMs=now+640;
+  playHushRupture();
+  if(depth===1){
+    triggerSw2Loss(now, 1);
+    return;
+  }
+  if(depth>1){
+    resetSubWorld1AfterHush('// the hush drags you back to the first depth.');
+    return;
+  }
+  resetSubWorld1AfterHush();
+}
+
+function maybeHushCapture(){
+  if(!isHorrorActive() || !hush.active || depth>1) return false;
+  if(depth===1 && sw2.active) return false;
+  if(depth===0 && doorRevealCutscene) return false;
+  if(hushDistance() > HUSH_TUNE.catchDistance) return false;
+  punishByHush();
+  return true;
+}
+
+function updateHorrorTick(){
+  if(!isHorrorActive()) return;
+  const now=performance.now();
+  if(horrorLastTickMs===0) horrorLastTickMs=now;
+  const dt=Math.min(0.08, Math.max(0.001, (now-horrorLastTickMs)/1000));
+  horrorLastTickMs=now;
+
+  if(paused || depth>1 || isOnboardingActive()){
+    return;
+  }
+
+  if(depth===1){
+    updateSubWorld2RiteTick(now, dt);
+    updateSpyEyes(now, dt);
+    updateHushMotion(now, dt);
+    maybeHushCapture();
+    return;
+  }
+
+  if(horrorPhase===HORROR_SEQUENCE.HORROR_ONSET && (now-horrorStartMs)>=HUSH_TUNE.onsetMs){
+    horrorPhase=HORROR_SEQUENCE.CHASE_PRESSURE;
+    if((now-lastHushEventMs)>700){
+      pushEvent('// the hush is behind you. stillness feeds it.');
+      lastHushEventMs=now;
+    }
+  }
+  if((horrorPhase===HORROR_SEQUENCE.HORROR_ONSET || horrorPhase===HORROR_SEQUENCE.CHASE_PRESSURE) &&
+     !doorRevealTriggered && isDoorInViewportNow()){
+    startDoorRevealCutscene(now);
+  }
+  if(doorRevealCutscene && now>=doorRevealEndsMs){
+    doorRevealCutscene=false;
+    startDoorSwarm();
+    if((now-lastHushEventMs)>500){
+      pushEvent('// statues wait. keep walking to hold the hush.');
+      lastHushEventMs=now;
+    }
+  }
+
+  const stress=computeHushStress();
+  if(hushBlinkActive && now>=hushBlinkEndsMs){
+    stopStressBlink();
+  }
+  if(!hushBlinkActive && now>=hushBlinkNextAtMs){
+    if(isHushLocked(now)){
+      hushBlinkNextAtMs=now+120;
+    } else {
+      startStressBlink(now, stress);
+    }
+  }
+  updateSpyEyes(now, dt);
+  updateHushMotion(now, dt);
+  maybeHushCapture();
+}
+
 // Called once when the player crosses out of the intro into the live
 // world. Picks a fuzzy 2–4 total target and schedules — but does not
 // place — the first key. Placement happens later in maybeSpawnScheduledKey
 // so the beacon lands relative to where the player has wandered to.
 function initKeysForSession(){
   if(keysTotal>0) return;  // already initialized for this session
+  if(depth===0) setSubWorld1Checkpoint(px, py);
   keyMap = new Map();
   keysFound = 0;
   door = null;
   nextSpawnAt = 0;
+  resetHorrorState();
   keysTotal = 2 + Math.floor(Math.random() * 3); // 2..4 inclusive
   scheduleNextKey(KEY_FIRST_DELAY_MIN_MS, KEY_FIRST_DELAY_MAX_MS);
   pushEvent(`// ${keysTotal} keys await discovery. listen for them.`);
@@ -1642,6 +3058,7 @@ function spawnDoor(){
 // level (beacons, fog, trail, voice routing) is wiped so the new level
 // reads as a clean slate.
 function descendThroughDoor(){
+  horrorPhase=HORROR_SEQUENCE.DESCENT_RUPTURE;
   triggerGateFlash(420, 720);
   pulseRevealRings(px, py, [3, 6, 10, 16]);
   if(navigator.vibrate) navigator.vibrate([60, 80, 100, 140]);
@@ -1652,6 +3069,8 @@ function descendThroughDoor(){
   silenceAmbientDrone();
 
   px = 0; py = 0;
+  lastStepDx=0;
+  lastStepDy=0;
   trail = [];
   fog = new Map();
   keyMap = new Map();
@@ -1659,6 +3078,9 @@ function descendThroughDoor(){
   keysTotal = 0;
   door = null;
   nextSpawnAt = 0;
+  resetHorrorState();
+  subWorld2Start={x:0,y:0};
+  subWorld2HasKeys=false;
   voidFatigue = 0;
   worldBoundaryLatch = false;
   worldBoundaryFriction = 0;
@@ -1668,8 +3090,7 @@ function descendThroughDoor(){
   curChunkKey = '';
 
   revealAroundWithRadius(px, py, 6);
-  pushEvent(`// you have descended. depth: ${depth}.`);
-  pushEvent(`// the void widens. nothing answers — yet.`);
+  startSubWorld2Sequence();
 }
 
 // Sensory feedback on pickup: brief shimmer chime layered over the world
@@ -1815,6 +3236,36 @@ function currentMoveIntervalMs(){
     const trudge = VOID_TRUDGE.startPenalty + (VOID_TRUDGE.maxPenalty-VOID_TRUDGE.startPenalty)*voidFatigue;
     ms *= trudge;
   }
+  if(doorRevealCutscene && depth===0){
+    const span=Math.max(1, doorRevealEndsMs-doorRevealStartedMs);
+    const t=clamp((performance.now()-doorRevealStartedMs)/span, 0, 1);
+    ms *= (1.68 + 0.34*Math.sin(t*Math.PI));
+    return Math.round(clamp(ms, 90, 230));
+  }
+  if(depth===0 && horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+    const doorDist=door ? Math.hypot(door.x-px, door.y-py) : 22;
+    const nearGate=clamp(1-(doorDist/28), 0, 1);
+    ms *= 1.22 + nearGate*0.58 + (hushBlinkActive ? 0.24 : 0);
+    return Math.round(clamp(ms, 92, 255));
+  }
+  if(depth===1 && sw2.active){
+    if(sw2.phase===SW2_PHASE.BOOT_SILENCE){
+      ms *= 1.3;
+      return Math.round(clamp(ms, 84, 220));
+    }
+    if(sw2.phase===SW2_PHASE.AREA_LOOP){
+      ms *= 1.05 + sw2.darkness*0.22;
+      return Math.round(clamp(ms, 68, 184));
+    }
+    if(sw2.phase===SW2_PHASE.FINAL_DARK){
+      ms *= 1.34 + sw2.darkness*0.28 + (sw2.caught ? 0.16 : 0);
+      return Math.round(clamp(ms, 92, 245));
+    }
+    if(sw2.phase===SW2_PHASE.POST_DOOR){
+      ms *= 1.24;
+      return Math.round(clamp(ms, 84, 220));
+    }
+  }
   // Keep motion responsive; difficulty is mostly handled by sink/lateral drag.
   return Math.round(clamp(ms, 44, 120));
 }
@@ -1881,6 +3332,8 @@ function finalizeIntroTransition(targetPhase, reason='world'){
   introDistance=INTRO_SCENE.introDistanceSteps;
   const landing=nearestWildernessCell(px, py, 24);
   px=landing.x; py=landing.y;
+  lastStepDx=0;
+  lastStepDy=0;
   trail=[];
   fog = new Map();
   if(moveTimer){ clearTimeout(moveTimer); moveTimer=null; }
@@ -2071,6 +3524,11 @@ function step(dx,dy){
     if((nowMs-lastMoveAtMs) < needMs) return;
   }
   let sx=dx, sy=dy;
+  const preHushDx=(!isOnboardingActive() && depth<=1 && isHorrorActive() && hush.active) ? (hush.x-px) : 0;
+  const preHushDy=(!isOnboardingActive() && depth<=1 && isHorrorActive() && hush.active) ? (hush.y-py) : 0;
+  const prevHushDist=(!isOnboardingActive() && depth<=1 && isHorrorActive() && hush.active)
+    ? Math.hypot(hush.x-px, hush.y-py)
+    : Infinity;
   if(shouldSinkLateral(sx, sy)){
     sx=0;
     if((stepCount-lastVoidSinkMsgStep) >= 28){
@@ -2084,6 +3542,8 @@ function step(dx,dy){
   if(isOnboardingActive() && !canMoveInOnboarding(nx,ny,sx,sy)) return;
   lastMoveAtMs=nowMs;
   px=nx; py=ny; stepCount++;
+  lastStepDx=sx;
+  lastStepDy=sy;
 
   trail.push({x:px,y:py});
   if(trail.length>TRAIL_LEN) trail.shift();
@@ -2105,19 +3565,41 @@ function step(dx,dy){
         pushEvent(`// key acquired. ${keysFound}/${keysTotal} — another forms, slowly.`);
       } else {
         spawnDoor();
-        pushEvent(`// final key acquired. a door materializes somewhere far.`);
+        startHorrorSequence();
       }
     }
   }
-
-  if(door && px===door.x && py===door.y){
-    descendThroughDoor();
-    return;
+  if(isHorrorActive() && hush.active && depth<=1){
+    registerHushApproachStep(prevHushDist, Math.hypot(hush.x-px, hush.y-py), sx, sy, preHushDx, preHushDy, nowMs);
   }
 
-  WEIRD.forEach(([t,m])=>{
-    if(stepCount===t&&!weirdShown.has(t)){weirdShown.add(t);pushEvent(m);}
-  });
+  if(depth===1 && sw2.active){
+    if(maybeCrossSw2Gate(nowMs)) return;
+  }
+
+  if(door && px===door.x && py===door.y){
+    if(horrorPhase===HORROR_SEQUENCE.HORROR_ONSET || horrorPhase===HORROR_SEQUENCE.CHASE_PRESSURE){
+      startDoorSwarm();
+    } else if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+      if(canDescendThroughSwarm()){
+        descendThroughDoor();
+        return;
+      }
+      if((performance.now()-lastHushEventMs)>1150){
+        pushEvent('// statues clamp the path. keep walking through the rupture.');
+        lastHushEventMs=performance.now();
+      }
+    } else {
+      descendThroughDoor();
+      return;
+    }
+  }
+
+  if(depth===0){
+    WEIRD.forEach(([t,m])=>{
+      if(stepCount===t&&!weirdShown.has(t)){weirdShown.add(t);pushEvent(m);}
+    });
+  }
 
   if(isOnboardingActive()){
     introDistance=Math.max(introDistance, introForwardDistanceAt(px,py));
@@ -2154,10 +3636,13 @@ function teleport(){
   const c=chunks[idx];
   px=tx*WORLD_TILE_W + c.wx;
   py=ty*WORLD_TILE_H + c.wy;
+  lastStepDx=0;
+  lastStepDy=0;
   trail=[];
   stopAllVoices();
   revealAround(px,py);
   updateAudio();
+  if(isHorrorActive() && door) spawnHushBehindPlayer();
   voidFatigue = 0;
   worldBoundaryLatch = false;
   worldBoundaryFriction = 0;
@@ -2205,6 +3690,91 @@ function togglePause(){
   }
 }
 
+function jumpToSubWorld2(){
+  if(!inRogue) return;
+  if(isOnboardingActive()){
+    pushEvent('// complete onboarding before forcing depth 2.');
+    return;
+  }
+  depth=1;
+  px=0;
+  py=0;
+  lastStepDx=0;
+  lastStepDy=0;
+  trail=[];
+  fog=new Map();
+  keyMap=new Map();
+  keysFound=0;
+  keysTotal=0;
+  door=null;
+  nextSpawnAt=0;
+  voidFatigue=0;
+  worldBoundaryLatch=false;
+  worldBoundaryFriction=0;
+  curChunkKey='';
+  curChunkIdx=-1;
+  curPlayerCtx=null;
+  subWorld2Start={x:0,y:0};
+  subWorld2HasKeys=false;
+  stopAllVoices();
+  stopWorldLayerVoice();
+  silenceAmbientDrone();
+  resetHorrorState();
+  revealAroundWithRadius(px, py, 6);
+  updateAudio();
+  startSubWorld2Sequence();
+  pushEvent('// debug: dropped into sub world 2.');
+}
+
+function grantAllKeysForCurrentLevel(){
+  if(!inRogue) return;
+  if(isOnboardingActive()){
+    pushEvent('// debug: complete onboarding first.');
+    return;
+  }
+  // Level 0 owns the active key-door-horror loop today.
+  if(depth===0){
+    if(keysTotal===0) initKeysForSession();
+    if(keysTotal===0){
+      pushEvent('// debug: no key session active.');
+      return;
+    }
+    keyMap = new Map();
+    keysFound = keysTotal;
+    nextSpawnAt = 0;
+    if(!door) spawnDoor();
+    if(!isHorrorActive()) startHorrorSequence();
+    pushEvent('// debug: all keys granted for depth 0.');
+    return;
+  }
+  // Sub World 2 debug path: fast-forward area completions.
+  if(depth===1){
+    if(!sw2.active){
+      startSubWorld2Sequence(SW2_TUNE.debugFastAreas, true);
+    } else {
+      const fast=Math.min(SW2_TUNE.areaCount, SW2_TUNE.debugFastAreas);
+      for(let i=0;i<sw2.areas.length;i++){
+        sw2.areas[i].grabbed = i<fast;
+        sw2.areas[i].complete = i<fast;
+      }
+      sw2.completedCount=fast;
+      sw2.heldItem=false;
+      sw2.heldFromArea=-1;
+      sw2.currentAreaIdx=Math.min(sw2.areas.length-1, Math.max(0, fast));
+      if(sw2.phase===SW2_PHASE.BOOT_SILENCE){
+        setSw2Phase(SW2_PHASE.AREA_LOOP, '// debug: area loop fast-forward.');
+      }
+      if(sw2.completedCount>=SW2_TUNE.areaCount){
+        startSw2FinalDark(performance.now());
+      }
+      sw2.charge=sw2ProgressPct();
+    }
+    pushEvent('// debug: sub world 2 set to late-stage loop.');
+    return;
+  }
+  pushEvent(`// debug: key grant not configured for depth ${depth}.`);
+}
+
 // ── Event log ─────────────────────────────────────────────────────────────────
 function pushEvent(msg){
   eventQueue.push(msg);
@@ -2214,10 +3784,13 @@ function pushEvent(msg){
 
 // ── Render ─────────────────────────────────────────────────────────────────────
 const MAP_EL    = document.getElementById('map');
+const HUSH_JUMP_EL = document.getElementById('hushJump');
 const CATALOG_EL = document.getElementById('catalog');
 const CATALOG_CTL_EL = document.getElementById('catalogCtl');
 const CATALOG_TOGGLE_BTN = document.getElementById('catalogToggleBtn');
 const ONBOARDING_TOGGLE_BTN = document.getElementById('onboardingToggleBtn');
+const SUBWORLD2_BTN = document.getElementById('subWorld2Btn');
+const DEBUG_KEYS_BTN = document.getElementById('debugKeysBtn');
 const STATUS_EL = document.getElementById('status');
 const KEYMETER_EL = document.getElementById('keymeter');
 const SENSE_EL = document.getElementById('sense');
@@ -2441,7 +4014,126 @@ function renderMap(){
   const trailMaxIdx = Math.max(1, trail.length-1);
 
   const introNow = isIntroActive();
+  const sw2Now = (!introNow && depth===1 && sw2.active);
   const playerCls = 't-player';
+  const nowMs = performance.now();
+  const sw2Progress = sw2Now ? clamp(sw2ProgressPct()/100, 0, 1) : 0;
+  const sw2Dark = sw2Now ? clamp(sw2.darkness, 0, 1) : 0;
+  const sw2FinalMask = sw2Now && (sw2.phase===SW2_PHASE.FINAL_DARK || sw2.phase===SW2_PHASE.POST_DOOR);
+  const hushCell = (!introNow && hush.active)
+    ? {x:Math.round(hush.x), y:Math.round(hush.y)}
+    : null;
+  const hushBodyLookup = new Map();
+  if(hushCell){
+    const hushMask = [
+      [0,1,1,0,0],
+      [1,2,4,2,0],
+      [2,4,5,3,1],
+      [1,3,4,2,1],
+      [0,1,2,1,0],
+    ];
+    for(let my=-2;my<=2;my++){
+      for(let mx=-2;mx<=2;mx++){
+        const w=hushMask[my+2][mx+2];
+        if(w<=0) continue;
+        const flicker=Math.floor((nowMs/92) + hushCell.x*0.43 + hushCell.y*0.37 + mx*1.9 + my*1.3);
+        let cls='t-hush-aura';
+        let glyph='░';
+        if(w>=4){
+          cls='t-hush-core';
+          if(mx===0 && my===0){
+            const coreGlyphs=['█','▉','▓','█','╳'];
+            glyph=coreGlyphs[Math.abs(flicker)%coreGlyphs.length];
+          } else {
+            glyph=(Math.abs(flicker)%4===0) ? '█' : (Math.abs(flicker)%4===1 ? '▓' : (Math.abs(flicker)%4===2 ? '▉' : '▒'));
+          }
+        } else if(w===3){
+          cls='t-hush-edge';
+          const edgeGlyphs=['▓','▒','╬','╫'];
+          glyph=edgeGlyphs[Math.abs(flicker)%edgeGlyphs.length];
+        } else if(w===2){
+          cls='t-hush-edge';
+          const edgeGlyphs=['▒','░','╫','╬'];
+          glyph=edgeGlyphs[Math.abs(flicker+1)%edgeGlyphs.length];
+        } else {
+          cls='t-hush-aura';
+          const auraGlyphs=['░','·','┆','░'];
+          glyph=auraGlyphs[Math.abs(flicker)%auraGlyphs.length];
+        }
+        if(hushBlinkActive && w>=3 && (Math.abs(flicker)%2===0)){
+          cls='t-hush-core';
+          glyph=(Math.abs(flicker)%4===0) ? '█' : '╳';
+        }
+        hushBodyLookup.set(`${hushCell.x+mx},${hushCell.y+my}`, {cls, glyph, w});
+      }
+    }
+  }
+  const eyeLookup = new Map();
+  if(!introNow && isHorrorActive()){
+    for(const eye of hushEyes){
+      const ex=Math.round(eye.x), ey=Math.round(eye.y);
+      const k=`${ex},${ey}`;
+      const pinging=(nowMs-eye.lastPingAt) < 220;
+      const d=Math.hypot(ex-px, ey-py);
+      const prev=eyeLookup.get(k);
+      if(!prev || pinging || d<prev.d){
+        eyeLookup.set(k, { pinging, d });
+      }
+    }
+  }
+  const statueLookup = new Map();
+  if(!introNow && isHorrorActive() && horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+    for(const s of corridorStatues){
+      const sx=Math.round(s.x), sy=Math.round(s.y);
+      const k=`${sx},${sy}`;
+      const phase=Math.floor((nowMs/120) + sx*0.27 + sy*0.21 + s.pulse);
+      const lurching=(s.lurch>0.44) || hushBlinkActive;
+      let glyph='◉';
+      if(s.side===0){
+        glyph=(Math.abs(phase)%2===0) ? '◍' : '◉';
+      } else if(lurching){
+        glyph=(Math.abs(phase)%3===0) ? '◈' : '◎';
+      } else {
+        glyph=(Math.abs(phase)%4===0) ? '◌' : '○';
+      }
+      const prev=statueLookup.get(k);
+      if(!prev || (lurching && !prev.lurching)){
+        statueLookup.set(k, {glyph, lurching});
+      }
+    }
+  }
+  const sw2ThreatLookup = new Map();
+  if(sw2Now){
+    for(const area of sw2.areas){
+      const tx=Math.round(area.threatX);
+      const ty=Math.round(area.threatY);
+      const k=`${tx},${ty}`;
+      const visible = sw2FinalMask || nowMs<area.revealUntilMs || area.grabbed || area.complete;
+      if(!visible) continue;
+      const p=Math.floor((nowMs/130) + area.idx*2.1 + tx*0.17 + ty*0.11);
+      const armed = !area.complete;
+      const glyph = sw2FinalMask
+        ? (Math.abs(p)%3===0 ? '█' : Math.abs(p)%3===1 ? '▮' : '▊')
+        : (armed ? (Math.abs(p)%2===0 ? '▮' : '▯') : (Math.abs(p)%2===0 ? '┆' : '│'));
+      sw2ThreatLookup.set(k, {
+        glyph,
+        cls: sw2FinalMask ? 't-sw2-adversary-dark' : (armed ? 't-sw2-adversary' : 't-sw2-adversary-dim')
+      });
+      if(sw2FinalMask){
+        const ringR = 1 + (Math.abs(p)%2);
+        for(let oy2=-ringR; oy2<=ringR; oy2++){
+          for(let ox2=-ringR; ox2<=ringR; ox2++){
+            if(ox2===0 && oy2===0) continue;
+            if((ox2*ox2 + oy2*oy2) > (ringR*ringR)) continue;
+            const kk=`${tx+ox2},${ty+oy2}`;
+            if(!sw2ThreatLookup.has(kk)){
+              sw2ThreatLookup.set(kk, {glyph:'·', cls:'t-sw2-adversary-aura'});
+            }
+          }
+        }
+      }
+    }
+  }
 
   // Pre-compute a single edge-alert cell for the closest off-screen beacon.
   // Keys take priority; fall back to the door once all keys are picked.
@@ -2484,10 +4176,65 @@ function renderMap(){
     let row='';
     for(let vx=0;vx<VIEW_W;vx++){
       const wx=ox+vx;
-      // Player must always render, regardless of transient fog state.
-      if(wx===px&&wy===py){
+      if(wx===px&&wy===py && !(sw2Now && sw2FinalMask)){
         row+=`<span class="${playerCls}">█</span>`;
         continue;
+      }
+      if(hushCell){
+        const hushTile=hushBodyLookup.get(`${wx},${wy}`);
+        if(hushTile){
+          row+=`<span class="${hushTile.cls}">${hushTile.glyph}</span>`;
+          continue;
+        }
+      }
+      if(sw2Now && sw2FinalMask){
+        if(sw2.doorActive){
+          const ddx=wx-sw2.doorX, ddy=wy-sw2.doorY;
+          if(ddx===0 && ddy===0){
+            row+=`<span class="t-sw2-gate">█</span>`;
+            continue;
+          }
+          if((ddx*ddx + ddy*ddy)<=2){
+            row+=`<span class="t-sw2-gate-aura">·</span>`;
+            continue;
+          }
+        }
+        const tInfo=sw2ThreatLookup.get(`${wx},${wy}`);
+        if(tInfo){
+          row+=`<span class="${tInfo.cls}">${tInfo.glyph}</span>`;
+          continue;
+        }
+        row+=' ';
+        continue;
+      }
+      if(sw2Now){
+        const tInfo=sw2ThreatLookup.get(`${wx},${wy}`);
+        if(tInfo){
+          row+=`<span class="${tInfo.cls}">${tInfo.glyph}</span>`;
+          continue;
+        }
+        if(wx===sw2.hubX && wy===sw2.hubY){
+          row+=`<span class="t-sw2-hub">${sw2.heldItem?'◉':'○'}</span>`;
+          continue;
+        }
+        const area=currentSw2Area();
+        if(area){
+          const dA=Math.hypot(wx-area.x, wy-area.y);
+          if(dA<=SW2_TUNE.areaEnterRadius && dA>SW2_TUNE.areaEnterRadius-0.7){
+            row+=`<span class="t-sw2-rite">·</span>`;
+            continue;
+          }
+          if(wx===area.x && wy===area.y){
+            row+=`<span class="t-sw2-anchor">${area.complete?'┆':'╳'}</span>`;
+            continue;
+          }
+        }
+        const n=hash01(wx*0.73 + nowMs*0.00025, wy*0.69 - nowMs*0.0002);
+        const threshold=0.965 - sw2Progress*0.05 - sw2Dark*0.12;
+        if(n>threshold){
+          row+=`<span class="t-sw2-mass">${(Math.floor(nowMs/130 + wx*0.27 + wy*0.13)%2===0)?'▒':'░'}</span>`;
+          continue;
+        }
       }
       // Beacons render *before* fog so keys and the door act as visible
       // markers across the dark map, the way the player does.
@@ -2510,6 +4257,23 @@ function renderMap(){
         if(edgeAlert && edgeAlert.x===wx && edgeAlert.y===wy){
           row+=`<span class="${edgeAlert.cls}" style="opacity:${edgeAlert.opacity}">!</span>`;
           continue;
+        }
+        const statueInfo=statueLookup.get(`${wx},${wy}`);
+        if(statueInfo!==undefined){
+          row+=`<span class="${statueInfo.lurching?'t-statue-lurch':'t-statue'}">${statueInfo.glyph}</span>`;
+          continue;
+        }
+        if(!sw2Now){
+          const eyeInfo=eyeLookup.get(`${wx},${wy}`);
+          if(eyeInfo!==undefined){
+            const phase=Math.floor((nowMs/120) + wx*0.41 + wy*0.37);
+            const eyeGlyph = eyeInfo.pinging
+              ? (phase%2===0 ? '◉' : '◎')
+              : (phase%5===0 ? '◌' : phase%5===1 ? '◍' : phase%5===2 ? '◎' : phase%5===3 ? '◉' : '◈');
+            const cls = eyeInfo.pinging ? 't-eye-ping' : (eyeInfo.d<7.5 ? 't-eye-near' : 't-eye');
+            row+=`<span class="${cls}">${eyeGlyph}</span>`;
+            continue;
+          }
         }
       }
 
@@ -2568,9 +4332,15 @@ function renderStatus(){
   const wId=curPlayerCtx?.worldId || '—';
   const bId=curPlayerCtx?.biomeId ? curPlayerCtx.biomeId.split(':').slice(-1)[0] : '—';
   const introMeta=isIntroActive()?`  intro:${Math.round(introProgress()*100)}%`: '';
+  const hushMeta=isHorrorActive() && depth===0 && Number.isFinite(hushDistance())
+    ? `  hush:${horrorPhase.replace(/_/g,'-')} d:${Math.max(0,Math.round(hushDistance()))}`
+    : '';
+  const sw2Meta=(depth===1 && sw2.active)
+    ? `  rite:${sw2.phase.replace(/sw2_/g,'').replace(/_/g,'-')} ${Math.round(sw2ProgressPct())}%  fails:${sw2.failCount}`
+    : '';
   const metaStr = depth > 0
-    ? `depth:${depth}  void  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}`
-    : `world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}`;
+    ? `depth:${depth}  void  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${sw2Meta}`
+    : `world:${wId}  biome:${bId}  vox:${voices.size}/${POLY_MAX}  step:${stepCount}  loop:${looping?'on':'off'}${introMeta}${hushMeta}`;
   const pad=Math.max(0,VIEW_W-chunkStr.length-metaStr.length);
   STATUS_EL.textContent=chunkStr+' '.repeat(pad)+metaStr;
 }
@@ -2597,8 +4367,100 @@ function distanceDescriptor(d){
 
 function renderSense(){
   if(!SENSE_EL) return;
+  if(depth===1 && sw2.active){
+    if(sw2.phase===SW2_PHASE.BOOT_SILENCE){
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `<span class="sense-dist">silence.</span>`;
+      return;
+    }
+    if(sw2.phase===SW2_PHASE.AREA_LOOP){
+      if(sw2.heldItem){
+        const dxH=sw2.hubX-px, dyH=sw2.hubY-py;
+        const bear=bearingName(dxH,dyH);
+        SENSE_EL.innerHTML =
+          `<span class="sense-prefix">// sense:</span> ` +
+          `return to hub <span class="sense-bearing">${bear}</span>.`;
+        return;
+      }
+      const area=currentSw2Area();
+      if(area){
+        const dxA=area.x-px, dyA=area.y-py;
+        const dT=Math.hypot(px-area.threatX, py-area.threatY);
+        const bear=bearingName(dxA,dyA);
+        SENSE_EL.innerHTML =
+          `<span class="sense-prefix">// sense:</span> ` +
+          `area <span class="sense-bearing">${bear}</span>. ` +
+          `<span class="sense-dist">too close at ${sw2KillRadius().toFixed(1)}</span>.`;
+        return;
+      }
+    }
+    if(sw2.phase===SW2_PHASE.FINAL_DARK){
+      const dxD=sw2.doorX-px, dyD=sw2.doorY-py;
+      const dBear=bearingName(dxD,dyD);
+      let nearest=null;
+      for(const area of sw2.areas){
+        const d=Math.hypot(px-area.threatX, py-area.threatY);
+        if(nearest===null || d<nearest) nearest=d;
+      }
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `door <span class="t-door-sense">█</span> to the ` +
+        `<span class="sense-bearing">${dBear}</span>. ` +
+        `<span class="sense-dist">nearest ${nearest===null?'—':nearest.toFixed(1)}</span>.`;
+      return;
+    }
+    if(sw2.phase===SW2_PHASE.POST_DOOR){
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `<span class="sense-dist">it does not leave.</span>`;
+      return;
+    }
+    SENSE_EL.innerHTML='';
+    return;
+  }
   if(isIntroActive() || keysTotal===0){
     SENSE_EL.innerHTML='';
+    return;
+  }
+  if(isHorrorActive() && depth===0 && door){
+    const dxH=hush.x-px, dyH=hush.y-py;
+    const hDist=Math.hypot(dxH,dyH);
+    const hBear=bearingName(dxH,dyH);
+    const hDesc=distanceDescriptor(hDist);
+    const dxD=door.x-px, dyD=door.y-py;
+    const dBear=bearingName(dxD,dyD);
+    if(doorRevealCutscene){
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `door <span class="t-door-sense">█</span> fixed to the ` +
+        `<span class="sense-bearing">${dBear}</span>. ` +
+        `<span class="t-hush-sense">☍</span> retreats to the ` +
+        `<span class="sense-bearing">${hBear}</span>. ` +
+        `<span class="sense-dist">your legs feel heavy.</span>`;
+    } else if(horrorPhase===HORROR_SEQUENCE.DOOR_SWARM){
+      const nowMs=performance.now();
+      const lockLeft=Math.max(0, hushLockedUntilMs-nowMs);
+      const lockText=isHushLocked(nowMs)
+        ? `lock holds ${Math.round(lockLeft)}ms`
+        : 'lock broken';
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `statues line the corridor to the ` +
+        `<span class="sense-bearing">${dBear}</span>. ` +
+        `<span class="sense-dist">${lockText}</span>. ` +
+        `<span class="t-hush-sense">☍</span> waits at the ` +
+        `<span class="sense-bearing">${hBear}</span> until the blink.`;
+    } else {
+      SENSE_EL.innerHTML =
+        `<span class="sense-prefix">// sense:</span> ` +
+        `<span class="t-hush-sense">☍</span> hush ` +
+        `<span class="sense-dist">${hDesc.label}</span> to the ` +
+        `<span class="sense-bearing">${hBear}</span>. ` +
+        `door <span class="t-door-sense">█</span> to the ` +
+        `<span class="sense-bearing">${dBear}</span>. ` +
+        `<span class="sense-dist">do not stop.</span>`;
+    }
     return;
   }
   // Pick the nearest active beacon. Keys outrank the door so the current
@@ -2641,6 +4503,23 @@ function renderSense(){
 
 function renderKeymeter(){
   if(!KEYMETER_EL) return;
+  if(depth===1 && sw2.active){
+    KEYMETER_EL.style.display='block';
+    const done=Math.max(0, Math.min(SW2_TUNE.areaCount, sw2.completedCount));
+    const held=sw2.heldItem ? '◉' : '·';
+    const meter='●'.repeat(done) + '○'.repeat(Math.max(0, SW2_TUNE.areaCount-done));
+    let tail=`<span class="km-danger">— dark ${Math.round(sw2.darkness*100)}%</span>`;
+    if(sw2.phase===SW2_PHASE.BOOT_SILENCE){
+      tail=`<span class="km-danger">— silence</span>`;
+    } else if(sw2.phase===SW2_PHASE.FINAL_DARK){
+      tail=`<span class="km-danger">— reach door</span>`;
+    } else if(sw2.phase===SW2_PHASE.POST_DOOR){
+      tail=`<span class="km-danger">— complete</span>`;
+    }
+    const carry=`<span class="km-label"> carry ${held}</span>`;
+    KEYMETER_EL.innerHTML = `<span class="km-lit">${meter}</span>${carry}${tail}`;
+    return;
+  }
   if(keysTotal===0 || isIntroActive()){
     KEYMETER_EL.style.display='none';
     return;
@@ -2659,9 +4538,14 @@ function renderKeymeter(){
   } else if(nextSpawnAt > 0 && keysFound < keysTotal){
     row += `<span class="km-pending">…</span>`;
   }
-  const tail = door
-    ? `<span class="km-door">— door active</span>`
-    : `<span class="km-label">${keysFound}/${keysTotal}</span>`;
+  let tail='';
+  if(isHorrorActive() && depth===0){
+    tail = `<span class="km-danger">— HUSH ACTIVE</span>`;
+  } else {
+    tail = door
+      ? `<span class="km-door">— door active</span>`
+      : `<span class="km-label">${keysFound}/${keysTotal}</span>`;
+  }
   KEYMETER_EL.innerHTML = `${row}${tail}`;
 }
 
@@ -2758,6 +4642,7 @@ function loop(){
         }
       }
       maybeSpawnScheduledKey();
+      updateHorrorTick();
       renderMap(); renderCatalog(); renderStatus(); renderSense(); renderKeymeter();
     }
     else renderBoot();
@@ -2866,6 +4751,7 @@ function onKey(e){
     e.preventDefault();
     if(isOnboardingActive() && (e.key==='ArrowDown' || e.key==='s' || e.key==='S')) return;
     keysDown.add(e.key);
+    if(!e.repeat) maybeLockHushFromInputKey(e.key, performance.now());
     const [dx,dy]=arrowDelta();
     if(dx||dy){
       step(dx,dy);
@@ -2944,6 +4830,12 @@ function boot(){
       else pushEvent('// onboarding already complete this session.');
     });
   }
+  if(SUBWORLD2_BTN){
+    SUBWORLD2_BTN.addEventListener('click', ()=>jumpToSubWorld2());
+  }
+  if(DEBUG_KEYS_BTN){
+    DEBUG_KEYS_BTN.addEventListener('click', ()=>grantAllKeysForCurrentLevel());
+  }
   // Register input/focus handlers once; avoid missing controls during a partial
   // enterRogue path.
   window.addEventListener('keydown',onKey, {capture:true});
@@ -2959,6 +4851,7 @@ function boot(){
   updateOnboardingButton();
   raf=requestAnimationFrame(loop);
   loadAll();
+  loadSw2DriverAudio();
 }
 
 boot();
