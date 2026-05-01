@@ -6,8 +6,9 @@ const OPERATOR_NAME = 'seb suarez';
 const OPERATOR_IMAGE = '/seb-portrait.jpg';
 const FEED_API_BASE = import.meta.env.VITE_FEED_API_BASE || 'https://seb-feed.cbassuarez.workers.dev';
 const TURNSTILE_DEV_TEST_SITE_KEY = '1x00000000000000000000AA';
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TURNSTILE_DEV_TEST_SITE_KEY : '');
+const TURNSTILE_SITE_KEY_BUILD = import.meta.env.VITE_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TURNSTILE_DEV_TEST_SITE_KEY : '');
 const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const TURNSTILE_CONTACT_ACTION = 'contact_form_v1';
 const UI_FONT_STACK = '"Times New Roman", Times, serif';
 const MONO_FONT_STACK = '"Courier New", Courier, monospace';
 
@@ -1975,10 +1976,12 @@ function ContactPage() {
     () => new Date().toLocaleTimeString('en-US', { hour12: false, timeZoneName: 'short' }),
     []
   );
-  const turnstileEnabled = Boolean(TURNSTILE_SITE_KEY);
+  const [resolvedTurnstileSiteKey, setResolvedTurnstileSiteKey] = useState(() => TURNSTILE_SITE_KEY_BUILD || '');
+  const [siteKeyStatus, setSiteKeyStatus] = useState(() => (TURNSTILE_SITE_KEY_BUILD ? 'ready' : 'loading'));
+  const turnstileEnabled = Boolean(resolvedTurnstileSiteKey);
   const [submitState, setSubmitState] = useState(sentFromQuery || sentFromPath ? 'sent' : 'idle');
   const [submitError, setSubmitError] = useState('');
-  const [turnstileStatus, setTurnstileStatus] = useState(turnstileEnabled ? 'loading' : 'disabled');
+  const [turnstileStatus, setTurnstileStatus] = useState('idle');
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileHostRef = useRef(null);
   const turnstileWidgetIdRef = useRef(null);
@@ -1997,6 +2000,43 @@ function ContactPage() {
   }
 
   useEffect(() => {
+    if (TURNSTILE_SITE_KEY_BUILD) {
+      setResolvedTurnstileSiteKey(TURNSTILE_SITE_KEY_BUILD);
+      setSiteKeyStatus('ready');
+      return;
+    }
+
+    let cancelled = false;
+    setSiteKeyStatus('loading');
+
+    const loadSiteKey = async () => {
+      try {
+        const response = await fetch(`${FEED_API_BASE}/api/contact-config`, { headers: { accept: 'application/json' } });
+        if (!response.ok) throw new Error(`contact-config failed (${response.status})`);
+        const payload = await response.json();
+        const siteKey = String(payload?.turnstileSiteKey || '').trim();
+        if (cancelled) return;
+        if (siteKey) {
+          setResolvedTurnstileSiteKey(siteKey);
+          setSiteKeyStatus('ready');
+        } else {
+          setResolvedTurnstileSiteKey('');
+          setSiteKeyStatus('missing');
+        }
+      } catch (_) {
+        if (cancelled) return;
+        setResolvedTurnstileSiteKey('');
+        setSiteKeyStatus('missing');
+      }
+    };
+
+    loadSiteKey();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!turnstileEnabled || submitState === 'sent') return undefined;
     const host = turnstileHostRef.current;
     if (!host) return undefined;
@@ -2012,8 +2052,9 @@ function ContactPage() {
 
         host.innerHTML = '';
         turnstileWidgetIdRef.current = turnstile.render(host, {
-          sitekey: TURNSTILE_SITE_KEY,
+          sitekey: resolvedTurnstileSiteKey,
           theme: 'light',
+          action: TURNSTILE_CONTACT_ACTION,
           callback: (token) => {
             setTurnstileToken(String(token || ''));
             setTurnstileStatus('verified');
@@ -2049,7 +2090,7 @@ function ContactPage() {
       }
       turnstileWidgetIdRef.current = null;
     };
-  }, [submitState, turnstileEnabled]);
+  }, [resolvedTurnstileSiteKey, submitState, turnstileEnabled]);
 
   function resetTurnstile() {
     setTurnstileToken('');
@@ -2100,7 +2141,9 @@ function ContactPage() {
 
     if (!turnstileEnabled) {
       setSubmitState('error');
-      setSubmitError('human verification is unavailable. please try again shortly.');
+      setSubmitError(siteKeyStatus === 'loading'
+        ? 'human verification is still loading. please wait a moment and retry.'
+        : 'human verification is unavailable. please try again shortly.');
       return;
     }
 
@@ -2156,7 +2199,12 @@ function ContactPage() {
         } catch (_) {
           // ignore parse failures
         }
-        if (response.status === 403 || detail === 'turnstile_failed') {
+        if (
+          response.status === 403 ||
+          detail === 'turnstile_failed' ||
+          detail === 'turnstile_bad_hostname' ||
+          detail === 'turnstile_bad_action'
+        ) {
           throw new Error('verification_failed');
         }
         if (response.status === 503 || detail === 'turnstile_unconfigured') {
@@ -2302,6 +2350,8 @@ function ContactPage() {
               <br />
               {turnstileEnabled ? (
                 <span ref={turnstileHostRef} />
+              ) : siteKeyStatus === 'loading' ? (
+                <small>loading verification key...</small>
               ) : (
                 <small>verification unavailable (missing site key)</small>
               )}
@@ -2324,7 +2374,7 @@ function ContactPage() {
               </p>
             ) : null}
             <p>
-              <button type="submit" disabled={submitState === 'sending' || (turnstileEnabled && !turnstileToken)}>
+              <button type="submit" disabled={submitState === 'sending' || !turnstileEnabled || !turnstileToken}>
                 {submitState === 'sending' ? 'sending...' : 'send transmission'}
               </button>
             </p>

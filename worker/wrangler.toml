@@ -7,6 +7,7 @@ enabled = true
 
 [vars]
 CONTACT_FORMSPREE_ENDPOINT = "https://formspree.io/f/mjkepaeo"
+TURNSTILE_ALLOWED_HOSTNAMES = "cbassuarez.com,www.cbassuarez.com"
 
 [[kv_namespaces]]
 binding = "HITS_KV"

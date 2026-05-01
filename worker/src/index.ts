@@ -49,6 +49,8 @@ type RateLimitBinding = {
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_ALLOWED_HOSTNAMES?: string;
   CONTACT_FORMSPREE_ENDPOINT?: string;
   HITS_KV?: KVNamespace;
   HITS_BASELINE?: string;
@@ -126,6 +128,7 @@ const normalizeIsoAt = (value: unknown): string | null => {
 
 const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
 const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
+const CONTACT_TURNSTILE_ACTION = "contact_form_v1";
 const CONTACT_EMAIL_REGEX =
   /^(?=.{6,254}$)(?=.{2,64}@)([A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]))+)$/;
 const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
@@ -1109,7 +1112,20 @@ function resolveTurnstileSecret(env: Env, request: Request): string {
   return isLocalHost ? TURNSTILE_TEST_SECRET_KEY : "";
 }
 
-async function verifyTurnstileToken(token: string, secret: string, remoteIp: string): Promise<{ success: boolean; errorCodes: string[] }> {
+function allowedTurnstileHostnames(env: Env): Set<string> {
+  const raw = clean(env.TURNSTILE_ALLOWED_HOSTNAMES || "cbassuarez.com,www.cbassuarez.com");
+  const parts = raw
+    .split(",")
+    .map((host) => clean(host).toLowerCase())
+    .filter(Boolean);
+  return new Set(parts);
+}
+
+async function verifyTurnstileToken(
+  token: string,
+  secret: string,
+  remoteIp: string
+): Promise<{ success: boolean; errorCodes: string[]; hostname: string; action: string }> {
   const payload = new URLSearchParams();
   payload.set("secret", secret);
   payload.set("response", token);
@@ -1128,14 +1144,21 @@ async function verifyTurnstileToken(token: string, secret: string, remoteIp: str
     const errorCodes = Array.isArray(parsed?.["error-codes"])
       ? parsed["error-codes"].map((code: unknown) => clean(code)).filter(Boolean)
       : [];
+    const hostname = clean(parsed?.hostname || "").toLowerCase();
+    const action = clean(parsed?.action || "");
 
     if (!response.ok) {
-      return { success: false, errorCodes: errorCodes.length ? errorCodes : [`siteverify_http_${response.status}`] };
+      return {
+        success: false,
+        errorCodes: errorCodes.length ? errorCodes : [`siteverify_http_${response.status}`],
+        hostname,
+        action,
+      };
     }
 
-    return { success: Boolean(parsed?.success), errorCodes };
+    return { success: Boolean(parsed?.success), errorCodes, hostname, action };
   } catch {
-    return { success: false, errorCodes: ["siteverify_network_error"] };
+    return { success: false, errorCodes: ["siteverify_network_error"], hostname: "", action: "" };
   }
 }
 
@@ -1388,6 +1411,29 @@ export default {
           );
         }
 
+        const allowedHosts = allowedTurnstileHostnames(env);
+        if (allowedHosts.size > 0 && !allowedHosts.has(verification.hostname)) {
+          return new Response(
+            JSON.stringify({
+              error: "turnstile_bad_hostname",
+              hostname: verification.hostname || null,
+              at: new Date().toISOString(),
+            }),
+            { status: 403, headers: jsonHeaders(allowOrigin) }
+          );
+        }
+
+        if (verification.action && verification.action !== CONTACT_TURNSTILE_ACTION) {
+          return new Response(
+            JSON.stringify({
+              error: "turnstile_bad_action",
+              action: verification.action,
+              at: new Date().toISOString(),
+            }),
+            { status: 403, headers: jsonHeaders(allowOrigin) }
+          );
+        }
+
         const forwarded = await forwardContactToFormspree(env, parsed.data);
         if (!forwarded.ok) {
           return new Response(
@@ -1410,6 +1456,24 @@ export default {
           { status: 502, headers: jsonHeaders(allowOrigin) }
         );
       }
+    }
+
+    if (url.pathname === "/api/contact-config") {
+      if (request.method !== "GET") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+
+      const siteKey = clean(env.TURNSTILE_SITE_KEY || "");
+      return new Response(
+        JSON.stringify({
+          turnstileSiteKey: siteKey || null,
+          at: new Date().toISOString(),
+        }),
+        { status: 200, headers: jsonHeaders(allowOrigin) }
+      );
     }
 
     if (url.pathname === "/api/string/pluck") {
