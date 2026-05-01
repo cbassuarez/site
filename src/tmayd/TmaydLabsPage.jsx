@@ -99,7 +99,7 @@ export default function TmaydLabsPage({ pathname }) {
           <i>labs / tell me about your day</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/feed">feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/feed">feed</a> ] [ <a href="/labs/guestbook">guestbook</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
