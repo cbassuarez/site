@@ -35,3 +35,27 @@ namespace_id = "1003"
   [ratelimits.simple]
   limit = 3
   period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_STRING_PLUCK"
+namespace_id = "1004"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_STRING_GET"
+namespace_id = "1005"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_STRING_CURSOR"
+namespace_id = "1006"
+
+  [ratelimits.simple]
+  limit = 80
+  period = 60

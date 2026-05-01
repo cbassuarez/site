@@ -727,7 +727,7 @@ function HomePage() {
           </p>
           <h3>labs</h3>
           <p>
-            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ]
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/labs/string/index.html">string</a> ]
           </p>
 
           <h3>operator</h3>
@@ -862,6 +862,9 @@ function HomePage() {
                   </li>
                   <li>
                     <a href="/labs/chunk-surfer/index.html">chunk surfer</a>
+                  </li>
+                  <li>
+                    <a href="/labs/string/index.html">string</a>
                   </li>
                 </ul>
 
@@ -1023,7 +1026,7 @@ function HomePage() {
                 ]
               </span>
             ))}{' '}
-            [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/feed">seb feed</a> / <a href="/guestbook">guestbook</a> / <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/colophon">colophon</a> ]
+            [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/feed">seb feed</a> / <a href="/guestbook">guestbook</a> / <a href="/labs/chunk-surfer/index.html">chunk surfer</a> / <a href="/labs/string/index.html">string</a> ] [ <a href="/colophon">colophon</a> ]
           </small>
         </center>
       </div>
@@ -1467,7 +1470,7 @@ function TalkRecapPage() {
       </p>
       <p>
         Walk the site:{' '}
-        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
+        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/labs/string/index.html">string</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
       </p>
 
       <hr />

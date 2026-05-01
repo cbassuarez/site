@@ -68,6 +68,9 @@ type Env = {
   RATE_LIMIT_FEED?: RateLimitBinding;
   RATE_LIMIT_HIT?: RateLimitBinding;
   RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
+  RATE_LIMIT_STRING_PLUCK?: RateLimitBinding;
+  RATE_LIMIT_STRING_GET?: RateLimitBinding;
+  RATE_LIMIT_STRING_CURSOR?: RateLimitBinding;
 };
 
 type FeedSnapshot = {
@@ -788,6 +791,90 @@ async function recordGuestbookSignature(env: Env, ip: string): Promise<void> {
   await kv.put(`guestbook:signer:${hash}`, new Date().toISOString());
 }
 
+type StringPluck = { x: number; y: number; t: number; who: string };
+type StringCursor = { x: number; t: number; who: string };
+
+const STRING_PLUCKS_KEY = "string:plucks-v1";
+const STRING_CURSORS_KEY = "string:cursors-v1";
+const STRING_PLUCK_WINDOW_MS = 90_000;
+const STRING_CURSOR_WINDOW_MS = 5_000;
+const STRING_PLUCK_MAX = 200;
+const STRING_CURSOR_MAX = 64;
+
+const clamp01 = (value: unknown) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+};
+
+async function hashStringWho(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(`string-who-v1:${ip}`);
+  const buffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buffer))
+    .slice(0, 6)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function readStringPlucks(env: Env): Promise<StringPluck[]> {
+  const kv = env.HITS_KV;
+  if (!kv) return [];
+  const raw = await kv.get(STRING_PLUCKS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((p: any): StringPluck | null => {
+        const t = Number(p?.t);
+        if (!Number.isFinite(t) || t <= 0) return null;
+        return {
+          x: clamp01(p?.x),
+          y: clamp01(p?.y),
+          t,
+          who: clean(p?.who).slice(0, 16),
+        };
+      })
+      .filter((p): p is StringPluck => p !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function writeStringPlucks(env: Env, plucks: StringPluck[]): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  await kv.put(STRING_PLUCKS_KEY, JSON.stringify(plucks));
+}
+
+async function readStringCursors(env: Env): Promise<StringCursor[]> {
+  const kv = env.HITS_KV;
+  if (!kv) return [];
+  const raw = await kv.get(STRING_CURSORS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((c: any): StringCursor | null => {
+        const t = Number(c?.t);
+        if (!Number.isFinite(t) || t <= 0) return null;
+        return { x: clamp01(c?.x), t, who: clean(c?.who).slice(0, 16) };
+      })
+      .filter((c): c is StringCursor => c !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function writeStringCursors(env: Env, cursors: StringCursor[]): Promise<void> {
+  const kv = env.HITS_KV;
+  if (!kv) return;
+  await kv.put(STRING_CURSORS_KEY, JSON.stringify(cursors));
+}
+
 async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
   const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
     ["github", () => fetchGitHub(env, FEED_MAX_ITEMS)],
@@ -1090,6 +1177,110 @@ export default {
         status: 405,
         headers: jsonHeaders(allowOrigin),
       });
+    }
+
+    if (url.pathname === "/api/string/pluck") {
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_PLUCK, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+      try {
+        const body: any = await request.json().catch(() => ({}));
+        const x = clamp01(body?.x);
+        const y = clamp01(body?.y);
+        const claimed = clean(body?.who).slice(0, 16);
+        const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed.toLowerCase() : await hashStringWho(clientKey(request));
+        const t = Date.now();
+        const cutoff = t - STRING_PLUCK_WINDOW_MS;
+        const existing = await readStringPlucks(env);
+        const next: StringPluck[] = [...existing, { x, y, t, who }]
+          .filter((p) => p.t >= cutoff)
+          .slice(-STRING_PLUCK_MAX);
+        await writeStringPlucks(env, next);
+        return new Response(JSON.stringify({ ok: true, t, who }), {
+          status: 200,
+          headers: jsonHeaders(allowOrigin),
+        });
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({ error: clean(error?.message || "string_pluck_failed"), at: new Date().toISOString() }),
+          { status: 502, headers: jsonHeaders(allowOrigin) }
+        );
+      }
+    }
+
+    if (url.pathname === "/api/string/recent") {
+      if (request.method !== "GET") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_GET, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+      try {
+        const since = Number(url.searchParams.get("since")) || 0;
+        const serverNow = Date.now();
+        const cutoff = Math.max(since, serverNow - STRING_PLUCK_WINDOW_MS);
+        const cursorCutoff = serverNow - STRING_CURSOR_WINDOW_MS;
+        const [allPlucks, allCursors] = await Promise.all([
+          readStringPlucks(env),
+          readStringCursors(env),
+        ]);
+        const plucks = allPlucks.filter((p) => p.t > cutoff).slice(-STRING_PLUCK_MAX);
+        const cursors = allCursors.filter((c) => c.t > cursorCutoff).slice(-STRING_CURSOR_MAX);
+        return new Response(JSON.stringify({ plucks, cursors, serverNow }), {
+          status: 200,
+          headers: {
+            ...jsonHeaders(allowOrigin),
+            "cache-control": "public, max-age=1",
+          },
+        });
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({ error: clean(error?.message || "string_recent_failed"), at: new Date().toISOString() }),
+          { status: 502, headers: jsonHeaders(allowOrigin) }
+        );
+      }
+    }
+
+    if (url.pathname === "/api/string/cursor") {
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_CURSOR, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+      try {
+        const body: any = await request.json().catch(() => ({}));
+        const x = clamp01(body?.x);
+        const claimed = clean(body?.who).slice(0, 16);
+        const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed.toLowerCase() : await hashStringWho(clientKey(request));
+        const t = Date.now();
+        const cutoff = t - STRING_CURSOR_WINDOW_MS;
+        const existing = await readStringCursors(env);
+        const filtered = existing.filter((c) => c.who !== who && c.t >= cutoff);
+        const next: StringCursor[] = [...filtered, { x, t, who }].slice(-STRING_CURSOR_MAX);
+        await writeStringCursors(env, next);
+        return new Response(JSON.stringify({ ok: true, t, who }), {
+          status: 200,
+          headers: jsonHeaders(allowOrigin),
+        });
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({ error: clean(error?.message || "string_cursor_failed"), at: new Date().toISOString() }),
+          { status: 502, headers: jsonHeaders(allowOrigin) }
+        );
+      }
     }
 
     if (url.pathname === "/api/health") {
