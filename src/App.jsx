@@ -2107,15 +2107,24 @@ function ContactPage() {
   }
 
   function isValidEmailAddress(value) {
-    const email = String(value || '').trim();
-    // Practical, production-safe regex: RFC-inspired local-part and domain labels,
-    // with hard length limits and mandatory dotted domain.
-    const match = email.match(
-      /^(?=.{6,254}$)(?=.{2,64}@)([A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]))+)$/
-    );
-    if (!match) return false;
-    const local = match[1].toLowerCase();
-    const domain = match[2].toLowerCase();
+    const email = String(value || '').trim().toLowerCase();
+    if (email.length < 6 || email.length > 254) return false;
+    const parts = email.split('@');
+    if (parts.length !== 2) return false;
+    const local = parts[0];
+    const domain = parts[1];
+    if (local.length < 2 || local.length > 64) return false;
+    if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i.test(local)) return false;
+    if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+    if (!/^[a-z0-9.-]+$/i.test(domain)) return false;
+    if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return false;
+    const labels = domain.split('.');
+    if (labels.length < 2) return false;
+    for (const label of labels) {
+      if (!/^[a-z0-9-]+$/i.test(label)) return false;
+      if (label.startsWith('-') || label.endsWith('-')) return false;
+      if (label.length < 1 || label.length > 63) return false;
+    }
     const tld = domain.split('.').pop() || '';
     if (!/^[a-z]{2,24}$/.test(tld)) return false;
     // Heuristic anti-placeholder checks (not a deliverability guarantee).
@@ -2193,22 +2202,33 @@ function ContactPage() {
 
       if (!response.ok) {
         let detail = '';
+        let upstreamStatus = 0;
+        let upstreamDetail = '';
+        let badHostname = '';
         try {
           const payload = await response.json();
           detail = String(payload?.error || '');
+          upstreamStatus = Number(payload?.upstreamStatus) || 0;
+          upstreamDetail = String(payload?.upstreamDetail || '');
+          badHostname = String(payload?.hostname || '');
         } catch (_) {
           // ignore parse failures
         }
-        if (
-          response.status === 403 ||
-          detail === 'turnstile_failed' ||
-          detail === 'turnstile_bad_hostname' ||
-          detail === 'turnstile_bad_action'
-        ) {
+        if (detail === 'turnstile_bad_hostname') {
+          throw new Error(badHostname ? `bad_hostname:${badHostname}` : 'bad_hostname');
+        }
+        if (detail === 'turnstile_bad_action' || detail === 'turnstile_failed' || response.status === 403) {
           throw new Error('verification_failed');
         }
         if (response.status === 503 || detail === 'turnstile_unconfigured') {
           throw new Error('verification_unavailable');
+        }
+        if (detail === 'invalid_email') {
+          throw new Error('invalid_email');
+        }
+        if (detail === 'contact_forward_failed') {
+          const hint = upstreamStatus ? `mail_relay_${upstreamStatus}` : 'mail_relay_failed';
+          throw new Error(upstreamDetail ? `${hint}:${upstreamDetail}` : hint);
         }
         throw new Error(`contact submit failed (${response.status})`);
       }
@@ -2228,8 +2248,15 @@ function ContactPage() {
       setSubmitState('error');
       if (error instanceof Error && error.message === 'verification_failed') {
         setSubmitError('cloudflare verification failed or expired. please retry the human check and send again.');
+      } else if (error instanceof Error && error.message.startsWith('bad_hostname')) {
+        const observed = error.message.includes(':') ? error.message.split(':').slice(1).join(':') : '';
+        setSubmitError(`verification hostname mismatch${observed ? ` (${observed})` : ''}. add this hostname to the turnstile widget and TURNSTILE_ALLOWED_HOSTNAMES.`);
       } else if (error instanceof Error && error.message === 'verification_unavailable') {
         setSubmitError('cloudflare verification is temporarily unavailable. please retry in a moment.');
+      } else if (error instanceof Error && error.message === 'invalid_email') {
+        setSubmitError('email address was rejected. please use a full address like name@domain.com.');
+      } else if (error instanceof Error && error.message.startsWith('mail_relay_')) {
+        setSubmitError('message could not be relayed to inbox. please verify Formspree form status/plan and retry.');
       } else {
         setSubmitError('transmission failed. refresh the human check and retry, or email contact@cbassuarez.com directly.');
       }
@@ -2295,6 +2322,8 @@ function ContactPage() {
                 value={formValues.email}
                 onChange={(event) => updateField('email', event.target.value)}
                 autoComplete="email"
+                pattern="^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$"
+                minLength={6}
                 required
               />
             </p>

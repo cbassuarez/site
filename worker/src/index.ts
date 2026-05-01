@@ -129,8 +129,6 @@ const normalizeIsoAt = (value: unknown): string | null => {
 const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
 const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
 const CONTACT_TURNSTILE_ACTION = "contact_form_v1";
-const CONTACT_EMAIL_REGEX =
-  /^(?=.{6,254}$)(?=.{2,64}@)([A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]))+)$/;
 const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
 const CONTACT_BLOCKED_LOCAL_PARTS = new Set([
   "a",
@@ -1052,13 +1050,24 @@ function clientKey(request: Request): string {
 
 function isValidContactEmail(value: unknown): boolean {
   const email = clean(value).toLowerCase();
-  const match = email.match(CONTACT_EMAIL_REGEX);
-  if (!match) return false;
-
-  const local = clean(match[1]).toLowerCase();
-  const domain = clean(match[2]).toLowerCase();
-  const tld = domain.split(".").pop() || "";
-
+  if (email.length < 6 || email.length > 254) return false;
+  const parts = email.split("@");
+  if (parts.length !== 2) return false;
+  const local = parts[0];
+  const domain = parts[1];
+  if (local.length < 2 || local.length > 64) return false;
+  if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i.test(local)) return false;
+  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  if (!/^[a-z0-9.-]+$/i.test(domain)) return false;
+  if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
+  const labels = domain.split(".");
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!/^[a-z0-9-]+$/i.test(label)) return false;
+    if (label.startsWith("-") || label.endsWith("-")) return false;
+    if (label.length < 1 || label.length > 63) return false;
+  }
+  const tld = labels[labels.length - 1] || "";
   if (!/^[a-z]{2,24}$/.test(tld)) return false;
   if (CONTACT_BLOCKED_LOCAL_PARTS.has(local)) return false;
   if (CONTACT_BLOCKED_DOMAINS.has(domain)) return false;
@@ -1162,10 +1171,13 @@ async function verifyTurnstileToken(
   }
 }
 
-async function forwardContactToFormspree(env: Env, payload: ContactSubmission): Promise<{ ok: boolean; status: number }> {
+async function forwardContactToFormspree(
+  env: Env,
+  payload: ContactSubmission
+): Promise<{ ok: boolean; status: number; detail: string }> {
   const endpoint = clean(env.CONTACT_FORMSPREE_ENDPOINT || CONTACT_FORMSPREE_DEFAULT_ENDPOINT);
   if (!endpoint.startsWith("https://formspree.io/")) {
-    return { ok: false, status: 500 };
+    return { ok: false, status: 500, detail: "invalid_formspree_endpoint" };
   }
 
   const response = await fetch(endpoint, {
@@ -1184,7 +1196,20 @@ async function forwardContactToFormspree(env: Env, payload: ContactSubmission): 
     }),
   });
 
-  return { ok: response.ok, status: response.status };
+  let detail = "";
+  try {
+    const contentType = clean(response.headers.get("content-type"));
+    if (contentType.includes("application/json")) {
+      const body: any = await response.json().catch(() => ({}));
+      detail = clean(body?.error || body?.message || body?.errors?.[0]?.message || "");
+    } else {
+      detail = clean((await response.text()).slice(0, 180));
+    }
+  } catch {
+    detail = "";
+  }
+
+  return { ok: response.ok, status: response.status, detail: short(detail, 160) };
 }
 
 async function handleFeedRequest(
@@ -1440,6 +1465,7 @@ export default {
             JSON.stringify({
               error: "contact_forward_failed",
               upstreamStatus: forwarded.status,
+              upstreamDetail: forwarded.detail || null,
               at: new Date().toISOString(),
             }),
             { status: 502, headers: jsonHeaders(allowOrigin) }
