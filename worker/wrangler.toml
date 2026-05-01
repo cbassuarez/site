@@ -5,6 +5,9 @@ compatibility_date = "2026-04-24"
 [observability]
 enabled = true
 
+[vars]
+CONTACT_FORMSPREE_ENDPOINT = "https://formspree.io/f/mjkepaeo"
+
 [[kv_namespaces]]
 binding = "HITS_KV"
 id = "5034b4f88e04478d84f90350268b5aa3"
@@ -34,6 +37,14 @@ namespace_id = "1003"
 
   [ratelimits.simple]
   limit = 3
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_CONTACT_POST"
+namespace_id = "1007"
+
+  [ratelimits.simple]
+  limit = 4
   period = 60
 
 [[ratelimits]]

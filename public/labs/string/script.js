@@ -18,7 +18,7 @@
   const REMOTE_CURSOR_STALE_MS = 6_000;
   const SIM_GC_INTERVAL_MS = 5_000;
 
-  const PITCH_LOW_HZ = 130.81; // C3
+  const PITCH_LOW_HZ = 55.0; // A1
   const PITCH_HIGH_HZ = 1046.5; // C6
   const VOICE_ATTACK_S = 0.030;
   const DECAY_FLOOR = 0.0005; // -66 dB target for both audio + visual
@@ -551,11 +551,32 @@
   const SYMPATHETIC_RECENT_MS = 30_000;
   const SYMPATHETIC_DELAY_MIN = 60;
   const SYMPATHETIC_DELAY_JITTER = 90;
+  const SYMPATHETIC_VISUAL_DELAY_MIN = 20;
+  const SYMPATHETIC_VISUAL_DELAY_JITTER = 130;
+
+  function injectBridgeImpulse(sim, impulse) {
+    if (!sim || !Number.isFinite(impulse)) return;
+    // Couple into the bridge taps (not the pluck point) so sympathetic motion
+    // arrives as a room/structure response, not an exact mirrored gesture.
+    for (const tap of [BRIDGE_TAP_LEFT, BRIDGE_TAP_RIGHT]) {
+      for (let o = -2; o <= 2; o++) {
+        const idx = tap + o;
+        if (idx <= 0 || idx >= N - 1) continue;
+        const falloff = 1 / (1 + 1.2 * o * o);
+        const f = impulse * falloff * (0.85 + Math.random() * 0.30);
+        sim.wL[idx] += f;
+        sim.wR[idx] += f;
+      }
+    }
+    sim.lastActiveT = Date.now();
+  }
 
   function triggerSympathetic(sourceWho, x01, y01, pluck) {
     const now = Date.now();
     const sourceSim = sims.get(sourceWho);
     const sourceLane = sourceSim ? sourceSim.identity.yOffset : 0;
+    const sourceSign = (pluck?.sign || 1) < 0 ? -1 : 1;
+    const sourceForce = clamp01(pluck?.force01);
     const candidates = [];
     for (const [w, sim] of sims) {
       if (w === sourceWho) continue;
@@ -573,18 +594,23 @@
       const { w, weight } = candidates[i];
       const targetSim = sims.get(w);
       if (!targetSim) continue;
+
+      const visualImpulse = sourceSign
+        * (0.00055 + sourceForce * 0.00105)
+        * (0.35 + 0.65 * weight);
+      const visualDelay = SYMPATHETIC_VISUAL_DELAY_MIN + Math.random() * SYMPATHETIC_VISUAL_DELAY_JITTER;
+      setTimeout(() => {
+        const liveTarget = sims.get(w);
+        if (!liveTarget) return;
+        injectBridgeImpulse(liveTarget, visualImpulse);
+      }, visualDelay);
+
       const sympatheticPluck = createPluckModel(x01, y01, {
         force01: 0.12 + clamp01(pluck?.force01) * 0.22,
         pull01: 0.08 + clamp01(pluck?.pull01) * 0.18,
         speed01: 0.06 + clamp01(pluck?.speed01) * 0.12,
         width01: 0.22 + clamp01(pluck?.width01) * 0.26,
         sign: pluck?.sign || 1,
-      });
-      exciteSim(targetSim, {
-        ...sympatheticPluck,
-        force01: sympatheticPluck.force01 * 0.35,
-        pull01: sympatheticPluck.pull01 * 0.30,
-        speed01: sympatheticPluck.speed01 * 0.30,
       });
       const delay = SYMPATHETIC_DELAY_MIN + Math.random() * SYMPATHETIC_DELAY_JITTER;
       const gain = SYMPATHETIC_GAIN * (0.35 + 0.65 * weight);

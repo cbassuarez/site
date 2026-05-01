@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import TmaydLabsPage from './tmayd/TmaydLabsPage';
 
 const SITE_DOMAIN = 'cbassuarez.com';
 const OPERATOR_NAME = 'seb suarez';
 const OPERATOR_IMAGE = '/seb-portrait.jpg';
 const FEED_API_BASE = import.meta.env.VITE_FEED_API_BASE || 'https://seb-feed.cbassuarez.workers.dev';
+const TURNSTILE_DEV_TEST_SITE_KEY = '1x00000000000000000000AA';
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TURNSTILE_DEV_TEST_SITE_KEY : '');
+const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const UI_FONT_STACK = '"Times New Roman", Times, serif';
 const MONO_FONT_STACK = '"Courier New", Courier, monospace';
 
@@ -41,6 +44,51 @@ const OBLIQUE_STRATEGIES = [
   'Do the last thing first.'
 ];
 const OBLIQUE_ATTRIBUTION = 'Brian Eno + Peter Schmidt, Oblique Strategies';
+
+let turnstileScriptPromise = null;
+function loadTurnstileScript() {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('turnstile unavailable'));
+  }
+  if (window.turnstile?.render) {
+    return Promise.resolve(window.turnstile);
+  }
+  if (turnstileScriptPromise) {
+    return turnstileScriptPromise;
+  }
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const scriptId = 'cf-turnstile-explicit';
+    const existing = document.getElementById(scriptId);
+
+    const onLoad = () => {
+      if (window.turnstile?.render) resolve(window.turnstile);
+      else reject(new Error('turnstile failed to initialize'));
+    };
+    const onError = () => reject(new Error('turnstile script failed to load'));
+
+    if (existing) {
+      if (window.turnstile?.render) {
+        resolve(window.turnstile);
+        return;
+      }
+      existing.addEventListener('load', onLoad, { once: true });
+      existing.addEventListener('error', onError, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = TURNSTILE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener('load', onLoad, { once: true });
+    script.addEventListener('error', onError, { once: true });
+    document.head.appendChild(script);
+  });
+
+  return turnstileScriptPromise;
+}
 
 function wireIframeTopNavigation(frame) {
   if (!frame) return;
@@ -926,14 +974,14 @@ function StringLabPage() {
 
       <iframe
         title="String Lab"
-        src="/labs/string/index.html?v=20260501g"
+        src="/labs/string/index.html?v=20260501i"
         onLoad={(event) => wireIframeTopNavigation(event.currentTarget)}
         style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
       />
       {isMobile ? (
         <p>
           <small>
-            mobile fallback: [ <a href="/labs/string/index.html?v=20260501g">open string directly</a> ]
+            mobile fallback: [ <a href="/labs/string/index.html?v=20260501i">open string directly</a> ]
           </small>
         </p>
       ) : null}
@@ -1921,17 +1969,227 @@ function GuestbookPage() {
 }
 
 function ContactPage() {
-  const sent = new URLSearchParams(window.location.search).get('sent') === '1';
-  const nextUrl = useMemo(() => `${window.location.origin}/contact?sent=1`, []);
+  const sentFromQuery = new URLSearchParams(window.location.search).get('sent') === '1';
+  const sentFromPath = /^\/contact\/sent\/?$/i.test(window.location.pathname);
   const localSystemTime = useMemo(
     () => new Date().toLocaleTimeString('en-US', { hour12: false, timeZoneName: 'short' }),
     []
   );
-  const humanCheck = useMemo(() => {
-    const a = Math.floor(Math.random() * 8) + 1;
-    const b = Math.floor(Math.random() * 8) + 1;
-    return { a, b, answer: a + b };
-  }, []);
+  const turnstileEnabled = Boolean(TURNSTILE_SITE_KEY);
+  const [submitState, setSubmitState] = useState(sentFromQuery || sentFromPath ? 'sent' : 'idle');
+  const [submitError, setSubmitError] = useState('');
+  const [turnstileStatus, setTurnstileStatus] = useState(turnstileEnabled ? 'loading' : 'disabled');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileHostRef = useRef(null);
+  const turnstileWidgetIdRef = useRef(null);
+  const [formValues, setFormValues] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    topic: 'commission',
+    timeSensitive: false,
+    message: '',
+    gotcha: ''
+  });
+
+  function updateField(field, value) {
+    setFormValues((current) => ({ ...current, [field]: value }));
+  }
+
+  useEffect(() => {
+    if (!turnstileEnabled || submitState === 'sent') return undefined;
+    const host = turnstileHostRef.current;
+    if (!host) return undefined;
+
+    let cancelled = false;
+    setTurnstileStatus('loading');
+    setTurnstileToken('');
+
+    const boot = async () => {
+      try {
+        const turnstile = await loadTurnstileScript();
+        if (cancelled) return;
+
+        host.innerHTML = '';
+        turnstileWidgetIdRef.current = turnstile.render(host, {
+          sitekey: TURNSTILE_SITE_KEY,
+          theme: 'light',
+          callback: (token) => {
+            setTurnstileToken(String(token || ''));
+            setTurnstileStatus('verified');
+          },
+          'expired-callback': () => {
+            setTurnstileToken('');
+            setTurnstileStatus('expired');
+          },
+          'error-callback': () => {
+            setTurnstileToken('');
+            setTurnstileStatus('error');
+          }
+        });
+        setTurnstileStatus('idle');
+      } catch (_) {
+        if (cancelled) return;
+        setTurnstileStatus('error');
+      }
+    };
+
+    boot();
+
+    return () => {
+      cancelled = true;
+      const turnstile = window.turnstile;
+      const widgetId = turnstileWidgetIdRef.current;
+      if (turnstile && widgetId !== null && widgetId !== undefined) {
+        try {
+          turnstile.remove(widgetId);
+        } catch (_) {
+          // Ignore widget teardown errors.
+        }
+      }
+      turnstileWidgetIdRef.current = null;
+    };
+  }, [submitState, turnstileEnabled]);
+
+  function resetTurnstile() {
+    setTurnstileToken('');
+    const turnstile = window.turnstile;
+    const widgetId = turnstileWidgetIdRef.current;
+    if (turnstile && widgetId !== null && widgetId !== undefined) {
+      try {
+        turnstile.reset(widgetId);
+      } catch (_) {
+        // Ignore reset errors; user can refresh if needed.
+      }
+    }
+    setTurnstileStatus('idle');
+  }
+
+  function isValidEmailAddress(value) {
+    const email = String(value || '').trim();
+    // Practical, production-safe regex: RFC-inspired local-part and domain labels,
+    // with hard length limits and mandatory dotted domain.
+    const match = email.match(
+      /^(?=.{6,254}$)(?=.{2,64}@)([A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]))+)$/
+    );
+    if (!match) return false;
+    const local = match[1].toLowerCase();
+    const domain = match[2].toLowerCase();
+    const tld = domain.split('.').pop() || '';
+    if (!/^[a-z]{2,24}$/.test(tld)) return false;
+    // Heuristic anti-placeholder checks (not a deliverability guarantee).
+    const blockedLocalParts = new Set(['a', 'aa', 'test', 'testing', 'asdf', 'qwerty', 'user', 'admin', 'none', 'na', 'n/a']);
+    const blockedDomains = new Set(['example.com', 'test.com', 'localhost', 'mailinator.com', 'tempmail.com', 'fake.com']);
+    if (blockedLocalParts.has(local)) return false;
+    if (blockedDomains.has(domain)) return false;
+    if (domain.startsWith('example.') || domain.startsWith('test.')) return false;
+    return true;
+  }
+
+  async function submitContactForm(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (submitState === 'sending' || submitState === 'sent') return;
+
+    setSubmitError('');
+
+    if (formValues.gotcha.trim()) {
+      setSubmitState('sent');
+      return;
+    }
+
+    if (!turnstileEnabled) {
+      setSubmitState('error');
+      setSubmitError('human verification is unavailable. please try again shortly.');
+      return;
+    }
+
+    if (!turnstileToken) {
+      setSubmitState('error');
+      setSubmitError('please complete the cloudflare human check before sending.');
+      return;
+    }
+
+    const name = formValues.name.trim();
+    const email = formValues.email.trim();
+    const subject = formValues.subject.trim();
+    const message = formValues.message.trim();
+
+    if (!name || !email || !subject || !message) {
+      setSubmitState('error');
+      setSubmitError('missing required field(s). please complete name, email, subject, and message.');
+      return;
+    }
+
+    if (!isValidEmailAddress(email)) {
+      setSubmitState('error');
+      setSubmitError('please enter a valid, reachable email address (for example: name@domain.com).');
+      return;
+    }
+
+    setSubmitState('sending');
+
+    try {
+      const response = await fetch(`${FEED_API_BASE}/api/contact`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json'
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          subject,
+          topic: formValues.topic,
+          time_sensitive: formValues.timeSensitive ? 'yes' : 'no',
+          message,
+          gotcha: formValues.gotcha,
+          turnstileToken
+        })
+      });
+
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const payload = await response.json();
+          detail = String(payload?.error || '');
+        } catch (_) {
+          // ignore parse failures
+        }
+        if (response.status === 403 || detail === 'turnstile_failed') {
+          throw new Error('verification_failed');
+        }
+        if (response.status === 503 || detail === 'turnstile_unconfigured') {
+          throw new Error('verification_unavailable');
+        }
+        throw new Error(`contact submit failed (${response.status})`);
+      }
+
+      setSubmitState('sent');
+      setFormValues({
+        name: '',
+        email: '',
+        subject: '',
+        topic: 'commission',
+        timeSensitive: false,
+        message: '',
+        gotcha: ''
+      });
+      window.history.replaceState({}, '', '/contact/sent');
+    } catch (error) {
+      setSubmitState('error');
+      if (error instanceof Error && error.message === 'verification_failed') {
+        setSubmitError('cloudflare verification failed or expired. please retry the human check and send again.');
+      } else if (error instanceof Error && error.message === 'verification_unavailable') {
+        setSubmitError('cloudflare verification is temporarily unavailable. please retry in a moment.');
+      } else {
+        setSubmitError('transmission failed. refresh the human check and retry, or email contact@cbassuarez.com directly.');
+      }
+      resetTurnstile();
+    }
+  }
+
+  const sent = submitState === 'sent';
 
   return (
     <>
@@ -1959,24 +2217,57 @@ function ContactPage() {
       ) : (
         <>
           <p>writes back within 24-72 hours.</p>
-          <form action="https://formspree.io/f/mjkepaeo" method="POST">
-            <input type="hidden" name="_next" value={nextUrl} />
-            <input type="text" name="_gotcha" tabIndex="-1" autoComplete="off" style={{ display: 'none' }} />
+          <form onSubmit={submitContactForm}>
+            <input
+              type="text"
+              name="_gotcha"
+              tabIndex="-1"
+              autoComplete="off"
+              value={formValues.gotcha}
+              onChange={(event) => updateField('gotcha', event.target.value)}
+              style={{ display: 'none' }}
+            />
             <p>
               name:{' '}
-              <input type="text" name="name" size="24" required />
+              <input
+                type="text"
+                name="name"
+                size="24"
+                value={formValues.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                required
+              />
             </p>
             <p>
               email:{' '}
-              <input type="email" name="email" size="28" required />
+              <input
+                type="email"
+                name="email"
+                size="28"
+                value={formValues.email}
+                onChange={(event) => updateField('email', event.target.value)}
+                autoComplete="email"
+                required
+              />
             </p>
             <p>
               subject:{' '}
-              <input type="text" name="subject" size="36" required />
+              <input
+                type="text"
+                name="subject"
+                size="36"
+                value={formValues.subject}
+                onChange={(event) => updateField('subject', event.target.value)}
+                required
+              />
             </p>
             <p>
               topic:{' '}
-              <select name="topic" defaultValue="commission">
+              <select
+                name="topic"
+                value={formValues.topic}
+                onChange={(event) => updateField('topic', event.target.value)}
+              >
                 <option value="commission">commission</option>
                 <option value="performance">performance</option>
                 <option value="collab">collab</option>
@@ -1986,28 +2277,56 @@ function ContactPage() {
             </p>
             <p>
               <label>
-                <input type="checkbox" name="time_sensitive" value="yes" /> this is time-sensitive
+                <input
+                  type="checkbox"
+                  name="time_sensitive"
+                  checked={formValues.timeSensitive}
+                  onChange={(event) => updateField('timeSensitive', event.target.checked)}
+                /> this is time-sensitive
               </label>
             </p>
             <p>
               message:
               <br />
-              <textarea name="message" rows="8" cols="56" required />
-            </p>
-            <p>
-              human check ({humanCheck.a} + {humanCheck.b} = ?):{' '}
-              <input
-                type="text"
-                name="human_check"
-                size="4"
-                inputMode="numeric"
-                pattern={`^${humanCheck.answer}$`}
-                title={`please enter ${humanCheck.answer}`}
+              <textarea
+                name="message"
+                rows="8"
+                cols="56"
+                value={formValues.message}
+                onChange={(event) => updateField('message', event.target.value)}
                 required
               />
             </p>
             <p>
-              <button type="submit">send transmission</button>
+              cloudflare human check:
+              <br />
+              {turnstileEnabled ? (
+                <span ref={turnstileHostRef} />
+              ) : (
+                <small>verification unavailable (missing site key)</small>
+              )}
+              {turnstileEnabled && turnstileStatus === 'loading' ? (
+                <>
+                  <br />
+                  <small>loading verification widget...</small>
+                </>
+              ) : null}
+              {turnstileEnabled && turnstileStatus === 'error' ? (
+                <>
+                  <br />
+                  <small>verification widget failed to load. disable blockers and retry.</small>
+                </>
+              ) : null}
+            </p>
+            {submitState === 'error' && submitError ? (
+              <p>
+                <small>{submitError}</small>
+              </p>
+            ) : null}
+            <p>
+              <button type="submit" disabled={submitState === 'sending' || (turnstileEnabled && !turnstileToken)}>
+                {submitState === 'sending' ? 'sending...' : 'send transmission'}
+              </button>
             </p>
           </form>
         </>

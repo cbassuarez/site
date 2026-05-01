@@ -48,6 +48,8 @@ type RateLimitBinding = {
 
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  CONTACT_FORMSPREE_ENDPOINT?: string;
   HITS_KV?: KVNamespace;
   HITS_BASELINE?: string;
   GITHUB_USERNAME?: string;
@@ -68,6 +70,7 @@ type Env = {
   RATE_LIMIT_FEED?: RateLimitBinding;
   RATE_LIMIT_HIT?: RateLimitBinding;
   RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
+  RATE_LIMIT_CONTACT_POST?: RateLimitBinding;
   RATE_LIMIT_STRING_PLUCK?: RateLimitBinding;
   RATE_LIMIT_STRING_GET?: RateLimitBinding;
   RATE_LIMIT_STRING_CURSOR?: RateLimitBinding;
@@ -119,6 +122,43 @@ const parseFeedTimeMs = (value: unknown) => {
 const normalizeIsoAt = (value: unknown): string | null => {
   const ms = parseFeedTimeMs(value);
   return ms > 0 ? new Date(ms).toISOString() : null;
+};
+
+const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
+const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
+const CONTACT_EMAIL_REGEX =
+  /^(?=.{6,254}$)(?=.{2,64}@)([A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]))+)$/;
+const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
+const CONTACT_BLOCKED_LOCAL_PARTS = new Set([
+  "a",
+  "aa",
+  "test",
+  "testing",
+  "asdf",
+  "qwerty",
+  "user",
+  "admin",
+  "none",
+  "na",
+  "n/a",
+]);
+const CONTACT_BLOCKED_DOMAINS = new Set([
+  "example.com",
+  "test.com",
+  "localhost",
+  "mailinator.com",
+  "tempmail.com",
+  "fake.com",
+]);
+
+type ContactSubmission = {
+  name: string;
+  email: string;
+  subject: string;
+  topic: string;
+  timeSensitive: boolean;
+  message: string;
+  turnstileToken: string;
 };
 
 function parseSpotifyEvent(text: string): { action: string; label: string } {
@@ -1007,6 +1047,123 @@ function clientKey(request: Request): string {
   );
 }
 
+function isValidContactEmail(value: unknown): boolean {
+  const email = clean(value).toLowerCase();
+  const match = email.match(CONTACT_EMAIL_REGEX);
+  if (!match) return false;
+
+  const local = clean(match[1]).toLowerCase();
+  const domain = clean(match[2]).toLowerCase();
+  const tld = domain.split(".").pop() || "";
+
+  if (!/^[a-z]{2,24}$/.test(tld)) return false;
+  if (CONTACT_BLOCKED_LOCAL_PARTS.has(local)) return false;
+  if (CONTACT_BLOCKED_DOMAINS.has(domain)) return false;
+  if (domain.startsWith("example.") || domain.startsWith("test.")) return false;
+  return true;
+}
+
+function parseContactSubmission(body: any): { ok: true; data: ContactSubmission } | { ok: false; error: string } {
+  const name = clean(body?.name).slice(0, 120);
+  const email = clean(body?.email).slice(0, 254);
+  const subject = clean(body?.subject).slice(0, 180);
+  const message = clean(body?.message).slice(0, 4000);
+  const requestedTopic = clean(body?.topic).toLowerCase();
+  const topic = CONTACT_ALLOWED_TOPICS.has(requestedTopic) ? requestedTopic : "other";
+  const timeSensitive = clean(body?.time_sensitive).toLowerCase() === "yes" || body?.time_sensitive === true;
+  const token =
+    clean(body?.turnstileToken || body?.["cf-turnstile-response"]).slice(0, 2048);
+
+  if (!name || !email || !subject || !message) {
+    return { ok: false, error: "missing_required_fields" };
+  }
+
+  if (!isValidContactEmail(email)) {
+    return { ok: false, error: "invalid_email" };
+  }
+
+  if (!token) {
+    return { ok: false, error: "missing_turnstile_token" };
+  }
+
+  return {
+    ok: true,
+    data: {
+      name,
+      email,
+      subject,
+      topic,
+      timeSensitive,
+      message,
+      turnstileToken: token,
+    },
+  };
+}
+
+function resolveTurnstileSecret(env: Env, request: Request): string {
+  const configured = clean(env.TURNSTILE_SECRET_KEY);
+  if (configured) return configured;
+
+  const host = clean(new URL(request.url).hostname).toLowerCase();
+  const isLocalHost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  return isLocalHost ? TURNSTILE_TEST_SECRET_KEY : "";
+}
+
+async function verifyTurnstileToken(token: string, secret: string, remoteIp: string): Promise<{ success: boolean; errorCodes: string[] }> {
+  const payload = new URLSearchParams();
+  payload.set("secret", secret);
+  payload.set("response", token);
+  if (remoteIp && remoteIp !== "unknown") {
+    payload.set("remoteip", remoteIp);
+  }
+
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: payload.toString(),
+    });
+
+    const parsed: any = await response.json().catch(() => ({}));
+    const errorCodes = Array.isArray(parsed?.["error-codes"])
+      ? parsed["error-codes"].map((code: unknown) => clean(code)).filter(Boolean)
+      : [];
+
+    if (!response.ok) {
+      return { success: false, errorCodes: errorCodes.length ? errorCodes : [`siteverify_http_${response.status}`] };
+    }
+
+    return { success: Boolean(parsed?.success), errorCodes };
+  } catch {
+    return { success: false, errorCodes: ["siteverify_network_error"] };
+  }
+}
+
+async function forwardContactToFormspree(env: Env, payload: ContactSubmission): Promise<{ ok: boolean; status: number }> {
+  const endpoint = clean(env.CONTACT_FORMSPREE_ENDPOINT || CONTACT_FORMSPREE_DEFAULT_ENDPOINT);
+  if (!endpoint.startsWith("https://formspree.io/")) {
+    return { ok: false, status: 500 };
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      subject: payload.subject,
+      topic: payload.topic,
+      time_sensitive: payload.timeSensitive ? "yes" : "no",
+      message: payload.message,
+    }),
+  });
+
+  return { ok: response.ok, status: response.status };
+}
+
 async function handleFeedRequest(
   request: Request,
   env: Env,
@@ -1177,6 +1334,82 @@ export default {
         status: 405,
         headers: jsonHeaders(allowOrigin),
       });
+    }
+
+    if (url.pathname === "/api/contact") {
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_CONTACT_POST, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+
+      try {
+        const body: any = await request.json().catch(() => ({}));
+        if (clean(body?._gotcha || body?.gotcha)) {
+          return new Response(JSON.stringify({ ok: true, at: new Date().toISOString() }), {
+            status: 200,
+            headers: jsonHeaders(allowOrigin),
+          });
+        }
+
+        const parsed = parseContactSubmission(body);
+        if (!parsed.ok) {
+          return new Response(JSON.stringify({ error: parsed.error, at: new Date().toISOString() }), {
+            status: 400,
+            headers: jsonHeaders(allowOrigin),
+          });
+        }
+
+        const turnstileSecret = resolveTurnstileSecret(env, request);
+        if (!turnstileSecret) {
+          return new Response(JSON.stringify({ error: "turnstile_unconfigured", at: new Date().toISOString() }), {
+            status: 503,
+            headers: jsonHeaders(allowOrigin),
+          });
+        }
+
+        const verification = await verifyTurnstileToken(
+          parsed.data.turnstileToken,
+          turnstileSecret,
+          clientKey(request)
+        );
+        if (!verification.success) {
+          return new Response(
+            JSON.stringify({
+              error: "turnstile_failed",
+              details: verification.errorCodes,
+              at: new Date().toISOString(),
+            }),
+            { status: 403, headers: jsonHeaders(allowOrigin) }
+          );
+        }
+
+        const forwarded = await forwardContactToFormspree(env, parsed.data);
+        if (!forwarded.ok) {
+          return new Response(
+            JSON.stringify({
+              error: "contact_forward_failed",
+              upstreamStatus: forwarded.status,
+              at: new Date().toISOString(),
+            }),
+            { status: 502, headers: jsonHeaders(allowOrigin) }
+          );
+        }
+
+        return new Response(JSON.stringify({ ok: true, at: new Date().toISOString() }), {
+          status: 200,
+          headers: jsonHeaders(allowOrigin),
+        });
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({ error: clean(error?.message || "contact_submit_failed"), at: new Date().toISOString() }),
+          { status: 502, headers: jsonHeaders(allowOrigin) }
+        );
+      }
     }
 
     if (url.pathname === "/api/string/pluck") {
