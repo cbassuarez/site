@@ -2278,7 +2278,7 @@ function ContactPage() {
       ) : (
         <>
           <p>writes back within 24-72 hours.</p>
-          <form onSubmit={submitContactForm}>
+          <form onSubmit={submitContactForm} noValidate>
             <input
               type="text"
               name="_gotcha"
@@ -2308,8 +2308,6 @@ function ContactPage() {
                 value={formValues.email}
                 onChange={(event) => updateField('email', event.target.value)}
                 autoComplete="email"
-                pattern="^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$"
-                minLength={6}
                 required
               />
             </p>
