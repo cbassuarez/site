@@ -6,12 +6,17 @@ compatibility_date = "2026-04-24"
 enabled = true
 
 [vars]
-CONTACT_FORMSPREE_ENDPOINT = "https://formspree.io/f/mjkepaeo"
 TURNSTILE_ALLOWED_HOSTNAMES = "cbassuarez.com,www.cbassuarez.com"
+CONTACT_FROM_EMAIL = "contact@cbassuarez.com"
+CONTACT_FROM_NAME = "cbassuarez contact"
 
 [[kv_namespaces]]
 binding = "HITS_KV"
 id = "5034b4f88e04478d84f90350268b5aa3"
+
+[[send_email]]
+name = "CONTACT_EMAIL"
+destination_address = "contact@cbassuarez.com"
 
 [triggers]
 crons = ["*/5 * * * *"]

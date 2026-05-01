@@ -46,12 +46,26 @@ type RateLimitBinding = {
   limit: (options: { key: string }) => Promise<{ success: boolean }>;
 };
 
+type SendEmailBinding = {
+  send: (message: {
+    to: string | string[];
+    from: string | { email: string; name: string };
+    subject: string;
+    text?: string;
+    html?: string;
+    replyTo?: string | { email: string; name: string };
+    headers?: Record<string, string>;
+  }) => Promise<{ messageId?: string } | unknown>;
+};
+
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_ALLOWED_HOSTNAMES?: string;
-  CONTACT_FORMSPREE_ENDPOINT?: string;
+  CONTACT_FROM_EMAIL?: string;
+  CONTACT_FROM_NAME?: string;
+  CONTACT_EMAIL?: SendEmailBinding;
   HITS_KV?: KVNamespace;
   HITS_BASELINE?: string;
   GITHUB_USERNAME?: string;
@@ -126,9 +140,9 @@ const normalizeIsoAt = (value: unknown): string | null => {
   return ms > 0 ? new Date(ms).toISOString() : null;
 };
 
-const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
 const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
 const CONTACT_TURNSTILE_ACTION = "contact_form_v1";
+const CONTACT_DESTINATION_EMAIL = "contact@cbassuarez.com";
 const CONTACT_EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$/i;
 const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
 const CONTACT_BLOCKED_LOCAL_PARTS = new Set([
@@ -1157,45 +1171,58 @@ async function verifyTurnstileToken(
   }
 }
 
-async function forwardContactToFormspree(
+function toContactEmailText(payload: ContactSubmission, receivedAt: string): string {
+  const lines = [
+    "new contact transmission",
+    "",
+    `received_at: ${receivedAt}`,
+    `name: ${payload.name}`,
+    `email: ${payload.email}`,
+    `subject: ${payload.subject}`,
+    `topic: ${payload.topic}`,
+    `time_sensitive: ${payload.timeSensitive ? "yes" : "no"}`,
+    "",
+    "message:",
+    payload.message,
+  ];
+  return lines.join("\n");
+}
+
+async function deliverContactEmail(
   env: Env,
-  payload: ContactSubmission
-): Promise<{ ok: boolean; status: number; detail: string }> {
-  const endpoint = clean(env.CONTACT_FORMSPREE_ENDPOINT || CONTACT_FORMSPREE_DEFAULT_ENDPOINT);
-  if (!endpoint.startsWith("https://formspree.io/")) {
-    return { ok: false, status: 500, detail: "invalid_formspree_endpoint" };
+  payload: ContactSubmission,
+  receivedAt: string
+): Promise<{ ok: boolean; error: string | null; messageId: string | null }> {
+  const sender = clean(env.CONTACT_FROM_EMAIL || "contact@cbassuarez.com");
+  const senderName = clean(env.CONTACT_FROM_NAME || "cbassuarez contact");
+  const destination = CONTACT_DESTINATION_EMAIL;
+  const email = env.CONTACT_EMAIL;
+
+  if (!email || typeof email.send !== "function") {
+    return { ok: false, error: "email_binding_unconfigured", messageId: null };
+  }
+  if (!sender || !destination) {
+    return { ok: false, error: "email_address_unconfigured", messageId: null };
   }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-    },
-    body: JSON.stringify({
-      name: payload.name,
-      email: payload.email,
-      subject: payload.subject,
-      topic: payload.topic,
-      time_sensitive: payload.timeSensitive ? "yes" : "no",
-      message: payload.message,
-    }),
-  });
-
-  let detail = "";
+  const subject = `[contact] ${payload.subject}`;
+  const text = toContactEmailText(payload, receivedAt);
   try {
-    const contentType = clean(response.headers.get("content-type"));
-    if (contentType.includes("application/json")) {
-      const body: any = await response.json().catch(() => ({}));
-      detail = clean(body?.error || body?.message || body?.errors?.[0]?.message || "");
-    } else {
-      detail = clean((await response.text()).slice(0, 180));
-    }
-  } catch {
-    detail = "";
+    const result: any = await email.send({
+      to: destination,
+      from: { email: sender, name: senderName || "cbassuarez contact" },
+      subject,
+      text,
+      replyTo: { email: payload.email, name: payload.name },
+      headers: {
+        "X-Contact-Topic": payload.topic,
+        "X-Contact-Time-Sensitive": payload.timeSensitive ? "yes" : "no",
+      },
+    });
+    return { ok: true, error: null, messageId: clean(result?.messageId) || null };
+  } catch (error: any) {
+    return { ok: false, error: clean(error?.message || "email_delivery_failed"), messageId: null };
   }
-
-  return { ok: response.ok, status: response.status, detail: short(detail, 160) };
 }
 
 async function handleFeedRequest(
@@ -1445,20 +1472,25 @@ export default {
           );
         }
 
-        const forwarded = await forwardContactToFormspree(env, parsed.data);
-        if (!forwarded.ok) {
+        const at = new Date().toISOString();
+        const delivered = await deliverContactEmail(env, parsed.data, at);
+        if (!delivered.ok) {
           return new Response(
             JSON.stringify({
-              error: "contact_forward_failed",
-              upstreamStatus: forwarded.status,
-              upstreamDetail: forwarded.detail || null,
-              at: new Date().toISOString(),
+              error: "contact_delivery_failed",
+              detail: delivered.error,
+              at,
             }),
             { status: 502, headers: jsonHeaders(allowOrigin) }
           );
         }
 
-        return new Response(JSON.stringify({ ok: true, at: new Date().toISOString() }), {
+        return new Response(JSON.stringify({
+          ok: true,
+          relayed: true,
+          messageId: delivered.messageId,
+          at,
+        }), {
           status: 200,
           headers: jsonHeaders(allowOrigin),
         });

@@ -1973,6 +1973,17 @@ function GuestbookPage() {
 function ContactPage() {
   const sentFromQuery = new URLSearchParams(window.location.search).get('sent') === '1';
   const sentFromPath = /^\/contact\/sent\/?$/i.test(window.location.pathname);
+  const hasRecentLocalRelay = () => {
+    try {
+      const raw = window.sessionStorage.getItem('contact:last_relay_at');
+      if (!raw) return false;
+      const atMs = Date.parse(raw);
+      if (!Number.isFinite(atMs)) return false;
+      return (Date.now() - atMs) < (30 * 60 * 1000);
+    } catch (_) {
+      return false;
+    }
+  };
   const localSystemTime = useMemo(
     () => new Date().toLocaleTimeString('en-US', { hour12: false, timeZoneName: 'short' }),
     []
@@ -1980,8 +1991,9 @@ function ContactPage() {
   const [resolvedTurnstileSiteKey, setResolvedTurnstileSiteKey] = useState(() => TURNSTILE_SITE_KEY_BUILD || '');
   const [siteKeyStatus, setSiteKeyStatus] = useState(() => (TURNSTILE_SITE_KEY_BUILD ? 'ready' : 'loading'));
   const turnstileEnabled = Boolean(resolvedTurnstileSiteKey);
-  const [submitState, setSubmitState] = useState(sentFromQuery || sentFromPath ? 'sent' : 'idle');
+  const [submitState, setSubmitState] = useState((sentFromQuery || sentFromPath) && hasRecentLocalRelay() ? 'sent' : 'idle');
   const [submitError, setSubmitError] = useState('');
+  const [submitNote, setSubmitNote] = useState('');
   const [turnstileStatus, setTurnstileStatus] = useState('idle');
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileHostRef = useRef(null);
@@ -1999,6 +2011,12 @@ function ContactPage() {
   function updateField(field, value) {
     setFormValues((current) => ({ ...current, [field]: value }));
   }
+
+  useEffect(() => {
+    if ((sentFromPath || sentFromQuery) && !hasRecentLocalRelay()) {
+      window.history.replaceState({}, '', '/contact');
+    }
+  }, [sentFromPath, sentFromQuery]);
 
   useEffect(() => {
     if (TURNSTILE_SITE_KEY_BUILD) {
@@ -2128,6 +2146,7 @@ function ContactPage() {
     if (submitState === 'sending' || submitState === 'sent') return;
 
     setSubmitError('');
+    setSubmitNote('');
 
     if (formValues.gotcha.trim()) {
       setSubmitState('sent');
@@ -2186,20 +2205,20 @@ function ContactPage() {
         })
       });
 
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (_) {
+        payload = null;
+      }
+
       if (!response.ok) {
         let detail = '';
-        let upstreamStatus = 0;
-        let upstreamDetail = '';
+        let deliveryDetail = '';
         let badHostname = '';
-        try {
-          const payload = await response.json();
-          detail = String(payload?.error || '');
-          upstreamStatus = Number(payload?.upstreamStatus) || 0;
-          upstreamDetail = String(payload?.upstreamDetail || '');
-          badHostname = String(payload?.hostname || '');
-        } catch (_) {
-          // ignore parse failures
-        }
+        detail = String(payload?.error || '');
+        deliveryDetail = String(payload?.detail || '');
+        badHostname = String(payload?.hostname || '');
         if (detail === 'turnstile_bad_hostname') {
           throw new Error(badHostname ? `bad_hostname:${badHostname}` : 'bad_hostname');
         }
@@ -2212,11 +2231,22 @@ function ContactPage() {
         if (detail === 'invalid_email') {
           throw new Error('invalid_email');
         }
-        if (detail === 'contact_forward_failed') {
-          const hint = upstreamStatus ? `mail_relay_${upstreamStatus}` : 'mail_relay_failed';
-          throw new Error(upstreamDetail ? `${hint}:${upstreamDetail}` : hint);
+        if (detail === 'contact_delivery_failed') {
+          throw new Error(deliveryDetail ? `mail_relay_failed:${deliveryDetail}` : 'mail_relay_failed');
         }
         throw new Error(`contact submit failed (${response.status})`);
+      }
+
+      const relayed = Boolean(payload?.relayed);
+      if (!relayed) {
+        throw new Error('contact_not_relayed');
+      }
+      const messageId = String(payload?.messageId || '').trim();
+      setSubmitNote(messageId ? `relayed to destination mailbox (id: ${messageId}).` : 'relayed to destination mailbox.');
+      try {
+        window.sessionStorage.setItem('contact:last_relay_at', String(payload?.at || new Date().toISOString()));
+      } catch (_) {
+        // Non-blocking local marker.
       }
 
       setSubmitState('sent');
@@ -2242,7 +2272,9 @@ function ContactPage() {
       } else if (error instanceof Error && error.message === 'invalid_email') {
         setSubmitError('email address was rejected. please use a full address like name@domain.com.');
       } else if (error instanceof Error && error.message.startsWith('mail_relay_')) {
-        setSubmitError('message could not be relayed to inbox. please verify Formspree form status/plan and retry.');
+        setSubmitError('delivery failed. please retry.');
+      } else if (error instanceof Error && error.message === 'contact_not_relayed') {
+        setSubmitError('message was not relayed. nothing was delivered. please retry.');
       } else {
         setSubmitError('transmission failed. refresh the human check and retry, or email contact@cbassuarez.com directly.');
       }
@@ -2269,8 +2301,13 @@ function ContactPage() {
       {sent ? (
         <>
           <p>
-            <b>message received. signal locked.</b>
+            <b>message relayed. signal locked.</b>
           </p>
+          {submitNote ? (
+            <p>
+              <small>{submitNote}</small>
+            </p>
+          ) : null}
           <p>
             [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/feed">seb feed</a> ]
           </p>
