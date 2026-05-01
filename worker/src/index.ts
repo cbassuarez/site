@@ -129,6 +129,7 @@ const normalizeIsoAt = (value: unknown): string | null => {
 const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
 const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
 const CONTACT_TURNSTILE_ACTION = "contact_form_v1";
+const CONTACT_EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$/i;
 const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
 const CONTACT_BLOCKED_LOCAL_PARTS = new Set([
   "a",
@@ -1049,26 +1050,11 @@ function clientKey(request: Request): string {
 }
 
 function isValidContactEmail(value: unknown): boolean {
-  const email = clean(value).toLowerCase();
-  if (email.length < 6 || email.length > 254) return false;
-  const parts = email.split("@");
-  if (parts.length !== 2) return false;
-  const local = parts[0];
-  const domain = parts[1];
-  if (local.length < 2 || local.length > 64) return false;
-  if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i.test(local)) return false;
-  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
-  if (!/^[a-z0-9.-]+$/i.test(domain)) return false;
-  if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
-  const labels = domain.split(".");
-  if (labels.length < 2) return false;
-  for (const label of labels) {
-    if (!/^[a-z0-9-]+$/i.test(label)) return false;
-    if (label.startsWith("-") || label.endsWith("-")) return false;
-    if (label.length < 1 || label.length > 63) return false;
-  }
-  const tld = labels[labels.length - 1] || "";
-  if (!/^[a-z]{2,24}$/.test(tld)) return false;
+  const email = clean(value);
+  if (!CONTACT_EMAIL_REGEX.test(email)) return false;
+  const lowered = email.toLowerCase();
+  const local = lowered.split("@")[0] || "";
+  const domain = lowered.split("@")[1] || "";
   if (CONTACT_BLOCKED_LOCAL_PARTS.has(local)) return false;
   if (CONTACT_BLOCKED_DOMAINS.has(domain)) return false;
   if (domain.startsWith("example.") || domain.startsWith("test.")) return false;

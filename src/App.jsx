@@ -9,6 +9,7 @@ const TURNSTILE_DEV_TEST_SITE_KEY = '1x00000000000000000000AA';
 const TURNSTILE_SITE_KEY_BUILD = import.meta.env.VITE_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TURNSTILE_DEV_TEST_SITE_KEY : '');
 const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TURNSTILE_CONTACT_ACTION = 'contact_form_v1';
+const CONTACT_EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$/i;
 const UI_FONT_STACK = '"Times New Roman", Times, serif';
 const MONO_FONT_STACK = '"Courier New", Courier, monospace';
 
@@ -2107,26 +2108,11 @@ function ContactPage() {
   }
 
   function isValidEmailAddress(value) {
-    const email = String(value || '').trim().toLowerCase();
-    if (email.length < 6 || email.length > 254) return false;
-    const parts = email.split('@');
-    if (parts.length !== 2) return false;
-    const local = parts[0];
-    const domain = parts[1];
-    if (local.length < 2 || local.length > 64) return false;
-    if (!/^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i.test(local)) return false;
-    if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
-    if (!/^[a-z0-9.-]+$/i.test(domain)) return false;
-    if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return false;
-    const labels = domain.split('.');
-    if (labels.length < 2) return false;
-    for (const label of labels) {
-      if (!/^[a-z0-9-]+$/i.test(label)) return false;
-      if (label.startsWith('-') || label.endsWith('-')) return false;
-      if (label.length < 1 || label.length > 63) return false;
-    }
-    const tld = domain.split('.').pop() || '';
-    if (!/^[a-z]{2,24}$/.test(tld)) return false;
+    const email = String(value || '').trim();
+    if (!CONTACT_EMAIL_REGEX.test(email)) return false;
+    const lowered = email.toLowerCase();
+    const local = lowered.split('@')[0] || '';
+    const domain = lowered.split('@')[1] || '';
     // Heuristic anti-placeholder checks (not a deliverability guarantee).
     const blockedLocalParts = new Set(['a', 'aa', 'test', 'testing', 'asdf', 'qwerty', 'user', 'admin', 'none', 'na', 'n/a']);
     const blockedDomains = new Set(['example.com', 'test.com', 'localhost', 'mailinator.com', 'tempmail.com', 'fake.com']);
