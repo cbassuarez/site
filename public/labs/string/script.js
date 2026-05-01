@@ -147,6 +147,53 @@
     sim.lastActiveT = Date.now();
   }
 
+  // ---------- sympathetic coupling (cross-string energy exchange) ----------
+  // Each substep, every sim is nudged toward the per-cell *distance-weighted*
+  // mean of all *other* sims by COUPLING_STRENGTH. Weight w(A,B) = 1/(1+α·Δy²)
+  // where Δy is the difference in y-lane offsets. Closer-lane neighbors couple
+  // more strongly, like nearby strings on a piano. K=0.001 over 120 substeps/sec
+  // gives ~12%/sec damping toward the (weighted) shared field — strings remain
+  // individually identifiable while settled strings get sympathetically excited
+  // by their neighbors' plucks.
+  const COUPLING_STRENGTH = 0.001;
+  const COUPLING_LANE_FALLOFF = 25;       // α: w = 1/(1+α·Δy²); 25 → opposite-end pairs ≈20% of same-lane
+  const sharedL = new Float32Array(N);
+  const sharedR = new Float32Array(N);
+
+  function couplingStep() {
+    const count = sims.size;
+    if (count <= 1) return;
+    const k = COUPLING_STRENGTH;
+    const alpha = COUPLING_LANE_FALLOFF;
+    for (const simA of sims.values()) {
+      sharedL.fill(0);
+      sharedR.fill(0);
+      let totalW = 0;
+      const yA = simA.identity.yOffset;
+      for (const simB of sims.values()) {
+        if (simB === simA) continue;
+        const dy = yA - simB.identity.yOffset;
+        const w = 1 / (1 + alpha * dy * dy);
+        totalW += w;
+        const wLB = simB.wL, wRB = simB.wR;
+        for (let i = 0; i < N; i++) {
+          sharedL[i] += w * wLB[i];
+          sharedR[i] += w * wRB[i];
+        }
+      }
+      if (totalW <= 0) continue;
+      const inv = 1 / totalW;
+      const wLA = simA.wL, wRA = simA.wR, posA = simA.pos;
+      for (let i = 0; i < N; i++) {
+        const meanOtherL = sharedL[i] * inv;
+        const meanOtherR = sharedR[i] * inv;
+        wLA[i] += k * (meanOtherL - wLA[i]);
+        wRA[i] += k * (meanOtherR - wRA[i]);
+        posA[i] = wLA[i] + wRA[i];
+      }
+    }
+  }
+
   function gcSims() {
     const now = Date.now();
     for (const [who, sim] of sims) {
@@ -338,7 +385,37 @@
       const sim = getSim(p.who);
       if (sim) exciteSim(sim, x01, y01, 0.85 + Math.random() * 0.15);
       playPluck(x01, y01, p.who, 0.78);
+      triggerSympathetic(p.who, x01, y01);
     }, PHANTOM_DELAY_MS);
+  }
+
+  // ---------- audible sympathetic echo ----------
+  // When any string is plucked, fire a low-amplitude voice on every other
+  // recently-active string in *that* string's identity. The whisper of the
+  // room's tonal palette tracks the visual coupling — what you see ringing
+  // sympathetically also sounds.
+  const SYMPATHETIC_GAIN = 0.18;
+  const SYMPATHETIC_MAX = 6;
+  const SYMPATHETIC_RECENT_MS = 30_000;
+  const SYMPATHETIC_DELAY_MIN = 60;
+  const SYMPATHETIC_DELAY_JITTER = 90;
+
+  function triggerSympathetic(sourceWho, x01, y01) {
+    const now = performance.now();
+    const candidates = [];
+    for (const [w, sim] of sims) {
+      if (w === sourceWho) continue;
+      const age = now - sim.lastActiveT;
+      if (age > SYMPATHETIC_RECENT_MS) continue;
+      candidates.push({ w, age });
+    }
+    candidates.sort((a, b) => a.age - b.age);
+    const limit = Math.min(candidates.length, SYMPATHETIC_MAX);
+    for (let i = 0; i < limit; i++) {
+      const { w } = candidates[i];
+      const delay = SYMPATHETIC_DELAY_MIN + Math.random() * SYMPATHETIC_DELAY_JITTER;
+      setTimeout(() => playPluck(x01, y01, w, SYMPATHETIC_GAIN), delay);
+    }
   }
 
   function startHeartbeat() {
@@ -365,6 +442,7 @@
     const sim = getSim(myWho);
     if (sim) exciteSim(sim, x01, y01, 1.0 + Math.random() * 0.2);
     playPluck(x01, y01, myWho, 0.92);
+    triggerSympathetic(myWho, x01, y01);
     postPluck(x01, y01);
   }
 
@@ -427,6 +505,7 @@
   function render() {
     for (let s = 0; s < SUBSTEPS; s++) {
       for (const sim of sims.values()) stepSim(sim);
+      couplingStep();
     }
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, viewW, viewH);
