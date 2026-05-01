@@ -552,13 +552,13 @@ function StringLabPage() {
 
       <iframe
         title="String Lab"
-        src="/labs/string/index.html"
+        src="/labs/string/index.html?v=20260501b"
         style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
       />
       {isMobile ? (
         <p>
           <small>
-            mobile fallback: [ <a href="/labs/string/index.html">open string directly</a> ]
+            mobile fallback: [ <a href="/labs/string/index.html?v=20260501b">open string directly</a> ]
           </small>
         </p>
       ) : null}
