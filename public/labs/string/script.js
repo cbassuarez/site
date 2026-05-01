@@ -13,7 +13,7 @@
   const POLL_INTERVAL_MS = 800;
   const HEARTBEAT_INTERVAL_MS = 1500;
   const PHANTOM_DELAY_MS = 240;
-  const SIM_IDLE_TIMEOUT_MS = 90_000;
+  const REMOTE_CURSOR_STALE_MS = 6_000;
   const SIM_GC_INTERVAL_MS = 5_000;
 
   const PITCH_LOW_HZ = 130.81; // C3
@@ -24,13 +24,14 @@
   const BG = '#fafafa';
   const STRING_AMP_FRAC = 0.12;       // per-string vertical amplitude (frac of viewH)
   const Y_LANE_RANGE = 0.20;          // total ±range of y-offsets (frac of viewH)
-  const COLOR_GAIN = 14;              // motion → color saturation/lightness factor
-  const GRAD_STOPS = 48;
 
   // ---------- canvas ----------
   const canvas = document.getElementById('stage');
   const ctx = canvas.getContext('2d');
   let dpr = 1, viewW = 0, viewH = 0;
+  const helpDialog = document.getElementById('string-help-dialog');
+  const helpOpenButton = document.getElementById('string-help-open');
+  const HELP_SEEN_KEY = 'prae:string:help:v1';
 
   function resize() {
     dpr = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
@@ -51,45 +52,99 @@
     return n < 0 ? 0 : n > 1 ? 1 : n;
   }
 
-  // ---------- identity (deterministic per `who` hash) ----------
-  // Each user's hash → a unique set of: y-lane, hue, thickness, damping, advection rate,
-  // octave shift, harmonic mode, detune, bitcrush bit-depth.
-  function deriveIdentity(who) {
-    const h = (typeof who === 'string' && who.length >= 12) ? who : '00000000000000000000';
-    const a = parseInt(h.slice(0, 4), 16) || 0;   // 16 bits
-    const b = parseInt(h.slice(4, 8), 16) || 0;   // 16 bits
-    const c = parseInt(h.slice(8, 12), 16) || 0;  // 16 bits
-
-    const huePrimary   = a % 360;
-    const yOffset      = (((b & 0xFF) / 255) - 0.5) * 2 * Y_LANE_RANGE;
-    const thickness    = 2.0 + (((b >> 8) & 0x07) / 7) * 3.0;       // 2.0 .. 5.0 px
-    // decaySec drives BOTH audio envelope and visual damping so they fall together.
-    const decaySec     = 2.5 + ((c & 0x1F) / 31) * 2.5;             // 2.5 .. 5.0 s
-    const damping      = Math.pow(DECAY_FLOOR, 1 / (decaySec * 60 * SUBSTEPS));
-    const adv          = 0.55   + (((c >> 5) & 0x1F) / 31) * 0.30;  // 0.55 .. 0.85
-
-    const octaveTable  = [-1, 0, 0, 0, 0, +1, 0, +1];
-    const octaveShift  = octaveTable[(c >> 10) & 7];
-
-    const harmonicTable = [0, 0, 0, 1, 1, 2, 0, 1];
-    const harmonicMode  = harmonicTable[(c >> 13) & 7];
-
-    const detuneCents  = ((((a >> 8) & 0xFF) / 255) - 0.5) * 24;    // ±12 cents
-
-    const crushTable   = [0, 0, 0, 0, 0, 8, 10, 12];
-    const bitcrushBits = crushTable[(a >> 4) & 7];
-
-    return {
-      huePrimary, yOffset, thickness, decaySec, damping, adv,
-      octaveShift, harmonicMode, detuneCents, bitcrushBits,
-    };
+  function markHelpSeen() {
+    try {
+      localStorage.setItem(HELP_SEEN_KEY, '1');
+    } catch (_) {}
   }
 
-  function identityColor(id, motion01) {
-    const m = motion01 < 0 ? 0 : motion01 > 1 ? 1 : motion01;
-    const lightness  = 8  + 32 * m;   // 8% (settled, near black) → 40% (active, vivid)
-    const saturation = 8  + 75 * m;   // 8% (settled, near grey)  → 83% (active)
-    return `hsl(${id.huePrimary}, ${saturation}%, ${lightness}%)`;
+  function openHelpDialog() {
+    if (!helpDialog || helpDialog.open) return;
+    if (typeof helpDialog.showModal === 'function') {
+      helpDialog.showModal();
+      return;
+    }
+    helpDialog.setAttribute('open', '');
+  }
+
+  if (helpOpenButton) helpOpenButton.addEventListener('click', openHelpDialog);
+  if (helpDialog) {
+    helpDialog.addEventListener('close', markHelpSeen);
+    helpDialog.addEventListener('cancel', markHelpSeen);
+    const dismissHelpButton = helpDialog.querySelector('[data-close-help]');
+    if (dismissHelpButton) dismissHelpButton.addEventListener('click', markHelpSeen);
+  }
+
+  const forceHelp = params.get('help') === '1';
+  let seenHelp = false;
+  try {
+    seenHelp = localStorage.getItem(HELP_SEEN_KEY) === '1';
+  } catch (_) {}
+  if (forceHelp || !seenHelp) openHelpDialog();
+
+  // ---------- identity (deterministic per `who` hash) ----------
+  // Curated palette of 24 colors that all read clearly on a warm-white field.
+  // Saturated enough to identify; not so bright they vibrate.
+  const PALETTE = [
+    [168, 36, 56],   // deep crimson
+    [192, 57, 43],   // brick red
+    [211, 84, 0],    // burnt orange
+    [184, 110, 33],  // amber
+    [127, 96, 0],    // ochre
+    [85, 122, 58],   // forest green
+    [39, 174, 96],   // emerald
+    [22, 160, 133],  // teal
+    [26, 140, 130],  // viridian
+    [31, 78, 121],   // navy
+    [41, 128, 185],  // ocean
+    [58, 49, 133],   // indigo
+    [108, 52, 131],  // purple
+    [142, 68, 173],  // amethyst
+    [162, 62, 140],  // magenta
+    [196, 82, 139],  // hot pink
+    [146, 52, 95],   // deep rose
+    [80, 45, 73],    // mauve
+    [61, 44, 74],    // eggplant
+    [38, 70, 83],    // slate teal
+    [42, 64, 69],    // dark cyan
+    [73, 56, 38],    // walnut
+    [60, 40, 22],    // dark espresso
+    [44, 62, 80],    // midnight blue
+  ];
+
+  // Each user's hash → a unique set of: color (palette idx), y-lane, thickness,
+  // ampScale (tightness/floppiness), decaySec, adv (wave speed), octave shift,
+  // harmonic mode, detune, bitcrush bit-depth.
+  function deriveIdentity(who) {
+    const h = (typeof who === 'string' && who.length >= 12) ? who : '00000000000000000000';
+    const a = parseInt(h.slice(0, 4), 16) || 0;
+    const b = parseInt(h.slice(4, 8), 16) || 0;
+    const c = parseInt(h.slice(8, 12), 16) || 0;
+
+    const colorRGB     = PALETTE[a % PALETTE.length];
+    const yOffset      = (((b & 0xFF) / 255) - 0.5) * 2 * Y_LANE_RANGE;
+    const thickness    = 1.5 + (((b >> 8) & 0x07) / 7) * 4.0;       // 1.5 .. 5.5 px
+    // tightness controls wave speed (advection) AND visual amplitude scale —
+    // taut strings have fast waves and small displacement; slack strings flop.
+    const tightness01  = ((c >> 5) & 0x1F) / 31;
+    const adv          = 0.45 + tightness01 * 0.45;                  // 0.45 .. 0.90
+    const ampScale     = 1.7 - tightness01 * 1.2;                    // 1.7 (slack) .. 0.5 (taut)
+    const decaySec     = 2.0 + ((c & 0x1F) / 31) * 4.0;              // 2.0 .. 6.0 s
+    const damping      = Math.pow(DECAY_FLOOR, 1 / (decaySec * 60 * SUBSTEPS));
+
+    // Sound variation tables — uniform, no zero-bias.
+    const octaveTable    = [-2, -2, -1, 0, +1, +1, +2, +2];
+    const octaveShift    = octaveTable[(c >> 10) & 7];
+    const harmonicTable  = [0, 1, 2, 3, 4, 1, 2, 3];
+    const harmonicMode   = harmonicTable[(c >> 13) & 7];
+    const detuneCents    = ((((a >> 8) & 0xFF) / 255) - 0.5) * 40;   // ±20 cents
+    const crushTable     = [0, 4, 6, 8, 10, 12, 14, 16];
+    const bitcrushBits   = crushTable[(a >> 4) & 7];
+
+    return {
+      colorRGB, yOffset, thickness, ampScale, decaySec, damping, adv,
+      octaveShift, harmonicMode, detuneCents, bitcrushBits,
+    };
   }
 
   // ---------- per-user simulation registry ----------
@@ -104,10 +159,9 @@
         wL: new Float32Array(N),
         wR: new Float32Array(N),
         pos: new Float32Array(N),
-        prevPos: new Float32Array(N),
         lastActiveT: Date.now(),
         cursorX: 0.5,
-        cursorAt: 0,
+        cursorAt: Date.now(),
       };
       sims.set(who, sim);
     }
@@ -198,11 +252,8 @@
     const now = Date.now();
     for (const [who, sim] of sims) {
       if (who === myWho) continue;
-      const lastSeen = Math.max(sim.lastActiveT, sim.cursorAt);
-      if (now - lastSeen <= SIM_IDLE_TIMEOUT_MS) continue;
-      let energy = 0;
-      for (let i = 0; i < N; i++) energy += sim.pos[i] * sim.pos[i];
-      if (energy < 1e-7) sims.delete(who);
+      if (now - sim.cursorAt <= REMOTE_CURSOR_STALE_MS) continue;
+      sims.delete(who);
     }
   }
   setInterval(gcSims, SIM_GC_INTERVAL_MS);
@@ -355,7 +406,7 @@
           const sim = getSim(c.who);
           if (!sim) continue;
           sim.cursorX = clamp01(c.x);
-          sim.cursorAt = performance.now();
+          sim.cursorAt = Date.now();
         }
       }
 
@@ -382,7 +433,7 @@
     setTimeout(() => {
       const x01 = clamp01(p.x);
       const y01 = clamp01(p.y);
-      const sim = getSim(p.who);
+      const sim = sims.get(p.who);
       if (sim) exciteSim(sim, x01, y01, 0.85 + Math.random() * 0.15);
       playPluck(x01, y01, p.who, 0.78);
       triggerSympathetic(p.who, x01, y01);
@@ -401,7 +452,7 @@
   const SYMPATHETIC_DELAY_JITTER = 90;
 
   function triggerSympathetic(sourceWho, x01, y01) {
-    const now = performance.now();
+    const now = Date.now();
     const candidates = [];
     for (const [w, sim] of sims) {
       if (w === sourceWho) continue;
@@ -458,47 +509,39 @@
   }, { passive: true });
 
   // ---------- render ----------
+  const SELF_ALPHA = 1.0;
+  const OTHER_ALPHA = 0.78;
+
   function renderSim(sim, ampPx) {
-    const { pos, prevPos, identity } = sim;
+    const { pos, identity, who } = sim;
     const yMid = (0.5 + identity.yOffset) * viewH;
-
-    const grad = ctx.createLinearGradient(0, yMid, viewW, yMid);
-    const cellsPerStop = (N - 1) / GRAD_STOPS;
-    for (let s = 0; s <= GRAD_STOPS; s++) {
-      const center = Math.floor(s * cellsPerStop);
-      const i0 = Math.max(0, center - 3);
-      const i1 = Math.min(N - 1, center + 3);
-      let m = 0;
-      for (let i = i0; i <= i1; i++) {
-        const d = Math.abs(pos[i] - prevPos[i]);
-        if (d > m) m = d;
-      }
-      grad.addColorStop(s / GRAD_STOPS, identityColor(identity, m * COLOR_GAIN));
-    }
-
+    const alpha = who === myWho ? SELF_ALPHA : OTHER_ALPHA;
+    const [r, g, b] = identity.colorRGB;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = identity.thickness;
-    ctx.strokeStyle = grad;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
     ctx.beginPath();
+    const a = ampPx * identity.ampScale;
     for (let i = 0; i < N; i++) {
       const x = (i / (N - 1)) * viewW;
-      const y = yMid + pos[i] * ampPx;
+      const y = yMid + pos[i] * a;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
 
   function renderCursor(sim) {
-    const cursorAge = performance.now() - sim.cursorAt;
+    const cursorAge = Date.now() - sim.cursorAt;
     if (sim.cursorAt === 0 || cursorAge > 5000) return;
     if (sim.who === myWho) return;
     const yMid = (0.5 + sim.identity.yOffset) * viewH;
     const x = sim.cursorX * viewW;
     const fade = Math.max(0, 1 - cursorAge / 5000);
-    ctx.fillStyle = `hsla(${sim.identity.huePrimary}, 55%, 32%, ${0.55 * fade})`;
+    const [r, g, b] = sim.identity.colorRGB;
+    ctx.fillStyle = `rgba(${r},${g},${b},${0.7 * fade})`;
     ctx.beginPath();
-    ctx.arc(x, yMid, 2.5, 0, Math.PI * 2);
+    ctx.arc(x, yMid, 2.8, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -510,11 +553,7 @@
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, viewW, viewH);
     const ampPx = Math.min(viewH * STRING_AMP_FRAC, 110);
-    for (const sim of sims.values()) {
-      renderSim(sim, ampPx);
-      const { pos, prevPos } = sim;
-      for (let i = 0; i < N; i++) prevPos[i] = pos[i];
-    }
+    for (const sim of sims.values()) renderSim(sim, ampPx);
     for (const sim of sims.values()) renderCursor(sim);
     requestAnimationFrame(render);
   }

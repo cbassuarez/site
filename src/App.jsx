@@ -533,6 +533,39 @@ function LabsWorksListPage() {
   );
 }
 
+function StringLabPage() {
+  const isMobile = useIsMobile();
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>string</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <iframe
+        title="String Lab"
+        src="/labs/string/index.html"
+        style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
+      />
+      {isMobile ? (
+        <p>
+          <small>
+            mobile fallback: [ <a href="/labs/string/index.html">open string directly</a> ]
+          </small>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function HomePage() {
   const HOME_GUESTBOOK_LIMIT = 40;
   const footerRef = useRef(null);
@@ -727,7 +760,7 @@ function HomePage() {
           </p>
           <h3>labs</h3>
           <p>
-            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/labs/string/index.html">string</a> ]
+            [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/string">string</a> ]
           </p>
 
           <h3>operator</h3>
@@ -864,7 +897,7 @@ function HomePage() {
                     <a href="/labs/chunk-surfer/index.html">chunk surfer</a>
                   </li>
                   <li>
-                    <a href="/labs/string/index.html">string</a>
+                    <a href="/string">string</a>
                   </li>
                 </ul>
 
@@ -1026,7 +1059,7 @@ function HomePage() {
                 ]
               </span>
             ))}{' '}
-            [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/feed">seb feed</a> / <a href="/guestbook">guestbook</a> / <a href="/labs/chunk-surfer/index.html">chunk surfer</a> / <a href="/labs/string/index.html">string</a> ] [ <a href="/colophon">colophon</a> ]
+            [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/feed">seb feed</a> / <a href="/guestbook">guestbook</a> / <a href="/labs/chunk-surfer/index.html">chunk surfer</a> / <a href="/string">string</a> ] [ <a href="/colophon">colophon</a> ]
           </small>
         </center>
       </div>
@@ -1470,7 +1503,7 @@ function TalkRecapPage() {
       </p>
       <p>
         Walk the site:{' '}
-        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/labs/string/index.html">string</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
+        [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs/chunk-surfer/index.html">chunk surfer</a> ] [ <a href="/string">string</a> ] [ <a href="/feed">seb feed</a> ] [ <a href="/guestbook">guestbook</a> ]
       </p>
 
       <hr />
@@ -1696,12 +1729,15 @@ export default function App() {
   const isColophonPage = window.location.pathname.startsWith('/colophon');
   const isTalkRecapPage = window.location.pathname.startsWith('/dma-2026');
   const isLabsWorksListPage = /^\/labs\/works?-list\/?$/i.test(pathname);
+  const isStringPage = /^\/string\/?$/i.test(pathname);
   const isTmaydLabsPage = pathname.startsWith('/labs/tell-me-about-your-day');
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
 
   let page = pathname === '/' ? <HomePage /> : <NotFoundPage />;
   if (isLabsWorksListPage) {
     page = <LabsWorksListPage />;
+  } else if (isStringPage) {
+    page = <StringLabPage />;
   } else if (isLegacyFeedHash) {
     page = <LegacyFeedHashRedirect />;
   } else if (isTmaydLabsPage) {

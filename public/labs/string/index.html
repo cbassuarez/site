@@ -10,6 +10,15 @@
   </style>
 </head>
 <body>
+  <button id="string-help-open" type="button" style="position:fixed;top:8px;left:8px;z-index:10">about /string</button>
+  <dialog id="string-help-dialog">
+    <form method="dialog">
+      <p><strong>/string</strong> is a shared live string instrument.</p>
+      <p>Click or tap anywhere to pluck your own line. Your line is full opacity; other visitors are slightly faded.</p>
+      <p>As others pluck, you hear their voices and see sympathetic motion across nearby lanes.</p>
+      <p><button type="submit" data-close-help>enter</button></p>
+    </form>
+  </dialog>
   <canvas id="stage" aria-label="A horizontal string. Click anywhere to pluck."></canvas>
   <script src="./script.js" defer></script>
 </body>
