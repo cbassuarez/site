@@ -73,9 +73,8 @@ type Env = {
   RATE_LIMIT_HIT?: RateLimitBinding;
   RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
   RATE_LIMIT_CONTACT_POST?: RateLimitBinding;
-  RATE_LIMIT_STRING_PLUCK?: RateLimitBinding;
-  RATE_LIMIT_STRING_GET?: RateLimitBinding;
-  RATE_LIMIT_STRING_CURSOR?: RateLimitBinding;
+  RATE_LIMIT_STRING_SOCKET?: RateLimitBinding;
+  STRING_ROOM: DurableObjectNamespace;
 };
 
 type FeedSnapshot = {
@@ -832,15 +831,32 @@ async function recordGuestbookSignature(env: Env, ip: string): Promise<void> {
   await kv.put(`guestbook:signer:${hash}`, new Date().toISOString());
 }
 
-type StringPluck = { x: number; y: number; t: number; who: string };
+type StringPluck = {
+  x: number;
+  y: number;
+  t: number;
+  who: string;
+  force: number;
+  pull: number;
+  speed: number;
+  width: number;
+  sign: 1 | -1;
+};
 type StringCursor = { x: number; t: number; who: string };
 
-const STRING_PLUCKS_KEY = "string:plucks-v1";
-const STRING_CURSORS_KEY = "string:cursors-v1";
 const STRING_PLUCK_WINDOW_MS = 90_000;
 const STRING_CURSOR_WINDOW_MS = 5_000;
 const STRING_PLUCK_MAX = 200;
 const STRING_CURSOR_MAX = 64;
+const STRING_INCOMING_MAX_BYTES = 1024;
+const STRING_PLUCK_RATE_CAPACITY = 6;
+const STRING_PLUCK_RATE_REFILL_PER_SEC = 4;
+const STRING_CURSOR_RATE_CAPACITY = 30;
+const STRING_CURSOR_RATE_REFILL_PER_SEC = 30;
+const STRING_PERSIST_DEBOUNCE_MS = 5_000;
+const STRING_ALARM_INTERVAL_MS = 30_000;
+const STRING_ROOM_NAME = "string:room-v1";
+const STRING_PERSISTED_PLUCKS_KEY = "plucks-v1";
 
 const clamp01 = (value: unknown) => {
   const n = Number(value);
@@ -859,61 +875,313 @@ async function hashStringWho(ip: string): Promise<string> {
     .join("");
 }
 
-async function readStringPlucks(env: Env): Promise<StringPluck[]> {
-  const kv = env.HITS_KV;
-  if (!kv) return [];
-  const raw = await kv.get(STRING_PLUCKS_KEY);
-  if (!raw) return [];
+interface SocketAttachment {
+  who: string;
+  joinedAt: number;
+  lastSeenAt: number;
+  pluckTokens: number;
+  pluckLast: number;
+  cursorTokens: number;
+  cursorLast: number;
+}
+
+function consumeToken(
+  attachment: SocketAttachment,
+  kind: "pluck" | "cursor",
+  now: number,
+  capacity: number,
+  refillPerSec: number
+): boolean {
+  const tokensField = kind === "pluck" ? "pluckTokens" : "cursorTokens";
+  const lastField = kind === "pluck" ? "pluckLast" : "cursorLast";
+  const elapsedSec = Math.max(0, (now - attachment[lastField]) / 1000);
+  const refilled = Math.min(capacity, attachment[tokensField] + elapsedSec * refillPerSec);
+  attachment[lastField] = now;
+  if (refilled < 1) {
+    attachment[tokensField] = refilled;
+    return false;
+  }
+  attachment[tokensField] = refilled - 1;
+  return true;
+}
+
+function readAttachment(ws: WebSocket): SocketAttachment | null {
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((p: any): StringPluck | null => {
-        const t = Number(p?.t);
-        if (!Number.isFinite(t) || t <= 0) return null;
-        return {
-          x: clamp01(p?.x),
-          y: clamp01(p?.y),
-          t,
-          who: clean(p?.who).slice(0, 16),
-        };
-      })
-      .filter((p): p is StringPluck => p !== null);
+    const value = ws.deserializeAttachment();
+    if (!value || typeof value !== "object") return null;
+    const att = value as SocketAttachment;
+    if (typeof att.who !== "string" || att.who.length === 0) return null;
+    return att;
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function writeStringPlucks(env: Env, plucks: StringPluck[]): Promise<void> {
-  const kv = env.HITS_KV;
-  if (!kv) return;
-  await kv.put(STRING_PLUCKS_KEY, JSON.stringify(plucks));
-}
+export class StringRoom {
+  private readonly state: DurableObjectState;
+  private readonly env: Env;
+  private plucks: StringPluck[] = [];
+  private cursors: Map<string, StringCursor> = new Map();
+  private persistDirty = false;
 
-async function readStringCursors(env: Env): Promise<StringCursor[]> {
-  const kv = env.HITS_KV;
-  if (!kv) return [];
-  const raw = await kv.get(STRING_CURSORS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((c: any): StringCursor | null => {
-        const t = Number(c?.t);
-        if (!Number.isFinite(t) || t <= 0) return null;
-        return { x: clamp01(c?.x), t, who: clean(c?.who).slice(0, 16) };
-      })
-      .filter((c): c is StringCursor => c !== null);
-  } catch {
-    return [];
+  constructor(state: DurableObjectState, env: Env) {
+    this.state = state;
+    this.env = env;
+    void this.state.blockConcurrencyWhile(async () => {
+      try {
+        const persisted = await this.state.storage.get<StringPluck[]>(STRING_PERSISTED_PLUCKS_KEY);
+        if (Array.isArray(persisted)) {
+          const cutoff = Date.now() - STRING_PLUCK_WINDOW_MS;
+          this.plucks = persisted
+            .filter((p) => p && Number.isFinite(p.t) && p.t >= cutoff)
+            .slice(-STRING_PLUCK_MAX);
+        }
+      } catch {
+        this.plucks = [];
+      }
+      // Reattach to any sockets that survived hibernation by topping up their
+      // token buckets so reactivated clients aren't immediately throttled.
+      const now = Date.now();
+      for (const ws of this.state.getWebSockets()) {
+        const att = readAttachment(ws);
+        if (!att) continue;
+        att.pluckTokens = STRING_PLUCK_RATE_CAPACITY;
+        att.pluckLast = now;
+        att.cursorTokens = STRING_CURSOR_RATE_CAPACITY;
+        att.cursorLast = now;
+        try {
+          ws.serializeAttachment(att);
+        } catch {
+          // ignore: closed sockets get cleaned up by the runtime
+        }
+      }
+    });
   }
-}
 
-async function writeStringCursors(env: Env, cursors: StringCursor[]): Promise<void> {
-  const kv = env.HITS_KV;
-  if (!kv) return;
-  await kv.put(STRING_CURSORS_KEY, JSON.stringify(cursors));
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.endsWith("/socket")) {
+      return new Response(JSON.stringify({ error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
+    const upgrade = request.headers.get("upgrade") || "";
+    if (upgrade.toLowerCase() !== "websocket") {
+      return new Response("expected websocket upgrade", { status: 426 });
+    }
+
+    const claimed = clean(url.searchParams.get("who")).toLowerCase();
+    const seed =
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      "anon";
+    const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed : await hashStringWho(seed);
+
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+
+    const now = Date.now();
+    const attachment: SocketAttachment = {
+      who,
+      joinedAt: now,
+      lastSeenAt: now,
+      pluckTokens: STRING_PLUCK_RATE_CAPACITY,
+      pluckLast: now,
+      cursorTokens: STRING_CURSOR_RATE_CAPACITY,
+      cursorLast: now,
+    };
+    server.serializeAttachment(attachment);
+    this.state.acceptWebSocket(server);
+
+    this.pruneExpired(now);
+    const recentCursors = [...this.cursors.values()].filter((c) => c.t >= now - STRING_CURSOR_WINDOW_MS);
+    try {
+      server.send(
+        JSON.stringify({
+          type: "hello",
+          who,
+          serverNow: now,
+          plucks: this.plucks,
+          cursors: recentCursors,
+        })
+      );
+    } catch {
+      // already disconnected; runtime cleans up
+    }
+
+    this.broadcast(JSON.stringify({ type: "join", who, t: now }), server);
+    void this.scheduleMaintenanceAlarm();
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    if (typeof raw !== "string") return;
+    if (raw.length === 0 || raw.length > STRING_INCOMING_MAX_BYTES) return;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!parsed || typeof parsed !== "object") return;
+    const att = readAttachment(ws);
+    if (!att) return;
+
+    const now = Date.now();
+    att.lastSeenAt = now;
+    const type = String(parsed.type || "");
+
+    if (type === "pluck") {
+      if (!consumeToken(att, "pluck", now, STRING_PLUCK_RATE_CAPACITY, STRING_PLUCK_RATE_REFILL_PER_SEC)) {
+        ws.serializeAttachment(att);
+        return;
+      }
+      const pluck: StringPluck = {
+        who: att.who,
+        t: now,
+        x: clamp01(parsed.x),
+        y: clamp01(parsed.y),
+        force: clamp01(parsed.force),
+        pull: clamp01(parsed.pull),
+        speed: clamp01(parsed.speed),
+        width: clamp01(parsed.width),
+        sign: Number(parsed.sign) < 0 ? -1 : 1,
+      };
+      this.plucks.push(pluck);
+      const cutoff = now - STRING_PLUCK_WINDOW_MS;
+      if (this.plucks.length > STRING_PLUCK_MAX || (this.plucks[0] && this.plucks[0].t < cutoff)) {
+        this.plucks = this.plucks.filter((p) => p.t >= cutoff).slice(-STRING_PLUCK_MAX);
+      }
+      this.persistDirty = true;
+      void this.scheduleMaintenanceAlarm();
+      this.broadcast(JSON.stringify({ type: "pluck", ...pluck }), ws);
+      ws.serializeAttachment(att);
+      return;
+    }
+
+    if (type === "cursor") {
+      if (!consumeToken(att, "cursor", now, STRING_CURSOR_RATE_CAPACITY, STRING_CURSOR_RATE_REFILL_PER_SEC)) {
+        ws.serializeAttachment(att);
+        return;
+      }
+      const cursor: StringCursor = {
+        who: att.who,
+        t: now,
+        x: clamp01(parsed.x),
+      };
+      this.cursors.set(att.who, cursor);
+      if (this.cursors.size > STRING_CURSOR_MAX) {
+        // drop the oldest tracked cursor to bound memory
+        let oldestWho: string | null = null;
+        let oldestT = Infinity;
+        for (const [w, c] of this.cursors) {
+          if (c.t < oldestT) {
+            oldestT = c.t;
+            oldestWho = w;
+          }
+        }
+        if (oldestWho && oldestWho !== att.who) this.cursors.delete(oldestWho);
+      }
+      this.broadcast(JSON.stringify({ type: "cursor", ...cursor }), ws);
+      ws.serializeAttachment(att);
+      return;
+    }
+
+    if (type === "ping") {
+      try {
+        ws.send(JSON.stringify({ type: "pong", t: now }));
+      } catch {
+        // ignore
+      }
+      ws.serializeAttachment(att);
+      return;
+    }
+  }
+
+  webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+    this.handleDeparture(ws);
+  }
+
+  webSocketError(ws: WebSocket, _error: unknown): void {
+    this.handleDeparture(ws);
+  }
+
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    this.pruneExpired(now);
+    if (this.persistDirty) {
+      try {
+        await this.state.storage.put(STRING_PERSISTED_PLUCKS_KEY, this.plucks);
+        this.persistDirty = false;
+      } catch {
+        // observability surfaces the failure; retry on next alarm
+      }
+    } else if (this.plucks.length === 0) {
+      try {
+        await this.state.storage.delete(STRING_PERSISTED_PLUCKS_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    if (this.state.getWebSockets().length > 0 || this.persistDirty || this.cursors.size > 0) {
+      try {
+        await this.state.storage.setAlarm(Date.now() + STRING_ALARM_INTERVAL_MS);
+      } catch {
+        // ignore alarm scheduling failure
+      }
+    }
+  }
+
+  private handleDeparture(ws: WebSocket): void {
+    const att = readAttachment(ws);
+    if (!att) return;
+    const stillPresent = this.state.getWebSockets().some((other) => {
+      if (other === ws) return false;
+      const otherAtt = readAttachment(other);
+      return Boolean(otherAtt && otherAtt.who === att.who);
+    });
+    if (stillPresent) return;
+    this.cursors.delete(att.who);
+    this.broadcast(JSON.stringify({ type: "leave", who: att.who, t: Date.now() }), ws);
+  }
+
+  private broadcast(message: string, exclude?: WebSocket): void {
+    for (const ws of this.state.getWebSockets()) {
+      if (ws === exclude) continue;
+      try {
+        ws.send(message);
+      } catch {
+        // socket dead; runtime will reap
+      }
+    }
+  }
+
+  private pruneExpired(now: number): void {
+    const pluckCutoff = now - STRING_PLUCK_WINDOW_MS;
+    if (this.plucks.length > 0 && this.plucks[0].t < pluckCutoff) {
+      const before = this.plucks.length;
+      this.plucks = this.plucks.filter((p) => p.t >= pluckCutoff).slice(-STRING_PLUCK_MAX);
+      if (this.plucks.length !== before) this.persistDirty = true;
+    }
+    const cursorCutoff = now - STRING_CURSOR_WINDOW_MS;
+    for (const [who, cursor] of this.cursors) {
+      if (cursor.t < cursorCutoff) this.cursors.delete(who);
+    }
+  }
+
+  private async scheduleMaintenanceAlarm(): Promise<void> {
+    try {
+      const existing = await this.state.storage.getAlarm();
+      if (existing != null) return;
+      const target = Date.now() + STRING_PERSIST_DEBOUNCE_MS;
+      await this.state.storage.setAlarm(target);
+    } catch {
+      // ignore: best-effort scheduling
+    }
+  }
 }
 
 async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
@@ -1508,108 +1776,26 @@ export default {
       );
     }
 
-    if (url.pathname === "/api/string/pluck") {
-      if (request.method !== "POST") {
-        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
-          status: 405,
+    if (url.pathname === "/api/string/socket") {
+      const upgrade = request.headers.get("upgrade") || "";
+      if (upgrade.toLowerCase() !== "websocket") {
+        return new Response(JSON.stringify({ error: "expected_websocket_upgrade" }), {
+          status: 426,
           headers: jsonHeaders(allowOrigin),
         });
       }
-      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_PLUCK, clientKey(request)))) {
+      if (!env.STRING_ROOM) {
+        return new Response(JSON.stringify({ error: "string_room_unconfigured" }), {
+          status: 503,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_SOCKET, clientKey(request)))) {
         return tooManyRequests(allowOrigin);
       }
-      try {
-        const body: any = await request.json().catch(() => ({}));
-        const x = clamp01(body?.x);
-        const y = clamp01(body?.y);
-        const claimed = clean(body?.who).slice(0, 16);
-        const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed.toLowerCase() : await hashStringWho(clientKey(request));
-        const t = Date.now();
-        const cutoff = t - STRING_PLUCK_WINDOW_MS;
-        const existing = await readStringPlucks(env);
-        const next: StringPluck[] = [...existing, { x, y, t, who }]
-          .filter((p) => p.t >= cutoff)
-          .slice(-STRING_PLUCK_MAX);
-        await writeStringPlucks(env, next);
-        return new Response(JSON.stringify({ ok: true, t, who }), {
-          status: 200,
-          headers: jsonHeaders(allowOrigin),
-        });
-      } catch (error: any) {
-        return new Response(
-          JSON.stringify({ error: clean(error?.message || "string_pluck_failed"), at: new Date().toISOString() }),
-          { status: 502, headers: jsonHeaders(allowOrigin) }
-        );
-      }
-    }
-
-    if (url.pathname === "/api/string/recent") {
-      if (request.method !== "GET") {
-        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
-          status: 405,
-          headers: jsonHeaders(allowOrigin),
-        });
-      }
-      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_GET, clientKey(request)))) {
-        return tooManyRequests(allowOrigin);
-      }
-      try {
-        const since = Number(url.searchParams.get("since")) || 0;
-        const serverNow = Date.now();
-        const cutoff = Math.max(since, serverNow - STRING_PLUCK_WINDOW_MS);
-        const cursorCutoff = serverNow - STRING_CURSOR_WINDOW_MS;
-        const [allPlucks, allCursors] = await Promise.all([
-          readStringPlucks(env),
-          readStringCursors(env),
-        ]);
-        const plucks = allPlucks.filter((p) => p.t > cutoff).slice(-STRING_PLUCK_MAX);
-        const cursors = allCursors.filter((c) => c.t > cursorCutoff).slice(-STRING_CURSOR_MAX);
-        return new Response(JSON.stringify({ plucks, cursors, serverNow }), {
-          status: 200,
-          headers: {
-            ...jsonHeaders(allowOrigin),
-            "cache-control": "public, max-age=1",
-          },
-        });
-      } catch (error: any) {
-        return new Response(
-          JSON.stringify({ error: clean(error?.message || "string_recent_failed"), at: new Date().toISOString() }),
-          { status: 502, headers: jsonHeaders(allowOrigin) }
-        );
-      }
-    }
-
-    if (url.pathname === "/api/string/cursor") {
-      if (request.method !== "POST") {
-        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
-          status: 405,
-          headers: jsonHeaders(allowOrigin),
-        });
-      }
-      if (!(await checkRateLimit(env.RATE_LIMIT_STRING_CURSOR, clientKey(request)))) {
-        return tooManyRequests(allowOrigin);
-      }
-      try {
-        const body: any = await request.json().catch(() => ({}));
-        const x = clamp01(body?.x);
-        const claimed = clean(body?.who).slice(0, 16);
-        const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed.toLowerCase() : await hashStringWho(clientKey(request));
-        const t = Date.now();
-        const cutoff = t - STRING_CURSOR_WINDOW_MS;
-        const existing = await readStringCursors(env);
-        const filtered = existing.filter((c) => c.who !== who && c.t >= cutoff);
-        const next: StringCursor[] = [...filtered, { x, t, who }].slice(-STRING_CURSOR_MAX);
-        await writeStringCursors(env, next);
-        return new Response(JSON.stringify({ ok: true, t, who }), {
-          status: 200,
-          headers: jsonHeaders(allowOrigin),
-        });
-      } catch (error: any) {
-        return new Response(
-          JSON.stringify({ error: clean(error?.message || "string_cursor_failed"), at: new Date().toISOString() }),
-          { status: 502, headers: jsonHeaders(allowOrigin) }
-        );
-      }
+      const id = env.STRING_ROOM.idFromName(STRING_ROOM_NAME);
+      const stub = env.STRING_ROOM.get(id);
+      return stub.fetch(request);
     }
 
     if (url.pathname === "/api/health") {

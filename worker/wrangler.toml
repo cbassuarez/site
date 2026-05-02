@@ -13,6 +13,14 @@ CONTACT_FORMSPREE_ENDPOINT = "https://formspree.io/f/mjkepaeo"
 binding = "HITS_KV"
 id = "5034b4f88e04478d84f90350268b5aa3"
 
+[[durable_objects.bindings]]
+name = "STRING_ROOM"
+class_name = "StringRoom"
+
+[[migrations]]
+tag = "v1-string-room"
+new_sqlite_classes = ["StringRoom"]
+
 [triggers]
 crons = ["*/5 * * * *"]
 
@@ -49,25 +57,9 @@ namespace_id = "1007"
   period = 60
 
 [[ratelimits]]
-name = "RATE_LIMIT_STRING_PLUCK"
+name = "RATE_LIMIT_STRING_SOCKET"
 namespace_id = "1004"
 
   [ratelimits.simple]
-  limit = 30
-  period = 60
-
-[[ratelimits]]
-name = "RATE_LIMIT_STRING_GET"
-namespace_id = "1005"
-
-  [ratelimits.simple]
-  limit = 120
-  period = 60
-
-[[ratelimits]]
-name = "RATE_LIMIT_STRING_CURSOR"
-namespace_id = "1006"
-
-  [ratelimits.simple]
-  limit = 80
+  limit = 12
   period = 60

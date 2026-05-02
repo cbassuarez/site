@@ -12,11 +12,14 @@
   const MAX_SIM_STEPS_PER_FRAME = 10;
   const REFLECT_BASE = 0.928;
 
-  const POLL_INTERVAL_MS = 800;
-  const HEARTBEAT_INTERVAL_MS = 1500;
+  const HEARTBEAT_INTERVAL_MS = 2_500;
   const PHANTOM_DELAY_MS = 240;
   const REMOTE_CURSOR_STALE_MS = 6_000;
   const SIM_GC_INTERVAL_MS = 5_000;
+  const SOCKET_INITIAL_BACKOFF_MS = 800;
+  const SOCKET_MAX_BACKOFF_MS = 15_000;
+  const SOCKET_PING_INTERVAL_MS = 25_000;
+  const SOCKET_SEND_QUEUE_MAX = 64;
 
   const PITCH_LOW_HZ = 55.0; // A1
   const PITCH_HIGH_HZ = 1046.5; // C6
@@ -428,10 +431,6 @@
   // ---------- network ----------
   let myWho = loadOrCreateWho();
   getSim(myWho); // spawn the local string immediately, before any network
-  let lastSeenT = 0;
-  let pollErrorBackoff = 0;
-  let pollTimer = null;
-  let heartbeatTimer = null;
   let myCursorX = 0.5;
 
   function createPluckModel(x01, y01, detail) {
@@ -454,80 +453,6 @@
     triggerSympathetic(who, pluck.x01, pluck.y01, pluck);
   }
 
-  async function postPluck(pluck) {
-    try {
-      const r = await fetch(API_BASE + '/api/string/pluck', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          x: pluck.x01,
-          y: pluck.y01,
-          force: pluck.force01,
-          pull: pluck.pull01,
-          speed: pluck.speed01,
-          width: pluck.width01,
-          sign: pluck.sign,
-          who: myWho,
-        }),
-      });
-      if (!r.ok) return;
-      const data = await r.json().catch(() => null);
-      if (data && Number.isFinite(data.t)) lastSeenT = Math.max(lastSeenT, data.t);
-    } catch (_) {}
-  }
-
-  async function postCursor(x01) {
-    try {
-      await fetch(API_BASE + '/api/string/cursor', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ x: x01, who: myWho }),
-      });
-    } catch (_) {}
-  }
-
-  async function pollRecent() {
-    try {
-      const url = API_BASE + '/api/string/recent?since=' + encodeURIComponent(String(lastSeenT));
-      const r = await fetch(url);
-      if (!r.ok) {
-        pollErrorBackoff = Math.min(8000, (pollErrorBackoff || 1000) * 2);
-        return;
-      }
-      pollErrorBackoff = 0;
-      const data = await r.json().catch(() => null);
-      if (!data) return;
-
-      // ingest cursor presences (skip our own)
-      if (Array.isArray(data.cursors)) {
-        for (const c of data.cursors) {
-          if (!c || !c.who || c.who === myWho) continue;
-          const sim = getSim(c.who);
-          if (!sim) continue;
-          sim.cursorX = clamp01(c.x);
-          sim.cursorAt = Date.now();
-        }
-      }
-
-      // ingest plucks (skip our own)
-      if (Array.isArray(data.plucks)) {
-        for (const p of data.plucks) {
-          if (!p || typeof p !== 'object') continue;
-          const t = Number(p.t);
-          if (!Number.isFinite(t) || t <= lastSeenT) continue;
-          lastSeenT = Math.max(lastSeenT, t);
-          if (myWho && p.who === myWho) continue;
-          scheduleRemotePluck(p);
-        }
-      }
-    } catch (_) {
-      pollErrorBackoff = Math.min(8000, (pollErrorBackoff || 1000) * 2);
-    } finally {
-      const delay = pollErrorBackoff > 0 ? pollErrorBackoff : POLL_INTERVAL_MS;
-      pollTimer = setTimeout(pollRecent, delay);
-    }
-  }
-
   function scheduleRemotePluck(p) {
     setTimeout(() => {
       const pluck = createPluckModel(p.x, p.y, {
@@ -539,6 +464,209 @@
       });
       applyPluckForWho(p.who, pluck, 0.78);
     }, PHANTOM_DELAY_MS);
+  }
+
+  // ---------- websocket client ----------
+  const SOCKET_URL = (() => {
+    let base = API_BASE;
+    try {
+      const u = new URL(API_BASE);
+      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      base = u.origin.replace(/\/+$/, '');
+    } catch (_) {
+      base = API_BASE.replace(/^http(s?):\/\//i, (_, s) => (s ? 'wss://' : 'ws://'));
+    }
+    return base + '/api/string/socket?who=' + encodeURIComponent(myWho);
+  })();
+
+  let socket = null;
+  let socketConnected = false;
+  let socketBackoffMs = SOCKET_INITIAL_BACKOFF_MS;
+  let reconnectTimer = null;
+  let pingTimer = null;
+  let heartbeatTimer = null;
+  const pendingMessages = [];
+
+  function enqueue(message) {
+    if (pendingMessages.length >= SOCKET_SEND_QUEUE_MAX) {
+      pendingMessages.splice(0, pendingMessages.length - SOCKET_SEND_QUEUE_MAX + 1);
+    }
+    pendingMessages.push(message);
+  }
+
+  function flushPending() {
+    if (!socketConnected || !socket || socket.readyState !== 1) return;
+    while (pendingMessages.length > 0) {
+      const json = pendingMessages.shift();
+      try {
+        socket.send(json);
+      } catch (_) {
+        pendingMessages.unshift(json);
+        return;
+      }
+    }
+  }
+
+  function sendOrQueue(payload) {
+    let json;
+    try { json = JSON.stringify(payload); } catch (_) { return; }
+    if (socketConnected && socket && socket.readyState === 1) {
+      try { socket.send(json); return; } catch (_) {}
+    }
+    enqueue(json);
+  }
+
+  function sendPluck(pluck) {
+    sendOrQueue({
+      type: 'pluck',
+      x: pluck.x01,
+      y: pluck.y01,
+      force: pluck.force01,
+      pull: pluck.pull01,
+      speed: pluck.speed01,
+      width: pluck.width01,
+      sign: pluck.sign,
+    });
+  }
+
+  function sendCursor(x01) {
+    sendOrQueue({ type: 'cursor', x: clamp01(x01) });
+  }
+
+  function startPing() {
+    stopPing();
+    pingTimer = setInterval(() => {
+      if (!socket || socket.readyState !== 1) return;
+      try { socket.send(JSON.stringify({ type: 'ping', t: Date.now() })); } catch (_) {}
+    }, SOCKET_PING_INTERVAL_MS);
+  }
+  function stopPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  }
+
+  function startHeartbeat() {
+    if (heartbeatTimer) return;
+    function tick() {
+      sendCursor(myCursorX);
+      heartbeatTimer = setTimeout(tick, HEARTBEAT_INTERVAL_MS);
+    }
+    tick();
+  }
+  function stopHeartbeat() {
+    if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
+  }
+
+  function ingestHello(msg) {
+    if (Array.isArray(msg.cursors)) {
+      for (const c of msg.cursors) {
+        if (!c || !c.who || c.who === myWho) continue;
+        const sim = getSim(c.who);
+        if (!sim) continue;
+        sim.cursorX = clamp01(c.x);
+        sim.cursorAt = Date.now();
+      }
+    }
+    // Replay only very recent plucks to give the joiner a sense of the current
+    // texture without a thunderclap of stale events. Anything older than ~1.5s
+    // is silently dropped.
+    if (Array.isArray(msg.plucks) && Number.isFinite(msg.serverNow)) {
+      const recencyCutoff = msg.serverNow - 1500;
+      for (const p of msg.plucks) {
+        if (!p || !p.who || p.who === myWho) continue;
+        const t = Number(p.t);
+        if (!Number.isFinite(t) || t < recencyCutoff) continue;
+        scheduleRemotePluck(p);
+      }
+    }
+  }
+
+  function handleSocketMessage(raw) {
+    let msg = null;
+    try { msg = JSON.parse(typeof raw === 'string' ? raw : ''); } catch (_) { return; }
+    if (!msg || typeof msg !== 'object') return;
+    switch (msg.type) {
+      case 'hello':
+        ingestHello(msg);
+        return;
+      case 'pluck':
+        if (msg.who && msg.who !== myWho) scheduleRemotePluck(msg);
+        return;
+      case 'cursor': {
+        if (!msg.who || msg.who === myWho) return;
+        const sim = getSim(msg.who);
+        if (!sim) return;
+        sim.cursorX = clamp01(msg.x);
+        sim.cursorAt = Date.now();
+        return;
+      }
+      case 'leave':
+        if (msg.who && msg.who !== myWho) {
+          const sim = sims.get(msg.who);
+          if (sim) sim.cursorAt = 0;
+        }
+        return;
+      case 'pong':
+      case 'join':
+      default:
+        return;
+    }
+  }
+
+  function connectSocket() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;
+    let ws;
+    try {
+      ws = new WebSocket(SOCKET_URL);
+    } catch (_) {
+      scheduleReconnect();
+      return;
+    }
+    socket = ws;
+    socketConnected = false;
+
+    ws.addEventListener('open', () => {
+      if (ws !== socket) return;
+      socketConnected = true;
+      socketBackoffMs = SOCKET_INITIAL_BACKOFF_MS;
+      flushPending();
+      startPing();
+      // Refresh cursor immediately so others see us at our current position.
+      sendCursor(myCursorX);
+    });
+    ws.addEventListener('message', (e) => {
+      if (ws !== socket) return;
+      handleSocketMessage(e.data);
+    });
+    ws.addEventListener('close', () => {
+      if (ws !== socket) return;
+      socketConnected = false;
+      stopPing();
+      socket = null;
+      scheduleReconnect();
+    });
+    ws.addEventListener('error', () => {
+      // The 'close' event fires next; the cleanup happens there.
+    });
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    const delay = Math.min(SOCKET_MAX_BACKOFF_MS, socketBackoffMs);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      socketBackoffMs = Math.min(SOCKET_MAX_BACKOFF_MS, Math.max(SOCKET_INITIAL_BACKOFF_MS, socketBackoffMs * 1.7));
+      connectSocket();
+    }, delay);
+  }
+
+  function teardownSocket() {
+    stopPing();
+    if (socket) {
+      try { socket.close(1000, 'page hidden'); } catch (_) {}
+      socket = null;
+    }
+    socketConnected = false;
   }
 
   // ---------- audible sympathetic echo ----------
@@ -618,20 +746,24 @@
     }
   }
 
-  function startHeartbeat() {
-    if (heartbeatTimer) return;
-    function tick() {
-      postCursor(myCursorX);
-      heartbeatTimer = setTimeout(tick, HEARTBEAT_INTERVAL_MS);
-    }
-    tick();
-  }
-  function stopHeartbeat() {
-    if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
-  }
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopHeartbeat();
-    else startHeartbeat();
+    if (document.hidden) {
+      stopHeartbeat();
+      teardownSocket();
+    } else {
+      connectSocket();
+      startHeartbeat();
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    stopHeartbeat();
+    teardownSocket();
+  });
+  window.addEventListener('online', () => {
+    if (!socket || socket.readyState > 1) {
+      socketBackoffMs = SOCKET_INITIAL_BACKOFF_MS;
+      connectSocket();
+    }
   });
 
   // ---------- input ----------
@@ -674,7 +806,8 @@
     });
     myCursorX = x01;
     applyPluckForWho(myWho, pluck, 0.92);
-    postPluck(pluck);
+    sendPluck(pluck);
+    sendCursor(x01);
   }
 
   canvas.addEventListener('webkitmouseforcechanged', (e) => {
@@ -688,7 +821,6 @@
   canvas.addEventListener('pointerdown', (e) => {
     if (!ensureAudio()) return;
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    if (!pollTimer) pollTimer = setTimeout(pollRecent, 50);
     pluckLocalTap(e);
   }, { passive: true });
 
@@ -793,8 +925,6 @@
   });
 
   // ---------- bootstrap ----------
-  // Register presence and resolve myWho before any pluck.
-  postCursor(myCursorX);
+  connectSocket();
   startHeartbeat();
-  pollTimer = setTimeout(pollRecent, 200);
 })();
