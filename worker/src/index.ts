@@ -91,12 +91,23 @@ const FEED_SNAPSHOT_KEY = "feed:snapshot-v1";
 const FEED_MAX_ITEMS = 500;
 const FEED_EDGE_CACHE_SECONDS = 60;
 
+// Surfaces the same site is reachable from. Emitted as a Link header on every
+// worker response so anyone watching the network tab (or running `curl -i`)
+// discovers them. Browsers silently ignore the non-HTTP rel/scheme values.
+const DISCOVERY_LINK_HEADER = [
+  '<https://cbassuarez.com/.well-known/cli-letter.txt>; rel="alternate"; type="text/plain"',
+  '<ssh://ssh.cbassuarez.com>; rel="alternate"',
+  '<gemini://gemini.cbassuarez.com>; rel="alternate"',
+  '<https://cbassuarez.com/humans.txt>; rel="author"',
+].join(", ");
+
 const jsonHeaders = (origin: string) => ({
   "access-control-allow-origin": origin,
   "access-control-allow-methods": "GET,POST,OPTIONS",
   "access-control-allow-headers": "content-type,authorization",
   "cache-control": "no-store",
   "content-type": "application/json; charset=utf-8",
+  link: DISCOVERY_LINK_HEADER,
 });
 
 const clean = (value: unknown) =>
@@ -1203,7 +1214,7 @@ type CoRoomLogEntry = {
 const COROOM_NAME = "coroom:room-v1";
 const COROOM_LOG_KEY = "log-v1";
 const COROOM_LOG_MAX = 200;
-const COROOM_LEAVE_GRACE_MS = 8_000;
+const COROOM_LEAVE_GRACE_MS = 4_000;
 const COROOM_INCOMING_MAX_BYTES = 256;
 // Accept legacy 12-hex IDs *and* UUID v4 with or without dashes.
 const COROOM_WHO_REGEX = /^[0-9a-f]{8,12}$|^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1478,17 +1489,21 @@ export class CoRoom {
   private async handleDisconnect(ws: WebSocket): Promise<void> {
     const att = readCoRoomAttachment(ws);
     if (!att) return;
-    const whos = this.distinctWhos();
+    // Cloudflare leaves the closing socket in state.getWebSockets() until this
+    // handler returns. Compute counts/members excluding it so the presence
+    // event we broadcast reflects post-disconnect state, not the transient
+    // pre-close state. Otherwise remaining clients keep seeing count=2 until
+    // the grace alarm fires (and the user perceives "stuck").
+    const whos = this.distinctWhos(ws);
+    const members = this.membersList(ws);
     const now = Date.now();
     if (this.currentInstance) {
-      // Inform remaining sockets of the count change. The instance itself stays
-      // open until grace expires; if a reconnect arrives before then, no close.
       this.broadcast(
         JSON.stringify({
           type: "presence",
           count: whos.size,
           peak: this.currentInstance.peak,
-          members: this.membersList(),
+          members,
           serverNow: now,
         }),
         ws
@@ -1506,18 +1521,20 @@ export class CoRoom {
     }
   }
 
-  private distinctWhos(): Set<string> {
+  private distinctWhos(exclude?: WebSocket): Set<string> {
     const whos = new Set<string>();
     for (const ws of this.state.getWebSockets()) {
+      if (exclude && ws === exclude) continue;
       const att = readCoRoomAttachment(ws);
       if (att) whos.add(att.who);
     }
     return whos;
   }
 
-  private membersList(): CoRoomMember[] {
+  private membersList(exclude?: WebSocket): CoRoomMember[] {
     const aggregated = new Map<string, { joinedAt: number; location: string }>();
     for (const ws of this.state.getWebSockets()) {
+      if (exclude && ws === exclude) continue;
       const att = readCoRoomAttachment(ws);
       if (!att) continue;
       const prev = aggregated.get(att.who);
@@ -2069,6 +2086,7 @@ function cliTextResponse(body: string, status = 200): Response {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      link: DISCOVERY_LINK_HEADER,
     },
   });
 }

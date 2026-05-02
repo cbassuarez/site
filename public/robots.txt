@@ -1,0 +1,16 @@
+# cbassuarez.com
+#
+# operator    seb suarez
+# source      https://github.com/cbassuarez/site
+#
+# also reachable:
+#   curl  cbassuarez.com/cli
+#   ssh   ssh.cbassuarez.com
+#   gemini://gemini.cbassuarez.com
+#   /humans.txt
+#   /.well-known/cli-letter.txt
+#   /version.json
+#   /api/feed
+
+User-agent: *
+Allow: /

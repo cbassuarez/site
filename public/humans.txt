@@ -1,23 +1,56 @@
 # /humans.txt
 # the operator behind cbassuarez.com
 
-/* TEAM */
+//----------------/* TEAM */----------------//
 
 operator     seb suarez
-location     caracas → new york
+location     los angeles
 contact      contact@cbassuarez.com
 source       https://github.com/cbassuarez/site
 
-/* PRACTICE */
+//--------------/* PRACTICE */---------------//
 
-cybernetic music systems · live performance · sonic + visual
-ongoing: let go / letting go · THE TUB · String · Praetorius
-live surfaces: /labs/string · /labs/feed · /labs/guestbook
+cybernetic music systems   *    live performance
+  sonic + visual arts      *       open-source
 
-/* SITE */
+ongoing: let go / letting go * THE TUB * Tell me
+        about your day * Praetorius
+        
+live surfaces:
+/labs/string
+/labs/anteroom
+/labs/feed
+/labs/guestbook
 
-last touched   2026-05-01
-the build label at the foot of every page is the truth-teller.
-the rest of the site is in the nav. the rest of the practice is offline.
+//----------------/* SITE */----------------//
 
-— seb
+last touched------------------------2026-05-01
+
+operations
+site-------------------------------operational
+api--------------------------------operational
+ssh--------------------------------operational
+gemini-----------------------------operational
+
+pieces
+tellmeaboutyourday---------------------offline
+string-----------------------------operational
+anteroom---------------------------operational
+
+
+
+
+
+portfolios are useless, so i tried
+     to
+            make
+              mine
+                                        useful.
+                                        
+                                        
+                                        
+the rest of it is offline,
+
+                  where the grass meets the sea.
+
+- seb

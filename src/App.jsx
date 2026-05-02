@@ -40,6 +40,24 @@ const WEBSAFE_LINK_COLORS = [
   '#CC3300'
 ];
 const VISITED_LINK_COLOR = '#551A8B';
+const RANDOM_LABS_ROUTES = [
+  '/labs/feed',
+  '/labs/guestbook',
+  '/labs/chunk-surfer',
+  '/labs/string',
+  '/room',
+  '/labs/tell-me-about-your-day'
+];
+
+function pickRandomLabsRoute() {
+  const index = Math.floor(Math.random() * RANDOM_LABS_ROUTES.length);
+  return RANDOM_LABS_ROUTES[index] || '/labs';
+}
+
+function openRandomLabsRoute(event) {
+  event.preventDefault();
+  window.location.href = pickRandomLabsRoute();
+}
 function pickWebsafeLinkColor() {
   const index = Math.floor(Math.random() * WEBSAFE_LINK_COLORS.length);
   return WEBSAFE_LINK_COLORS[index] || '#0000CC';
@@ -1097,20 +1115,23 @@ function SiteLeftPane() {
       </ul>
 
       <h3>labs</h3>
-      <ul>
-        <li>
-          <a href="/labs/feed">seb feed</a>
-        </li>
-        <li>
-          <a href="/labs/guestbook">guestbook</a>
-        </li>
-        <li>
-          <a href="/labs/chunk-surfer">chunk surfer</a>
-        </li>
-        <li>
-          <a href="/labs/string">string</a>
-        </li>
-      </ul>
+        <ul>
+          <li>
+            <a href="/labs/feed">seb feed</a>
+          </li>
+          <li>
+            <a href="/labs/guestbook">guestbook</a>
+          </li>
+          <li>
+            <a href="/labs/chunk-surfer">chunk surfer</a>
+          </li>
+          <li>
+            <a href="/labs/string">string</a>
+          </li>
+          <li>
+            <a href="/room">anteroom</a> <small>(usually closed)</small>
+          </li>
+        </ul>
 
       <h3>operator</h3>
       <p>
@@ -1133,7 +1154,7 @@ function SiteLeftPane() {
   );
 }
 
-function SplitPaneLayout({ children }) {
+function SplitPaneLayout({ children, naturalHeight = false }) {
   const obliqueLine = useMemo(() => {
     const index = Math.floor(Math.random() * OBLIQUE_STRATEGIES.length);
     return OBLIQUE_STRATEGIES[index] || 'Use an old idea.';
@@ -1165,14 +1186,20 @@ function SplitPaneLayout({ children }) {
         <tbody>
           <tr>
             <td width="30%" valign="top" style={{ width: '30%' }}>
-              <div className="shell-left-pane" style={{ height: paneHeight, overflowY: 'auto' }}>
-                <SiteLeftPane />
-              </div>
+              <div
+  className="shell-left-pane"
+  style={naturalHeight ? { minHeight: paneHeight } : { height: paneHeight, overflowY: 'auto' }}
+>
+  <SiteLeftPane />
+</div>
             </td>
             <td width="70%" valign="top" style={{ width: '70%' }}>
-              <div className="shell-right-pane" style={{ height: paneHeight, overflowY: 'auto' }}>
-                {children}
-              </div>
+              <div
+  className="shell-right-pane"
+  style={naturalHeight ? { minHeight: paneHeight } : { height: paneHeight, overflowY: 'auto' }}
+>
+  {children}
+</div>
             </td>
           </tr>
         </tbody>
@@ -1202,7 +1229,7 @@ function GlobalFooter() {
               ]
             </span>
           ))}{' '}
-          [ <a href="/works">works</a> ] [ <a href="/recent">recent</a> ] [ <a href="/labs">labs</a> ] [ <a href="/about">about</a> ] [ <a href="/press">press</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/labs/feed">seb feed</a> / <a href="/labs/guestbook">guestbook</a> / <a href="/labs/chunk-surfer">chunk surfer</a> / <a href="/labs/string">string</a> ] [ <a href="/colophon">colophon</a> ]
+          [ <a href="/works">works</a> ] [ <a href="/recent">recent</a> ] [ <a href="/labs">labs</a> ] [ <a href="/about">about</a> ] [ <a href="/press">press</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/labs/feed">seb feed</a> / <a href="/labs/guestbook">guestbook</a> / <a href="/labs/chunk-surfer">chunk surfer</a> / <a href="/labs/string">string</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/access">access</a> ]
         </small>
       </center>
     </>
@@ -1373,12 +1400,24 @@ function HomePage({ shellMode = false }) {
           I build cybernetic work: connected pieces that listen, relay, adapt, and evolve in real time.
         </p>
         <p>
-          currently building live cybernetic works. visit <a href="/works">works</a> to explore pieces, or <a href="/contact">contact</a> for commissions, performances, and collaborations.
+          I also create tools: <a href="https://cbassuarez.github.io/praetorius" target="_blank" rel="noreferrer">Praetorius</a>, <a href="https://tenneyapp.com" target="_blank" rel="noreferrer">Tenney</a>, and <a href="https://synctimerapp.com" target="_blank" rel="noreferrer">SyncTimer</a>.
         </p>
-        <p>
-          I also create tools: <a href="https://github.com/cbassuarez/praetorius" target="_blank" rel="noreferrer">Praetorius</a>, <a href="https://github.com/stagedevices/Tenney" target="_blank" rel="noreferrer">Tenney</a>, and <a href="https://github.com/cbassuarez/SyncTimer" target="_blank" rel="noreferrer">SyncTimer</a>.
-        </p>
+<left>
+  <p>
+    <small>
+      <tt>─────────────────────────────────────────────</tt>
+    </small>
+  </p>
+</left>
 
+        <p>
+        visit <a href="/works">works</a> to explore pieces; <a href="/contact">contact</a> for commissions, performances, and collaborations; </p>
+        
+        <p>
+                or let the site choose a random{' '}
+<a href="/labs" onClick={openRandomLabsRoute}>labs page</a> (experimental pieces and methods of interacting with my work).
+        </p>
+        
         <h2>what is seb doing // live feed</h2>
         <div style={{ minHeight: '21em', fontFamily: MONO_FONT_STACK }}>
           {isBooting ? (
@@ -1527,8 +1566,8 @@ function HomePage({ shellMode = false }) {
           </p>
           <h3>labs</h3>
           <p>
-            [ <a href="/labs/feed">seb feed</a> ] [ <a href="/labs/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer">chunk surfer</a> ] [ <a href="/labs/string">string</a> ]
-          </p>
+          [ <a href="/labs/feed">seb feed</a> ] [ <a href="/labs/guestbook">guestbook</a> ] [ <a href="/labs/chunk-surfer">chunk surfer</a> ] [ <a href="/labs/string">string</a> ] [ <a href="/room">anteroom</a> <small>(usually closed)</small> ]
+        </p>
 
           <h3>operator</h3>
           <p>
@@ -1677,6 +1716,9 @@ function HomePage({ shellMode = false }) {
                   </li>
                   <li>
                     <a href="/labs/string">string</a>
+                  </li>
+                  <li>
+                    <a href="/room">anteroom</a> <small>(usually closed)</small>
                   </li>
                 </ul>
 
@@ -2815,6 +2857,13 @@ function ColophonPage() {
       <p>works shell: Praetorius embed at <code>/works-console</code>.</p>
       <p>hosting: static site + cloudflare worker endpoints.</p>
       <p>
+        also reachable: <code>curl cbassuarez.com/cli</code>{' · '}
+        <code>ssh ssh.cbassuarez.com</code>{' · '}
+        <code>gemini://gemini.cbassuarez.com</code>{' · '}
+        <a href="/humans.txt">/humans.txt</a>{' · '}
+        <a href="/access">/access</a>
+      </p>
+      <p>
         build:{' '}
         {BUILD_COMMIT_URL ? (
           <a href={BUILD_COMMIT_URL} target="_blank" rel="noreferrer">
@@ -2824,6 +2873,81 @@ function ColophonPage() {
           <code>{BUILD_LABEL}</code>
         )}
         {' '}(<a href="/version.json" target="_blank" rel="noreferrer">version.json</a>)
+      </p>
+    </>
+  );
+}
+
+function AccessPage() {
+  const rowStyle = { margin: '0.4em 0', display: 'flex', flexWrap: 'wrap', gap: '0.4em 1.2em' };
+  const labelStyle = { minWidth: '20em', fontFamily: MONO_FONT_STACK };
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>access</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ] [ <a href="/colophon">colophon</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <p>
+        this site is reachable in five registers. each one returns the same
+        essential thing — that this is seb's site, that it has some live
+        surfaces, and how to reach the operator. the registers differ in
+        the texture of the reply.
+      </p>
+
+      <div style={{ marginTop: '1em' }}>
+        <p style={rowStyle}>
+          <code style={labelStyle}>https://cbassuarez.com</code>
+          <span>the React site you are looking at.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}>curl cbassuarez.com/cli</code>
+          <span>the hand-typed letter, in plain text.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}>ssh ssh.cbassuarez.com</code>
+          <span>one-shot interactive surface.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}>gemini://gemini.cbassuarez.com</code>
+          <span>the Gemini protocol mirror.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/humans.txt">/humans.txt</a></code>
+          <span>the operator's signed colophon.</span>
+        </p>
+      </div>
+
+      <p style={{ marginTop: '1.5em' }}>smaller endpoints for those building things:</p>
+
+      <div>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/version.json">/version.json</a></code>
+          <span>the live build manifest.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="https://seb-feed.cbassuarez.workers.dev/api/feed?limit=20" target="_blank" rel="noreferrer">/api/feed</a></code>
+          <span>the seb feed as JSON.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="https://seb-feed.cbassuarez.workers.dev/api/coroom/snapshot" target="_blank" rel="noreferrer">/api/coroom/snapshot</a></code>
+          <span>/404 anteroom state as JSON.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/.well-known/cli-letter.txt">/.well-known/cli-letter.txt</a></code>
+          <span>canonical text of the curl letter.</span>
+        </p>
+      </div>
+
+      <p style={{ marginTop: '1.5em' }}>
+        — more at <a href="/colophon">/colophon</a>
       </p>
     </>
   );
@@ -2909,7 +3033,7 @@ function formatCoRoomLocation(location) {
   return trimmed || 'unknown location';
 }
 
-function NotFoundPlain() {
+function NotFoundPlain({ isRoomPage = false }) {
   return (
     <>
       <center>
@@ -2921,7 +3045,16 @@ function NotFoundPlain() {
 
       <hr />
 
-      <p>the page you asked for does not exist.</p>
+     {isRoomPage ? (
+  <>
+    <p>the anteroom is not accessible right now.</p>
+    <p>
+      <small>it appears only under certain conditions of simultaneous access.</small>
+    </p>
+  </>
+) : (
+  <p>the page you asked for does not exist.</p>
+)}
       <p>
         [ <a href="/">home</a> ] [ <a href="/labs/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
       </p>
@@ -3057,17 +3190,18 @@ const sectionTitleStyle = { fontStyle: 'italic', margin: '1.2em 0 0.4em', textAl
           <p style={{ textAlign: 'center' }}><small>no prior instances on record.</small></p>
         ) : (
           <pre style={{
-            fontFamily: MONO_FONT_STACK,
-            fontSize: '0.82em',
-            margin: '0 auto',
-            maxWidth: '44em',
-            lineHeight: 1.55,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            background: '#f5f5f0',
-            padding: '0.8em 1em',
-            border: '1px solid #ddd'
-          }}>
+    fontFamily: MONO_FONT_STACK,
+    fontSize: '0.82em',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
+    lineHeight: 1.55,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    background: '#f5f5f0',
+    padding: '0.8em 1em',
+    border: '1px solid #ddd'
+  }}>
 {log.map((entry) => {
   const started = formatCoRoomTimestamp(entry.startedAt);
   const dur = formatCoRoomDuration(entry.durationMs);
@@ -3095,7 +3229,7 @@ const sectionTitleStyle = { fontStyle: 'italic', margin: '1.2em 0 0.4em', textAl
   );
 }
 
-function NotFoundPage() {
+function NotFoundPage({ isRoomPage = false }) {
   const [who] = useState(() => loadOrCreateCoRoomWho());
   const [count, setCount] = useState(1);
   const [peak, setPeak] = useState(1);
@@ -3266,7 +3400,7 @@ function NotFoundPage() {
         />
     );
   }
-  return <NotFoundPlain />;
+ return <NotFoundPlain isRoomPage={isRoomPage} />;
 }
 
 function LegacyFeedHashRedirect() {
@@ -3285,6 +3419,26 @@ export default function App() {
   const linkColor = useMemo(() => pickWebsafeLinkColor(), []);
   const isMobile = useIsMobile();
 
+  // Print a one-time-per-session greeting in the dev console enumerating the
+  // alternate command-line surfaces. Visible only to people who open devtools;
+  // gated on sessionStorage so it doesn't repeat on internal navigations.
+  useEffect(() => {
+    try {
+      if (window.sessionStorage.getItem('cbassuarez:console-greeted')) return;
+      window.sessionStorage.setItem('cbassuarez:console-greeted', '1');
+    } catch (_) { /* private mode etc. — fall through, prints once per page load */ }
+    const dim = 'color:#666;font-family:monospace;font-size:12px;line-height:1.5;';
+    const head = 'color:#0000CC;font-family:monospace;font-size:14px;font-weight:bold;line-height:1.6;';
+    /* eslint-disable no-console */
+    console.log('%ccbassuarez.com', head);
+    console.log('%calso reachable from the command line:', dim);
+    console.log('%c  curl cbassuarez.com/cli', dim);
+    console.log('%c  ssh  ssh.cbassuarez.com', dim);
+    console.log('%c  gemini://gemini.cbassuarez.com', dim);
+    console.log('%c  /humans.txt   /.well-known/cli-letter.txt', dim);
+    /* eslint-enable no-console */
+  }, []);
+
   const pathname = window.location.pathname;
   const hash = window.location.hash;
   const isHomePage = pathname === '/';
@@ -3295,6 +3449,7 @@ export default function App() {
   const isGuestbookPage = /^\/labs\/guestbook\/?$/i.test(pathname);
   const isContactPage = window.location.pathname.startsWith('/contact');
   const isColophonPage = window.location.pathname.startsWith('/colophon');
+  const isAccessPage = /^\/access\/?$/i.test(pathname);
   const isTalkRecapPage = window.location.pathname.startsWith('/dma-2026');
   const isRecentPage = /^\/(?:recent|events)\/?$/i.test(pathname);
   const isLabsWorksListPage = /^\/labs\/works?-list\/?$/i.test(pathname);
@@ -3303,7 +3458,29 @@ export default function App() {
   const isLabsChildRoute = /^\/labs\/.+/i.test(pathname);
   const isStringPage = /^\/labs\/string\/?$/i.test(pathname);
   const isTmaydLabsPage = pathname.startsWith('/labs/tell-me-about-your-day');
+  const isRoomPage = /^\/room\/?$/i.test(pathname);
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
+  const isKnownRoute =
+  isRoomPage ||
+  isHomePage ||
+  isWorksPage ||
+  isAboutPage ||
+  isPressPage ||
+  isFeedPage ||
+  isGuestbookPage ||
+  isContactPage ||
+  isColophonPage ||
+  isAccessPage ||
+  isTalkRecapPage ||
+  isRecentPage ||
+  isLabsWorksListPage ||
+  isChunkSurferPage ||
+  isLabsDirectoryPage ||
+  isStringPage ||
+  isTmaydLabsPage ||
+  isLegacyFeedHash;
+
+const isNotFoundRoute = !isKnownRoute;
   const useSplitPaneShell = !isMobile && !isWorksPage && !isLabsChildRoute;
   const hideGlobalFooter = isWorksPage || isLabsChildRoute;
 
@@ -3320,6 +3497,8 @@ export default function App() {
     page = <StringLabPage />;
   } else if (isLegacyFeedHash) {
     page = <LegacyFeedHashRedirect />;
+    } else if (isRoomPage) {
+  page = <NotFoundPage isRoomPage />;
   } else if (isTmaydLabsPage) {
     page = <TmaydLabsPage pathname={pathname} />;
   } else if (isAboutPage) {
@@ -3336,11 +3515,16 @@ export default function App() {
     page = <ContactPage />;
   } else if (isColophonPage) {
     page = <ColophonPage />;
+  } else if (isAccessPage) {
+    page = <AccessPage />;
   } else if (isTalkRecapPage) {
     page = <TalkRecapPage />;
   }
-  const content = useSplitPaneShell ? <SplitPaneLayout>{page}</SplitPaneLayout> : page;
-
+const content = useSplitPaneShell ? (
+  <SplitPaneLayout naturalHeight={isNotFoundRoute}>
+    {page}
+  </SplitPaneLayout>
+) : page;
   return (
     <>
       <style>{`a:link { color: ${linkColor}; } a:visited { color: ${VISITED_LINK_COLOR}; }`}</style>
