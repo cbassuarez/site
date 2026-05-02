@@ -25,8 +25,12 @@ func startSSHServer(ctx context.Context, cfg Config, content *Content) error {
 		PublicKeyHandler: func(_ ssh.Context, _ ssh.PublicKey) bool {
 			return true // anonymous
 		},
-		KeyboardInteractiveHandler: func(_ ssh.Context, _ ssh.KeyboardInteractiveChallenge) bool {
-			return true // anonymous
+		// Refuse PTY allocation. This is a one-shot text server; without a PTY
+		// the client runs in non-interactive (pipe) mode and closes cleanly
+		// the instant the handler returns. With a PTY accepted, the channel
+		// can hang waiting on a phantom stdin until the user Ctrl-C's.
+		PtyCallback: func(_ ssh.Context, _ ssh.Pty) bool {
+			return false
 		},
 	}
 

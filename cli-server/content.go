@@ -34,16 +34,21 @@ over gemini: gemini://gemini.cbassuarez.com/
 — seb
 `
 
-const letterTTL = 5 * time.Minute
+const (
+	letterTTL          = 5 * time.Minute
+	letterFailureBackoff = 30 * time.Second
+	userAgent          = "cbassuarez-cli/1 (+https://cbassuarez.com)"
+)
 
 type Content struct {
 	WorkerURL string
 	LetterURL string
 
-	mu       sync.Mutex
-	letter   string
-	letterAt time.Time
-	client   *http.Client
+	mu        sync.Mutex
+	letter    string
+	letterAt  time.Time // last successful fetch
+	nextRetry time.Time // earliest time we may try fetching again after a failure
+	client    *http.Client
 }
 
 func NewContent(workerURL, letterURL string) *Content {
@@ -56,33 +61,43 @@ func NewContent(workerURL, letterURL string) *Content {
 }
 
 // Letter returns the canonical hand-typed letter, refreshed at most once per
-// letterTTL. On any failure the cached or fallback letter is returned.
+// letterTTL on success and not more often than letterFailureBackoff on
+// failure. The fallback letter is returned if we've never fetched
+// successfully.
 func (c *Content) Letter() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.letter != "" && time.Since(c.letterAt) < letterTTL {
+	now := time.Now()
+	if !c.letterAt.IsZero() && now.Sub(c.letterAt) < letterTTL {
+		return c.letter
+	}
+	if now.Before(c.nextRetry) {
 		return c.letter
 	}
 	if c.LetterURL != "" {
 		req, err := http.NewRequest("GET", c.LetterURL, nil)
 		if err == nil {
 			req.Header.Set("Accept", "text/plain")
+			req.Header.Set("User-Agent", userAgent)
 			resp, err := c.client.Do(req)
 			if err == nil {
 				defer resp.Body.Close()
 				if resp.StatusCode == 200 {
-					body, err := io.ReadAll(io.LimitReader(resp.Body, 16*1024))
-					if err == nil && len(body) > 0 {
+					body, readErr := io.ReadAll(io.LimitReader(resp.Body, 16*1024))
+					if readErr == nil && len(body) > 0 {
 						c.letter = string(body)
-						c.letterAt = time.Now()
+						c.letterAt = now
+						c.nextRetry = time.Time{}
+						return c.letter
 					}
 				}
 			}
 		}
 	}
+	// Fetch failed (or no URL configured); back off so we don't hammer.
+	c.nextRetry = now.Add(letterFailureBackoff)
 	if c.letter == "" {
 		c.letter = FallbackLetter
-		c.letterAt = time.Now()
 	}
 	return c.letter
 }
@@ -137,8 +152,18 @@ type feedPayload struct {
 	} `json:"items"`
 }
 
+func (c *Content) httpGet(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json, text/plain;q=0.9")
+	return c.client.Do(req)
+}
+
 func (c *Content) renderFeed() string {
-	resp, err := c.client.Get(c.WorkerURL + "/api/feed?limit=8")
+	resp, err := c.httpGet(c.WorkerURL + "/api/feed?limit=8")
 	if err != nil {
 		return "the feed is unreachable right now.\n"
 	}
@@ -195,7 +220,7 @@ type coroomSnapshot struct {
 }
 
 func (c *Content) renderRoom() string {
-	resp, err := c.client.Get(c.WorkerURL + "/api/coroom/snapshot")
+	resp, err := c.httpGet(c.WorkerURL + "/api/coroom/snapshot")
 	if err != nil {
 		return "the /404 anteroom is unreachable right now.\n"
 	}
@@ -286,7 +311,7 @@ type versionPayload struct {
 }
 
 func (c *Content) renderVersion() string {
-	resp, err := c.client.Get("https://cbassuarez.com/version.json")
+	resp, err := c.httpGet("https://cbassuarez.com/version.json")
 	if err != nil {
 		return "the live build manifest is unreachable right now.\n"
 	}
@@ -322,7 +347,7 @@ func (c *Content) renderVersion() string {
 }
 
 func (c *Content) renderHumans() string {
-	resp, err := c.client.Get("https://cbassuarez.com/humans.txt")
+	resp, err := c.httpGet("https://cbassuarez.com/humans.txt")
 	if err != nil {
 		return "humans.txt is unreachable right now.\n"
 	}

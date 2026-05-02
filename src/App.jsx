@@ -40,6 +40,42 @@ const WEBSAFE_LINK_COLORS = [
   '#CC3300'
 ];
 const VISITED_LINK_COLOR = '#551A8B';
+function pickWebsafeLinkColor() {
+  const index = Math.floor(Math.random() * WEBSAFE_LINK_COLORS.length);
+  return WEBSAFE_LINK_COLORS[index] || '#0000CC';
+}
+
+function hexToRgb(hex) {
+  const value = String(hex || '').replace('#', '').trim();
+  if (!/^[0-9a-f]{6}$/i.test(value)) {
+    return { r: 255, g: 255, b: 153 };
+  }
+
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function mixRgb(a, b, amount) {
+  const t = Math.max(0, Math.min(1, amount));
+  return {
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t)
+  };
+}
+
+function rgbToCss({ r, g, b }) {
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function highlightFromLinkColor(linkColor) {
+  const source = hexToRgb(linkColor);
+  const paper = { r: 255, g: 255, b: 204 };
+  return rgbToCss(mixRgb(source, paper, 0.72));
+}
 
 const OBLIQUE_STRATEGIES = [
   'Use an old idea.',
@@ -2813,7 +2849,7 @@ const COROOM_WHO_REGEX = /^[0-9a-f]{8,12}$|^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{
 const COROOM_PIECE_TITLE = 'Anteroom';
 const COROOM_PIECE_YEAR = 2026;
 const COROOM_PIECE_DESCRIPTION =
-  'A vestibule that exists only while two or more strangers are simultaneously requesting a page that does not exist. While you are alone here, the room is invisible — the page returns the ordinary 404. When a second visitor arrives, both of you become present to each other, and the record of every prior co-presence event the site has ever witnessed becomes legible. The piece is the act of meeting, briefly and accidentally, in a place neither of you meant to come to.';
+  'You have found a piece that exists only when ≥2 strangers simultaneously request a page that does not exist.';
 
 function generateUuid() {
   try {
@@ -2923,7 +2959,7 @@ function CoRoomMemberRow({ member, currentTick, isSelf }) {
   );
 }
 
-function CoRoomView({ currentInstance, log, count, peak, members, selfWho }) {
+function CoRoomView({ currentInstance, log, count, peak, members, selfWho, highlightColor }) {
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -2937,7 +2973,12 @@ function CoRoomView({ currentInstance, log, count, peak, members, selfWho }) {
   const titleStyle = { fontStyle: 'italic', margin: '0.4em 0', letterSpacing: '0.02em' };
   const yearStyle = { color: '#666', marginLeft: '0.5em' };
   const descriptionStyle = { lineHeight: 1.6, margin: '0.8em 0', textAlign: 'left' };
-  const sectionTitleStyle = { fontStyle: 'italic', margin: '1.2em 0 0.4em', textAlign: 'center' };
+const roomStatusHighlightStyle = {
+  backgroundColor: highlightColor || '#ffff99',
+  color: '#111',
+  padding: '0 0.15em'
+};
+const sectionTitleStyle = { fontStyle: 'italic', margin: '1.2em 0 0.4em', textAlign: 'center' };
 
   return (
     <>
@@ -2966,13 +3007,23 @@ function CoRoomView({ currentInstance, log, count, peak, members, selfWho }) {
         <p style={descriptionStyle}>{COROOM_PIECE_DESCRIPTION}</p>
 
         <p style={{ ...descriptionStyle, color: '#444' }}>
-          <small>
-            The room is open right now because there are {count} simultaneous visitors on a 404 page. When the
-            count drops below 2, the room closes, this instance is appended to the log below, and both visitors'
-            views revert to the ordinary 404. Identifiers shown below are persistent UUIDs stored in each
-            visitor's browser; locations are derived from the connecting network and are approximate.
-          </small>
-        </p>
+  <small>
+    <img
+      src="/icons/warning.png"
+      alt="[!]"
+      width="24"
+      height="24"
+      align="absmiddle"
+    />{' '}
+    <mark style={roomStatusHighlightStyle}>
+      This piece is accessible because there are currently <b>{count}</b> simultaneous visitors on a 404 page.
+    </mark>{' '}
+    When the count drops below 2, the room closes, this instance is appended to the log below, and both visitors&apos;
+    views revert to the ordinary 404. Identifiers shown below are persistent UUIDs stored in each visitor&apos;s
+    browser; locations are derived from the connecting network and are approximate.
+  </small>
+</p>
+
 
         <hr style={{ margin: '1.5em 0' }} />
 
@@ -3055,6 +3106,7 @@ function NotFoundPage() {
   const reconnectTimerRef = useRef(null);
   const pingTimerRef = useRef(null);
   const backoffRef = useRef(800);
+  const roomHighlightColor = useMemo(() => highlightFromLinkColor(pickWebsafeLinkColor()), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -3204,13 +3256,14 @@ function NotFoundPage() {
   if (count >= 2) {
     return (
       <CoRoomView
-        currentInstance={currentInstance}
-        log={log}
-        count={count}
-        peak={peak}
-        members={members}
-        selfWho={who}
-      />
+          currentInstance={currentInstance}
+          log={log}
+          count={count}
+          peak={peak}
+          members={members}
+          selfWho={who}
+          highlightColor={roomHighlightColor}
+        />
     );
   }
   return <NotFoundPlain />;
@@ -3229,10 +3282,7 @@ function LegacyFeedHashRedirect() {
 }
 
 export default function App() {
-  const linkColor = useMemo(() => {
-    const index = Math.floor(Math.random() * WEBSAFE_LINK_COLORS.length);
-    return WEBSAFE_LINK_COLORS[index] || '#0000CC';
-  }, []);
+  const linkColor = useMemo(() => pickWebsafeLinkColor(), []);
   const isMobile = useIsMobile();
 
   const pathname = window.location.pathname;

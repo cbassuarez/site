@@ -14,12 +14,13 @@
 package main
 
 import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
+    "context"
+    "log"
+    "os"
+    "os/signal"
+    "path/filepath"
+    "sync"
+    "syscall"
 )
 
 type Config struct {
@@ -52,8 +53,9 @@ func loadConfig() Config {
 
 func main() {
 	cfg := loadConfig()
-	log.SetFlags(log.LstdFlags | log.LUTC)
-	content := NewContent(cfg.WorkerURL, cfg.LetterURL)
+    log.SetFlags(log.LstdFlags | log.LUTC)
+    materializeSecrets(cfg)
+    content := NewContent(cfg.WorkerURL, cfg.LetterURL)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -101,6 +103,31 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return v == "1" || v == "true" || v == "TRUE" || v == "yes"
+}
+
+func materializeSecretFile(envKey, path string, mode os.FileMode) {
+    value := os.Getenv(envKey)
+    if value == "" || path == "" {
+        return
+    }
+
+    if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+        log.Printf("secret: mkdir for %s failed: %v", path, err)
+        return
+    }
+
+    if err := os.WriteFile(path, []byte(value), mode); err != nil {
+        log.Printf("secret: write %s failed: %v", path, err)
+        return
+    }
+
+    log.Printf("secret: materialized %s", path)
+}
+
+func materializeSecrets(cfg Config) {
+    materializeSecretFile("SSH_HOST_KEY", cfg.SSHHostKeys[0], 0600)
+    materializeSecretFile("GEMINI_CERT", cfg.GeminiCert, 0600)
+    materializeSecretFile("GEMINI_KEY", cfg.GeminiKey, 0600)
 }
 
 func envList(key, fallback string) []string {
