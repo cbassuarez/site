@@ -1190,13 +1190,14 @@ export class StringRoom {
 
 // ---------- co-presence room (the back of /404) ----------
 
-type CoRoomMember = { who: string; joinedAt: number };
+type CoRoomMember = { who: string; joinedAt: number; location: string };
 type CoRoomLogEntry = {
   startedAt: number;
   endedAt: number;
   durationMs: number;
   peak: number;
-  members: string[]; // sorted distinct whos
+  // Distinct participants who passed through this instance, with last-known location.
+  members: Array<{ who: string; location: string }>;
 };
 
 const COROOM_NAME = "coroom:room-v1";
@@ -1204,11 +1205,24 @@ const COROOM_LOG_KEY = "log-v1";
 const COROOM_LOG_MAX = 200;
 const COROOM_LEAVE_GRACE_MS = 8_000;
 const COROOM_INCOMING_MAX_BYTES = 256;
+// Accept legacy 12-hex IDs *and* UUID v4 with or without dashes.
+const COROOM_WHO_REGEX = /^[0-9a-f]{8,12}$|^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface CoRoomAttachment {
   who: string;
   joinedAt: number;
   lastSeenAt: number;
+  location: string;
+}
+
+function deriveCfLocation(request: Request): string {
+  const cf = (request as any).cf || {};
+  const city = clean(cf.city || "");
+  const region = clean(cf.region || cf.regionCode || "");
+  const country = clean(cf.country || "");
+  const head = city || region || "";
+  if (head && country) return `${head}, ${country}`;
+  return head || country || "";
 }
 
 function readCoRoomAttachment(ws: WebSocket): CoRoomAttachment | null {
@@ -1227,7 +1241,8 @@ export class CoRoom {
   private readonly state: DurableObjectState;
   private readonly env: Env;
   private log: CoRoomLogEntry[] = [];
-  private currentInstance: { startedAt: number; peak: number; seenWhos: Set<string> } | null = null;
+  // seenWhos maps each who that has been part of this instance to their last-known location.
+  private currentInstance: { startedAt: number; peak: number; seenWhos: Map<string, string> } | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -1256,12 +1271,12 @@ export class CoRoom {
         // We don't know the original startedAt; best-effort: use the earliest
         // joinedAt across surviving sockets.
         let startedAt = Date.now();
-        const seen = new Set<string>();
+        const seen = new Map<string, string>();
         for (const ws of this.state.getWebSockets()) {
           const att = readCoRoomAttachment(ws);
           if (!att) continue;
           if (att.joinedAt < startedAt) startedAt = att.joinedAt;
-          seen.add(att.who);
+          seen.set(att.who, att.location || "");
         }
         this.currentInstance = { startedAt, peak: seen.size, seenWhos: seen };
       }
@@ -1270,6 +1285,32 @@ export class CoRoom {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname.endsWith("/snapshot")) {
+      const now = Date.now();
+      const whos = this.distinctWhos();
+      const members = this.membersList();
+      return new Response(
+        JSON.stringify({
+          count: whos.size,
+          currentInstance: this.currentInstance
+            ? {
+                startedAt: this.currentInstance.startedAt,
+                peak: this.currentInstance.peak,
+                members,
+              }
+            : null,
+          log: this.log,
+          serverNow: now,
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
+        }
+      );
+    }
     if (!url.pathname.endsWith("/socket")) {
       return new Response(JSON.stringify({ error: "not_found" }), {
         status: 404,
@@ -1286,14 +1327,15 @@ export class CoRoom {
       request.headers.get("cf-connecting-ip") ||
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       "anon";
-    const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed : await hashStringWho(seed);
+    const who = COROOM_WHO_REGEX.test(claimed) ? claimed : await hashStringWho(seed);
+    const location = deriveCfLocation(request);
 
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
 
     const now = Date.now();
-    const att: CoRoomAttachment = { who, joinedAt: now, lastSeenAt: now };
+    const att: CoRoomAttachment = { who, joinedAt: now, lastSeenAt: now, location };
     server.serializeAttachment(att);
     this.state.acceptWebSocket(server);
 
@@ -1302,10 +1344,15 @@ export class CoRoom {
     const wasOpen = this.currentInstance !== null;
     let openedNow = false;
     if (whos.size >= 2 && !this.currentInstance) {
-      this.currentInstance = { startedAt: now, peak: whos.size, seenWhos: new Set(whos) };
+      const seen = new Map<string, string>();
+      for (const m of this.membersList()) seen.set(m.who, m.location);
+      this.currentInstance = { startedAt: now, peak: whos.size, seenWhos: seen };
       openedNow = true;
     } else if (this.currentInstance) {
-      for (const w of whos) this.currentInstance.seenWhos.add(w);
+      for (const m of this.membersList()) {
+        // Always update with the most recent location for each who.
+        this.currentInstance.seenWhos.set(m.who, m.location);
+      }
       if (whos.size > this.currentInstance.peak) this.currentInstance.peak = whos.size;
     }
 
@@ -1409,7 +1456,9 @@ export class CoRoom {
         endedAt: now,
         durationMs: Math.max(0, now - this.currentInstance.startedAt),
         peak: this.currentInstance.peak,
-        members: [...this.currentInstance.seenWhos].sort(),
+        members: [...this.currentInstance.seenWhos.entries()]
+          .map(([who, location]) => ({ who, location }))
+          .sort((a, b) => a.who.localeCompare(b.who)),
       };
       this.log.unshift(entry);
       this.log = this.log.slice(0, COROOM_LOG_MAX);
@@ -1467,15 +1516,20 @@ export class CoRoom {
   }
 
   private membersList(): CoRoomMember[] {
-    const earliest = new Map<string, number>();
+    const aggregated = new Map<string, { joinedAt: number; location: string }>();
     for (const ws of this.state.getWebSockets()) {
       const att = readCoRoomAttachment(ws);
       if (!att) continue;
-      const prev = earliest.get(att.who);
-      if (prev === undefined || att.joinedAt < prev) earliest.set(att.who, att.joinedAt);
+      const prev = aggregated.get(att.who);
+      if (!prev || att.joinedAt < prev.joinedAt) {
+        aggregated.set(att.who, { joinedAt: att.joinedAt, location: att.location || prev?.location || "" });
+      } else if (att.location && !prev.location) {
+        // Backfill location if a sibling socket has it.
+        aggregated.set(att.who, { ...prev, location: att.location });
+      }
     }
-    return [...earliest.entries()]
-      .map(([who, joinedAt]) => ({ who, joinedAt }))
+    return [...aggregated.entries()]
+      .map(([who, v]) => ({ who, joinedAt: v.joinedAt, location: v.location }))
       .sort((a, b) => a.joinedAt - b.joinedAt);
   }
 
@@ -1935,6 +1989,392 @@ async function handleFeedRequest(
   return new Response(body, { status: 200, headers: jsonHeaders(allowOrigin) });
 }
 
+// ---------- CLI surface (curl, wget, httpie, ...) ----------
+
+const CLI_USER_AGENT_REGEX = /^(curl|wget|HTTPie|httpie|aria2|powershell|fetch|node-fetch|go-http-client|libwww-perl|python-requests|python-urllib)\b/i;
+const CLI_LETTER_FALLBACK = `hello.
+
+this is cbassuarez.com from the command line.
+i'm seb. i make cybernetic music systems.
+
+the live surfaces:
+  /labs/string    a shared string instrument
+  /labs/feed      everything i did online today
+  /labs/guestbook a place to leave a small mark
+
+the offline ones:
+  let go / letting go · THE TUB · String · Praetorius
+
+if you want to talk:  contact@cbassuarez.com
+if you want to read:  this came from /humans.txt
+
+curl /feed       see what's happening today
+curl /string     /labs/string state
+curl /room       /404 anteroom state
+curl /works      list of works
+curl /version    build label
+curl /contact    how to reach me
+
+— seb
+`;
+
+type CliPath =
+  | "letter"
+  | "feed"
+  | "string"
+  | "room"
+  | "works"
+  | "contact"
+  | "version"
+  | "humans";
+
+const CLI_PATH_MAP: Record<string, CliPath | undefined> = {
+  "/": "letter",
+  "/cli": "letter",
+  "/cli/": "letter",
+  "/cli/feed": "feed",
+  "/cli/string": "string",
+  "/cli/room": "room",
+  "/cli/works": "works",
+  "/cli/contact": "contact",
+  "/cli/version": "version",
+  "/cli/humans": "humans",
+  "/feed": "feed",
+  "/string": "string",
+  "/room": "room",
+  "/works": "works",
+  "/contact": "contact",
+  "/version": "version",
+};
+
+function isCliClient(request: Request): boolean {
+  const ua = clean(request.headers.get("user-agent") || "");
+  if (CLI_USER_AGENT_REGEX.test(ua)) return true;
+  const accept = clean(request.headers.get("accept") || "");
+  if (accept && accept.includes("text/plain") && !accept.includes("text/html")) {
+    return true;
+  }
+  return false;
+}
+
+function classifyCliPath(pathname: string): CliPath | null {
+  const trimmed = pathname.replace(/\/+$/, "") || "/";
+  return CLI_PATH_MAP[trimmed] ?? null;
+}
+
+function cliTextResponse(body: string, status = 200): Response {
+  return new Response(body.endsWith("\n") ? body : body + "\n", {
+    status,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+function buildCliFooter(): string {
+  return [
+    "",
+    "—",
+    "more at https://cbassuarez.com  ·  signed at /humans.txt",
+    "",
+  ].join("\n");
+}
+
+async function fetchCliLetter(request: Request): Promise<string> {
+  // Try fetching the canonical letter from the deployed site, fall back to
+  // the inline copy when the site is unreachable (e.g. local dev, transient
+  // outage). The fetch is best-effort and never blocks the response.
+  try {
+    const origin = new URL(request.url);
+    origin.pathname = "/.well-known/cli-letter.txt";
+    origin.search = "";
+    // Hit the canonical apex if available; fall back to the worker's own URL.
+    const candidates = [
+      `https://cbassuarez.com/.well-known/cli-letter.txt`,
+      origin.toString(),
+    ];
+    for (const candidate of candidates) {
+      try {
+        const r = await fetch(candidate, {
+          headers: { accept: "text/plain" },
+          cf: { cacheTtl: 60, cacheEverything: true },
+        } as RequestInit);
+        if (r.ok) {
+          const text = await r.text();
+          const trimmed = text.trim();
+          if (trimmed.length > 0) return text;
+        }
+      } catch {
+        // try next
+      }
+    }
+  } catch {
+    // fall through to inline fallback
+  }
+  return CLI_LETTER_FALLBACK;
+}
+
+function formatCliRelative(at: string, nowMs: number): string {
+  const t = parseFeedTimeMs(at);
+  if (!t) return "";
+  const diffMs = Math.max(0, nowMs - t);
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  return `${d}d ago`;
+}
+
+async function renderCliFeed(env: Env, allowOrigin: string): Promise<string> {
+  const snapshot = await readFeedSnapshot(env);
+  const items = (snapshot?.items || []).slice(0, 6);
+  const now = Date.now();
+  const lines = ["the feed says, today:"];
+  if (items.length === 0) {
+    lines.push("");
+    lines.push("  (the feed is quiet right now.)");
+  } else {
+    for (const item of items) {
+      const src = sourceBase(item.source).padEnd(8, " ");
+      const when = formatCliRelative(item.at, now).padEnd(8, " ");
+      const text = short(item.text, 88);
+      lines.push(`  · ${when} ${src} ${text}`);
+    }
+  }
+  lines.push("");
+  lines.push("more at https://cbassuarez.com/labs/feed");
+  return lines.join("\n");
+}
+
+function formatCliDuration(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return `${h}h${String(rm).padStart(2, "0")}m`;
+  }
+  return `${String(m).padStart(2, "0")}m${String(r).padStart(2, "0")}s`;
+}
+
+async function renderCliRoom(env: Env): Promise<string> {
+  if (!env.CO_ROOM) return "the /404 anteroom is not configured here.\n";
+  try {
+    const id = env.CO_ROOM.idFromName(COROOM_NAME);
+    const stub = env.CO_ROOM.get(id);
+    const r = await stub.fetch(new Request("https://internal/snapshot", { method: "GET" }));
+    if (!r.ok) {
+      return "the /404 anteroom is unreachable right now.\n";
+    }
+    const data: any = await r.json().catch(() => null);
+    if (!data) return "the /404 anteroom returned no state.\n";
+    const count = Number(data.count) || 0;
+    const log = Array.isArray(data.log) ? data.log : [];
+    if (data.currentInstance && count >= 2) {
+      const startedAt = Number(data.currentInstance.startedAt) || 0;
+      const dur = formatCliDuration(Math.max(0, Date.now() - startedAt));
+      const peak = Number(data.currentInstance.peak) || count;
+      const members = Array.isArray(data.currentInstance.members) ? data.currentInstance.members : [];
+      const places = members
+        .map((m: any) => clean(m?.location || ""))
+        .filter((p: string) => p.length > 0);
+      const placeLine = places.length > 0 ? `they are connecting from ${places.join(", ")}.` : "";
+      return [
+        `the /404 anteroom is open right now.`,
+        `${count} people are present (peak ${peak}); the instance has been open ${dur}.`,
+        placeLine,
+        ``,
+        `wander toward https://cbassuarez.com/this-does-not-exist if you want to join.`,
+        ``,
+      ].filter(Boolean).join("\n") + "\n";
+    }
+    const last = log[0];
+    if (!last) {
+      return [
+        "the /404 anteroom has never opened. it opens when two strangers are",
+        "simultaneously asking the site for a page that doesn't exist.",
+        "",
+        "wander toward https://cbassuarez.com/this-does-not-exist if you want to try.",
+        "",
+      ].join("\n");
+    }
+    const dur = formatCliDuration(Number(last.durationMs) || 0);
+    const ago = formatCliRelative(new Date(last.endedAt || 0).toISOString(), Date.now());
+    const peak = Number(last.peak) || 0;
+    const places = Array.isArray(last.members)
+      ? last.members.map((m: any) => clean(m?.location || "")).filter((p: string) => p.length > 0)
+      : [];
+    const placeLine = places.length > 0 ? `they were from ${places.join(", ")}.` : "";
+    return [
+      `the /404 anteroom is currently closed.`,
+      `it last opened ${ago} for ${dur}, with ${peak} ${peak === 1 ? "person" : "people"}.`,
+      placeLine,
+      ``,
+      `wander toward https://cbassuarez.com/this-does-not-exist if you want to try.`,
+      ``,
+    ].filter(Boolean).join("\n") + "\n";
+  } catch {
+    return "the /404 anteroom is unreachable right now.\n";
+  }
+}
+
+async function renderCliString(env: Env): Promise<string> {
+  // The string lab's state lives only inside the StringRoom DO; surface a
+  // tiny prose summary by hitting it (or fall back to a static blurb).
+  // We don't add a /snapshot path to StringRoom in this pass — keep the
+  // CLI text purely descriptive.
+  return [
+    "the string lab is a shared instrument that lives in your browser.",
+    "every visitor plays one string; every pluck travels outward and",
+    "returns as sympathetic sound from other strings nearby.",
+    "",
+    "pluck it yourself at https://cbassuarez.com/labs/string.",
+    "",
+  ].join("\n");
+}
+
+function renderCliWorks(): string {
+  return [
+    "the offline works:",
+    "",
+    "  · let go / letting go    cybernetic performance, ongoing.",
+    "  · THE TUB                installation + sonic sculpture.",
+    "  · String                 cybernetic strings, multi-visitor.",
+    "  · Praetorius             prepared instruments + live system.",
+    "",
+    "the online (live) ones:",
+    "",
+    "  · /labs/string           shared string instrument.",
+    "  · /labs/feed             a feed of what i did online today.",
+    "  · /labs/guestbook        a place to leave a small mark.",
+    "  · /404 (anteroom)        opens only when two strangers are",
+    "                           simultaneously on a page that doesn't exist.",
+    "",
+    "more at https://cbassuarez.com/works",
+    "",
+  ].join("\n");
+}
+
+function renderCliContact(): string {
+  return [
+    "to reach me:",
+    "",
+    "  email      contact@cbassuarez.com",
+    "  form       https://cbassuarez.com/contact",
+    "  github     https://github.com/cbassuarez",
+    "  bandcamp   https://cbassuarez.bandcamp.com",
+    "",
+    "i read every email. i answer most of them.",
+    "",
+    "— seb",
+    "",
+  ].join("\n");
+}
+
+async function renderCliVersion(env: Env): Promise<string> {
+  if (!env.HITS_KV) return "build label is not available right now.\n";
+  let manifest: any = null;
+  try {
+    const r = await fetch("https://cbassuarez.com/version.json", {
+      headers: { accept: "application/json" },
+      cf: { cacheTtl: 60 } as any,
+    });
+    if (r.ok) manifest = await r.json().catch(() => null);
+  } catch {
+    manifest = null;
+  }
+  if (!manifest || !manifest.sha) {
+    return "the live build manifest is unreachable right now.\n";
+  }
+  const shortSha = clean(manifest.shortSha || String(manifest.sha).slice(0, 7));
+  const at = clean(manifest.at).slice(0, 19).replace("T", " ");
+  const subjects = Array.isArray(manifest.subjects) ? manifest.subjects : [];
+  const lines = [
+    `build · ${shortSha} · ${at} UTC`,
+    "",
+  ];
+  if (subjects.length > 0) {
+    lines.push("recent work:");
+    for (const s of subjects.slice(0, 8)) {
+      const trimmed = clean(s);
+      if (trimmed) lines.push(`  · ${trimmed}`);
+    }
+    lines.push("");
+  }
+  lines.push("more at https://cbassuarez.com/colophon");
+  lines.push("");
+  return lines.join("\n");
+}
+
+async function renderCliHumans(request: Request): Promise<string> {
+  try {
+    const r = await fetch("https://cbassuarez.com/humans.txt", {
+      headers: { accept: "text/plain" },
+      cf: { cacheTtl: 60 } as any,
+    });
+    if (r.ok) return await r.text();
+  } catch {
+    // ignore
+  }
+  return "humans.txt is unavailable right now.\n";
+}
+
+async function handleCliRequest(
+  request: Request,
+  env: Env,
+  url: URL
+): Promise<Response> {
+  const kind = classifyCliPath(url.pathname);
+  if (!kind) {
+    const lines = [
+      `cbassuarez.com · cli`,
+      ``,
+      `no such path: ${url.pathname}`,
+      ``,
+      `try: /, /feed, /string, /room, /works, /contact, /version`,
+      ``,
+    ];
+    return cliTextResponse(lines.join("\n"), 404);
+  }
+  switch (kind) {
+    case "letter": {
+      const letter = await fetchCliLetter(request);
+      return cliTextResponse(letter);
+    }
+    case "feed": {
+      const body = await renderCliFeed(env, "*");
+      return cliTextResponse(body + buildCliFooter());
+    }
+    case "string": {
+      const body = await renderCliString(env);
+      return cliTextResponse(body + buildCliFooter());
+    }
+    case "room": {
+      const body = await renderCliRoom(env);
+      return cliTextResponse(body + buildCliFooter());
+    }
+    case "works": {
+      return cliTextResponse(renderCliWorks() + buildCliFooter());
+    }
+    case "contact": {
+      return cliTextResponse(renderCliContact() + buildCliFooter());
+    }
+    case "version": {
+      const body = await renderCliVersion(env);
+      return cliTextResponse(body + buildCliFooter());
+    }
+    case "humans": {
+      const body = await renderCliHumans(request);
+      return cliTextResponse(body);
+    }
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -1942,6 +2382,21 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: jsonHeaders(allowOrigin) });
+    }
+
+    // CLI surface: catch curl/wget/httpie at the top, before any API routes,
+    // so `curl <worker>/feed` and `curl <worker>/cli/feed` both serve text.
+    // Two ways to opt in:
+    //   1. The path is under /cli (explicit namespace) — always serve text.
+    //   2. The User-Agent looks CLI-shaped — serve text on the short paths.
+    // /api/* paths are explicitly NOT considered CLI paths so existing JSON
+    // contracts are preserved.
+    if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
+      const cliKind = classifyCliPath(url.pathname);
+      const explicitCliPath = url.pathname === "/cli" || url.pathname.startsWith("/cli/");
+      if (cliKind && (explicitCliPath || isCliClient(request))) {
+        return handleCliRequest(request, env, url);
+      }
     }
 
     if (url.pathname === "/api/feed") {
@@ -2210,6 +2665,32 @@ export default {
       const id = env.CO_ROOM.idFromName(COROOM_NAME);
       const stub = env.CO_ROOM.get(id);
       return stub.fetch(request);
+    }
+
+    if (url.pathname === "/api/coroom/snapshot") {
+      if (request.method !== "GET") {
+        return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+          status: 405,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!env.CO_ROOM) {
+        return new Response(JSON.stringify({ error: "coroom_unconfigured" }), {
+          status: 503,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      const id = env.CO_ROOM.idFromName(COROOM_NAME);
+      const stub = env.CO_ROOM.get(id);
+      const snapshotUrl = new URL(request.url);
+      snapshotUrl.pathname = "/snapshot";
+      const doRequest = new Request(snapshotUrl.toString(), { method: "GET" });
+      const response = await stub.fetch(doRequest);
+      const body = await response.text();
+      return new Response(body, {
+        status: response.status,
+        headers: jsonHeaders(allowOrigin),
+      });
     }
 
     if (url.pathname === "/api/health") {

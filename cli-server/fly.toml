@@ -1,0 +1,60 @@
+# Fly.io app config for cbassuarez-cli (SSH + Gemini front-end).
+#
+# After `fly launch`, set the host key + TLS cert as Fly secrets:
+#
+#   ssh-keygen -t ed25519 -f /tmp/ssh_host_ed25519 -N ""
+#   fly secrets set SSH_HOST_KEY="$(cat /tmp/ssh_host_ed25519)"
+#
+#   openssl req -x509 -newkey ed25519 -nodes -days 3650 \
+#     -subj "/CN=gemini.cbassuarez.com" \
+#     -keyout /tmp/gemini.key -out /tmp/gemini.crt
+#   fly secrets set GEMINI_CERT="$(cat /tmp/gemini.crt)" GEMINI_KEY="$(cat /tmp/gemini.key)"
+#
+# The release_command writes the secrets to disk where the binary expects them.
+#
+# DNS: point ssh.cbassuarez.com and gemini.cbassuarez.com (DNS-only / gray
+# cloud) at the Fly app's anycast IPs, which `fly ips list` will print after
+# `fly launch`.
+
+app = "cbassuarez-cli"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  WORKER_URL = "https://seb-feed.cbassuarez.workers.dev"
+  LETTER_URL = "https://cbassuarez.com/.well-known/cli-letter.txt"
+  SSH_ADDR = ":2222"
+  SSH_HOST_KEY_PATHS = "/secrets/ssh_host_ed25519"
+  GEMINI_ADDR = ":1965"
+  GEMINI_HOST = "gemini.cbassuarez.com"
+  GEMINI_CERT_PATH = "/secrets/gemini.crt"
+  GEMINI_KEY_PATH = "/secrets/gemini.key"
+
+# Fly will materialize secrets to /secrets at boot via this release command.
+[deploy]
+  release_command = "/bin/sh -c 'mkdir -p /secrets && printf \"%s\" \"$SSH_HOST_KEY\" > /secrets/ssh_host_ed25519 && chmod 600 /secrets/ssh_host_ed25519 && printf \"%s\" \"$GEMINI_CERT\" > /secrets/gemini.crt && printf \"%s\" \"$GEMINI_KEY\" > /secrets/gemini.key && chmod 600 /secrets/gemini.key'"
+
+[[services]]
+  internal_port = 2222
+  protocol = "tcp"
+  [[services.ports]]
+    port = 22
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "5s"
+
+[[services]]
+  internal_port = 1965
+  protocol = "tcp"
+  [[services.ports]]
+    port = 1965
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

@@ -2809,14 +2809,41 @@ function coRoomColor(who) {
   return `rgb(${r},${g},${b})`;
 }
 
+const COROOM_WHO_REGEX = /^[0-9a-f]{8,12}$|^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const COROOM_PIECE_TITLE = 'Anteroom';
+const COROOM_PIECE_YEAR = 2026;
+const COROOM_PIECE_DESCRIPTION =
+  'A vestibule that exists only while two or more strangers are simultaneously requesting a page that does not exist. While you are alone here, the room is invisible — the page returns the ordinary 404. When a second visitor arrives, both of you become present to each other, and the record of every prior co-presence event the site has ever witnessed becomes legible. The piece is the act of meeting, briefly and accidentally, in a place neither of you meant to come to.';
+
+function generateUuid() {
+  try {
+    if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID().toLowerCase();
+    }
+  } catch (_) {}
+  // RFC 4122 v4 fallback using crypto.getRandomValues if available, else Math.random.
+  const bytes = new Uint8Array(16);
+  try {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+  } catch (_) {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 function loadOrCreateCoRoomWho() {
   try {
     const saved = window.localStorage.getItem('prae:coroom:who');
-    if (saved && /^[0-9a-f]{12}$/i.test(saved)) return saved.toLowerCase();
+    if (saved && COROOM_WHO_REGEX.test(saved)) return saved.toLowerCase();
   } catch (_) {}
-  const chars = '0123456789abcdef';
-  let w = '';
-  for (let i = 0; i < 12; i++) w += chars[Math.floor(Math.random() * 16)];
+  const w = generateUuid();
   try { window.localStorage.setItem('prae:coroom:who', w); } catch (_) {}
   return w;
 }
@@ -2839,6 +2866,11 @@ function formatCoRoomTimestamp(ms) {
   const date = d.toISOString().slice(0, 10);
   const time = d.toISOString().slice(11, 19);
   return `${date} ${time} UTC`;
+}
+
+function formatCoRoomLocation(location) {
+  const trimmed = String(location || '').trim();
+  return trimmed || 'unknown location';
 }
 
 function NotFoundPlain() {
@@ -2864,7 +2896,34 @@ function NotFoundPlain() {
   );
 }
 
-function CoRoomView({ currentInstance, log, count, peak, members }) {
+function CoRoomMemberRow({ member, currentTick, isSelf }) {
+  const joinedAt = Number(member.joinedAt) || currentTick;
+  const here = formatCoRoomDuration(Math.max(0, currentTick - joinedAt));
+  const idStyle = { fontFamily: MONO_FONT_STACK, fontSize: '0.85em', wordBreak: 'break-all' };
+  const dotStyle = {
+    display: 'inline-block',
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    background: coRoomColor(member.who),
+    marginRight: '0.6em',
+    verticalAlign: 'middle',
+    boxShadow: isSelf ? '0 0 0 2px rgba(0,0,0,0.18)' : 'none'
+  };
+  return (
+    <p style={{ margin: '0.3em 0', lineHeight: 1.55 }}>
+      <span style={dotStyle} />
+      <span style={idStyle}>{member.who}</span>
+      <br />
+      <small style={{ marginLeft: '1.5em' }}>
+        from <i>{formatCoRoomLocation(member.location)}</i> · here {here}
+        {isSelf ? ' · this is you' : ''}
+      </small>
+    </p>
+  );
+}
+
+function CoRoomView({ currentInstance, log, count, peak, members, selfWho }) {
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setTick(Date.now()), 1000);
@@ -2872,66 +2931,115 @@ function CoRoomView({ currentInstance, log, count, peak, members }) {
   }, []);
   const startedAt = currentInstance?.startedAt || tick;
   const durationMs = Math.max(0, tick - startedAt);
+
+  const wrapStyle = { maxWidth: '46em', margin: '0 auto', padding: '0 1em' };
+  const headerStyle = { textAlign: 'center', marginTop: '1em' };
+  const titleStyle = { fontStyle: 'italic', margin: '0.4em 0', letterSpacing: '0.02em' };
+  const yearStyle = { color: '#666', marginLeft: '0.5em' };
+  const descriptionStyle = { lineHeight: 1.6, margin: '0.8em 0', textAlign: 'left' };
+  const sectionTitleStyle = { fontStyle: 'italic', margin: '1.2em 0 0.4em', textAlign: 'center' };
+
   return (
     <>
       <center>
-        <p style={{ marginTop: '1.5em', marginBottom: '0.4em' }}><i>co-presence</i></p>
-        <p style={{ margin: '0.3em 0' }}>
-          {members.map((m) => (
-            <span
-              key={m.who}
-              title=""
-              style={{
-                display: 'inline-block',
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                background: coRoomColor(m.who),
-                margin: '0 4px',
-                verticalAlign: 'middle'
-              }}
-            />
-          ))}
-        </p>
+        <h1 style={{ marginBottom: 0 }}>{SITE_DOMAIN}</h1>
         <p style={{ margin: '0.2em 0' }}>
           <small>
-            since {formatCoRoomTimestamp(startedAt)} · {formatCoRoomDuration(durationMs)}
+            <i>404 // not found</i> · <i>occupied</i>
           </small>
         </p>
-        <p style={{ margin: '0.2em 0' }}>
-          <small>
-            {count} present · peak {peak}
-          </small>
+        <p style={{ margin: '0.4em 0' }}>
+          [ <a href="/">home</a> ] [ <a href="/labs/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
       <hr />
 
-      <center>
-        <p style={{ marginBottom: '0.4em' }}><i>log</i></p>
-      </center>
-      {log.length === 0 ? (
-        <center>
-          <p><small>no prior instances on record.</small></p>
-        </center>
-      ) : (
-        <pre style={{
-          fontFamily: MONO_FONT_STACK,
-          fontSize: '0.85em',
-          margin: '0 auto',
-          maxWidth: '40em',
-          lineHeight: 1.5,
-          whiteSpace: 'pre',
-          overflowX: 'auto'
-        }}>
+      <div style={wrapStyle}>
+        <div style={headerStyle}>
+          <p style={titleStyle}>
+            <strong>{COROOM_PIECE_TITLE}</strong>
+            <span style={yearStyle}>({COROOM_PIECE_YEAR})</span>
+          </p>
+        </div>
+
+        <p style={descriptionStyle}>{COROOM_PIECE_DESCRIPTION}</p>
+
+        <p style={{ ...descriptionStyle, color: '#444' }}>
+          <small>
+            The room is open right now because there are {count} simultaneous visitors on a 404 page. When the
+            count drops below 2, the room closes, this instance is appended to the log below, and both visitors'
+            views revert to the ordinary 404. Identifiers shown below are persistent UUIDs stored in each
+            visitor's browser; locations are derived from the connecting network and are approximate.
+          </small>
+        </p>
+
+        <hr style={{ margin: '1.5em 0' }} />
+
+        <p style={sectionTitleStyle}>currently in this instance</p>
+        <div style={{ margin: '0 auto', maxWidth: '40em' }}>
+          {members.length === 0 ? (
+            <p style={{ textAlign: 'center' }}><small>(awaiting members…)</small></p>
+          ) : (
+            members.map((m) => (
+              <CoRoomMemberRow
+                key={m.who}
+                member={m}
+                currentTick={tick}
+                isSelf={m.who === selfWho}
+              />
+            ))
+          )}
+        </div>
+
+        <p style={{ textAlign: 'center', margin: '1em 0 0.2em' }}>
+          <small>
+            since {formatCoRoomTimestamp(startedAt)} · {formatCoRoomDuration(durationMs)} · peak {peak} ·{' '}
+            {count} present
+          </small>
+        </p>
+
+        <hr style={{ margin: '1.5em 0' }} />
+
+        <p style={sectionTitleStyle}>log of every prior co-presence instance</p>
+        {log.length === 0 ? (
+          <p style={{ textAlign: 'center' }}><small>no prior instances on record.</small></p>
+        ) : (
+          <pre style={{
+            fontFamily: MONO_FONT_STACK,
+            fontSize: '0.82em',
+            margin: '0 auto',
+            maxWidth: '44em',
+            lineHeight: 1.55,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            background: '#f5f5f0',
+            padding: '0.8em 1em',
+            border: '1px solid #ddd'
+          }}>
 {log.map((entry) => {
   const started = formatCoRoomTimestamp(entry.startedAt);
   const dur = formatCoRoomDuration(entry.durationMs);
   const peakStr = String(entry.peak).padStart(2, ' ');
-  return `${started}   ${dur}   ${peakStr}\n`;
+  const memberLines = Array.isArray(entry.members)
+    ? entry.members.map((mm) => {
+        const who = String(mm?.who || '').trim();
+        const loc = formatCoRoomLocation(mm?.location);
+        return who ? `      · ${who}  (${loc})` : '';
+      }).filter(Boolean).join('\n')
+    : '';
+  const header = `${started}   ${dur}   peak ${peakStr}`;
+  return memberLines ? `${header}\n${memberLines}\n\n` : `${header}\n\n`;
 }).join('')}
-        </pre>
-      )}
+          </pre>
+        )}
+
+        <p style={{ textAlign: 'center', margin: '2em 0 1em' }}>
+          <small>
+            piece: <i>{COROOM_PIECE_TITLE}</i> ({COROOM_PIECE_YEAR}) · seb suarez · cbassuarez.com
+          </small>
+        </p>
+      </div>
     </>
   );
 }
@@ -3101,6 +3209,7 @@ function NotFoundPage() {
         count={count}
         peak={peak}
         members={members}
+        selfWho={who}
       />
     );
   }
