@@ -2272,7 +2272,8 @@ function ContactPage() {
       } else if (error instanceof Error && error.message === 'invalid_email') {
         setSubmitError('email address was rejected. please use a full address like name@domain.com.');
       } else if (error instanceof Error && error.message.startsWith('mail_relay_')) {
-        setSubmitError('delivery failed. please retry.');
+        const raw = error.message.split(':').slice(1).join(':').trim();
+        setSubmitError(raw ? `delivery failed: ${raw}` : 'delivery failed. please retry.');
       } else if (error instanceof Error && error.message === 'contact_not_relayed') {
         setSubmitError('message was not relayed. nothing was delivered. please retry.');
       } else {

@@ -46,26 +46,12 @@ type RateLimitBinding = {
   limit: (options: { key: string }) => Promise<{ success: boolean }>;
 };
 
-type SendEmailBinding = {
-  send: (message: {
-    to: string | string[];
-    from: string | { email: string; name: string };
-    subject: string;
-    text?: string;
-    html?: string;
-    replyTo?: string | { email: string; name: string };
-    headers?: Record<string, string>;
-  }) => Promise<{ messageId?: string } | unknown>;
-};
-
 type Env = {
   FEED_ALLOW_ORIGIN?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_ALLOWED_HOSTNAMES?: string;
-  CONTACT_FROM_EMAIL?: string;
-  CONTACT_FROM_NAME?: string;
-  CONTACT_EMAIL?: SendEmailBinding;
+  CONTACT_FORMSPREE_ENDPOINT?: string;
   HITS_KV?: KVNamespace;
   HITS_BASELINE?: string;
   GITHUB_USERNAME?: string;
@@ -142,7 +128,6 @@ const normalizeIsoAt = (value: unknown): string | null => {
 
 const TURNSTILE_TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
 const CONTACT_TURNSTILE_ACTION = "contact_form_v1";
-const CONTACT_DESTINATION_EMAIL = "contact@cbassuarez.com";
 const CONTACT_EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$/i;
 const CONTACT_ALLOWED_TOPICS = new Set(["commission", "performance", "collab", "press", "other"]);
 const CONTACT_BLOCKED_LOCAL_PARTS = new Set([
@@ -1171,57 +1156,60 @@ async function verifyTurnstileToken(
   }
 }
 
-function toContactEmailText(payload: ContactSubmission, receivedAt: string): string {
-  const lines = [
-    "new contact transmission",
-    "",
-    `received_at: ${receivedAt}`,
-    `name: ${payload.name}`,
-    `email: ${payload.email}`,
-    `subject: ${payload.subject}`,
-    `topic: ${payload.topic}`,
-    `time_sensitive: ${payload.timeSensitive ? "yes" : "no"}`,
-    "",
-    "message:",
-    payload.message,
-  ];
-  return lines.join("\n");
-}
+const CONTACT_FORMSPREE_DEFAULT_ENDPOINT = "https://formspree.io/f/mjkepaeo";
 
 async function deliverContactEmail(
   env: Env,
   payload: ContactSubmission,
   receivedAt: string
 ): Promise<{ ok: boolean; error: string | null; messageId: string | null }> {
-  const sender = clean(env.CONTACT_FROM_EMAIL || "contact@cbassuarez.com");
-  const senderName = clean(env.CONTACT_FROM_NAME || "cbassuarez contact");
-  const destination = CONTACT_DESTINATION_EMAIL;
-  const email = env.CONTACT_EMAIL;
-
-  if (!email || typeof email.send !== "function") {
-    return { ok: false, error: "email_binding_unconfigured", messageId: null };
-  }
-  if (!sender || !destination) {
-    return { ok: false, error: "email_address_unconfigured", messageId: null };
+  const endpoint = clean(env.CONTACT_FORMSPREE_ENDPOINT || CONTACT_FORMSPREE_DEFAULT_ENDPOINT);
+  if (!endpoint) {
+    return { ok: false, error: "formspree_endpoint_unconfigured", messageId: null };
   }
 
-  const subject = `[contact] ${payload.subject}`;
-  const text = toContactEmailText(payload, receivedAt);
+  const body = {
+    name: payload.name,
+    email: payload.email,
+    _replyto: payload.email,
+    _subject: `[contact] ${payload.subject}`,
+    subject: payload.subject,
+    topic: payload.topic,
+    time_sensitive: payload.timeSensitive ? "yes" : "no",
+    received_at: receivedAt,
+    message: payload.message,
+  };
+
   try {
-    const result: any = await email.send({
-      to: destination,
-      from: { email: sender, name: senderName || "cbassuarez contact" },
-      subject,
-      text,
-      replyTo: { email: payload.email, name: payload.name },
+    const response = await fetch(endpoint, {
+      method: "POST",
       headers: {
-        "X-Contact-Topic": payload.topic,
-        "X-Contact-Time-Sensitive": payload.timeSensitive ? "yes" : "no",
+        "content-type": "application/json",
+        accept: "application/json",
       },
+      body: JSON.stringify(body),
     });
-    return { ok: true, error: null, messageId: clean(result?.messageId) || null };
+
+    let parsed: any = null;
+    try {
+      parsed = await response.json();
+    } catch {
+      parsed = null;
+    }
+
+    if (!response.ok || parsed?.ok === false) {
+      const errors = Array.isArray(parsed?.errors)
+        ? parsed.errors.map((e: any) => clean(e?.message || e?.code || "")).filter(Boolean).join("; ")
+        : "";
+      const detail = errors || clean(parsed?.error) || `formspree_status_${response.status}`;
+      return { ok: false, error: short(detail, 220), messageId: null };
+    }
+
+    const id = clean(parsed?.id || parsed?.next || "");
+    return { ok: true, error: null, messageId: id || null };
   } catch (error: any) {
-    return { ok: false, error: clean(error?.message || "email_delivery_failed"), messageId: null };
+    const message = clean(error?.message || "formspree_network_error");
+    return { ok: false, error: short(message, 220), messageId: null };
   }
 }
 
