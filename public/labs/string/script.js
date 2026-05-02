@@ -21,7 +21,7 @@
   const SOCKET_PING_INTERVAL_MS = 25_000;
   const SOCKET_SEND_QUEUE_MAX = 64;
 
-  const PITCH_LOW_HZ = 55.0; // A1
+  const PITCH_LOW_HZ = 41.2; // E1 (bass guitar low E)
   const PITCH_HIGH_HZ = 1046.5; // C6
   const VOICE_ATTACK_S = 0.030;
   const DECAY_FLOOR = 0.0005; // -66 dB target for both audio + visual
@@ -161,7 +161,7 @@
     const bridgeCouple = 0.0007 + slack01 * 0.0008;
 
     // Sound variation tables — uniform, no zero-bias.
-    const octaveTable    = [-2, -2, -1, 0, +1, +1, +2, +2];
+    const octaveTable    = [-2, -1, -1, 0, 0, +1, +1, +2];
     const octaveShift    = octaveTable[(c >> 10) & 7];
     const harmonicTable  = [0, 1, 2, 3, 4, 1, 2, 3];
     const harmonicMode   = harmonicTable[(c >> 13) & 7];

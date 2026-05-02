@@ -13,6 +13,14 @@ const CONTACT_EMAIL_REGEX = /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*
 const UI_FONT_STACK = '"Times New Roman", Times, serif';
 const MONO_FONT_STACK = '"Courier New", Courier, monospace';
 
+const RAW_BUILD_SHA = String(import.meta.env.VITE_BUILD_SHA || '').trim();
+const RAW_BUILD_AT = String(import.meta.env.VITE_BUILD_AT || '').trim();
+const BUILD_REPO_URL = String(import.meta.env.VITE_BUILD_REPO_URL || '').replace(/\/+$/, '');
+const BUILD_SHORT_SHA = RAW_BUILD_SHA ? RAW_BUILD_SHA.slice(0, 7) : 'dev';
+const BUILD_DATE = /^\d{4}-\d{2}-\d{2}/.test(RAW_BUILD_AT) ? RAW_BUILD_AT.slice(0, 10) : '';
+const BUILD_LABEL = BUILD_DATE ? `${BUILD_DATE} · ${BUILD_SHORT_SHA}` : BUILD_SHORT_SHA;
+const BUILD_COMMIT_URL = RAW_BUILD_SHA && BUILD_REPO_URL ? `${BUILD_REPO_URL}/commit/${RAW_BUILD_SHA}` : '';
+
 const SOCIAL_LINKS = [
   { label: 'github', url: 'https://github.com/cbassuarez' },
   { label: 'instagram', url: 'https://instagram.com/cbassuarez' },
@@ -976,14 +984,14 @@ function StringLabPage() {
 
       <iframe
         title="String Lab"
-        src="/labs/string/index.html?v=20260501ws1"
+        src="/labs/string/index.html?v=20260501ws2"
         onLoad={(event) => wireIframeTopNavigation(event.currentTarget)}
         style={{ width: '100%', height: isMobile ? '64vh' : '78vh', border: 0, display: 'block' }}
       />
       {isMobile ? (
         <p>
           <small>
-            mobile fallback: [ <a href="/labs/string/index.html?v=20260501ws1">open string directly</a> ]
+            mobile fallback: [ <a href="/labs/string/index.html?v=20260501ws2">open string directly</a> ]
           </small>
         </p>
       ) : null}
@@ -1162,6 +1170,24 @@ function GlobalFooter() {
         </small>
       </center>
     </>
+  );
+}
+
+function SiteVersion() {
+  const labelStyle = { color: '#666', fontSize: '0.78em', display: 'block', padding: '6px 8px 10px' };
+  return (
+    <center>
+      <small style={labelStyle}>
+        build ·{' '}
+        {BUILD_COMMIT_URL ? (
+          <a href={BUILD_COMMIT_URL} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+            {BUILD_LABEL}
+          </a>
+        ) : (
+          BUILD_LABEL
+        )}
+      </small>
+    </center>
   );
 }
 
@@ -2752,6 +2778,17 @@ function ColophonPage() {
       <p>feed API: <a href="https://seb-feed.cbassuarez.workers.dev/api/feed?limit=20" target="_blank" rel="noreferrer">seb-feed.cbassuarez.workers.dev</a></p>
       <p>works shell: Praetorius embed at <code>/works-console</code>.</p>
       <p>hosting: static site + cloudflare worker endpoints.</p>
+      <p>
+        build:{' '}
+        {BUILD_COMMIT_URL ? (
+          <a href={BUILD_COMMIT_URL} target="_blank" rel="noreferrer">
+            <code>{BUILD_LABEL}</code>
+          </a>
+        ) : (
+          <code>{BUILD_LABEL}</code>
+        )}
+        {' '}(<a href="/version.json" target="_blank" rel="noreferrer">version.json</a>)
+      </p>
     </>
   );
 }
@@ -2771,6 +2808,9 @@ function NotFoundPage() {
       <p>the page you asked for does not exist.</p>
       <p>
         [ <a href="/">home</a> ] [ <a href="/labs/feed">seb feed</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+      </p>
+      <p>
+        <small>build: <code>{BUILD_LABEL}</code></small>
       </p>
     </>
   );
@@ -2858,6 +2898,7 @@ export default function App() {
         {content}
       </div>
       {hideGlobalFooter ? null : <GlobalFooter />}
+      <SiteVersion />
     </>
   );
 }

@@ -8,6 +8,8 @@ enabled = true
 [vars]
 TURNSTILE_ALLOWED_HOSTNAMES = "cbassuarez.com,www.cbassuarez.com"
 CONTACT_FORMSPREE_ENDPOINT = "https://formspree.io/f/mjkepaeo"
+SITE_VERSION_URL = "https://cbassuarez.com/version.json"
+SITE_REPO_URL = "https://github.com/cbassuarez/site"
 
 [[kv_namespaces]]
 binding = "HITS_KV"

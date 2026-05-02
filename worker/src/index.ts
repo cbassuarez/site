@@ -69,6 +69,8 @@ type Env = {
   CF_ZONE_ID?: string;
   CF_API_TOKEN?: string;
   CF_ANALYTICS_SINCE?: string;
+  SITE_VERSION_URL?: string;
+  SITE_REPO_URL?: string;
   RATE_LIMIT_FEED?: RateLimitBinding;
   RATE_LIMIT_HIT?: RateLimitBinding;
   RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
@@ -1184,6 +1186,88 @@ export class StringRoom {
   }
 }
 
+type SiteDeployRecord = {
+  sha: string;
+  shortSha: string;
+  at: string;
+  text: string;
+  url?: string;
+};
+
+const SITE_DEPLOYS_KEY = "feed:site-deploys-v1";
+const SITE_DEPLOYS_MAX = 30;
+const SITE_DEPLOY_TEXT_MAX = 240;
+const SITE_DEPLOY_SUBJECTS_MAX = 220;
+
+async function fetchSite(env: Env): Promise<FeedItem[]> {
+  const url = clean(env.SITE_VERSION_URL);
+  const kv = env.HITS_KV;
+  if (!url || !kv) return [];
+
+  let stored: SiteDeployRecord[] = [];
+  try {
+    const raw = await kv.get(SITE_DEPLOYS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        stored = parsed
+          .filter((d): d is SiteDeployRecord => !!d && typeof d.sha === "string" && typeof d.at === "string")
+          .slice(0, SITE_DEPLOYS_MAX);
+      }
+    }
+  } catch {
+    stored = [];
+  }
+
+  let manifest: any = null;
+  try {
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      cf: { cacheTtl: 30, cacheEverything: false },
+    } as RequestInit);
+    if (response.ok) {
+      manifest = await response.json().catch(() => null);
+    }
+  } catch {
+    manifest = null;
+  }
+
+  const sha = clean(manifest?.sha);
+  if (sha && sha !== "dev" && !stored.some((d) => d.sha === sha)) {
+    const shortSha = clean(manifest?.shortSha) || sha.slice(0, 7);
+    const at = normalizeIsoAt(manifest?.at) || new Date().toISOString();
+    const subjects = Array.isArray(manifest?.subjects)
+      ? manifest.subjects.map((s: unknown) => clean(s)).filter((s: string) => s.length > 0)
+      : [];
+    const subjectsBody = subjects.length > 0 ? short(subjects.join("; "), SITE_DEPLOY_SUBJECTS_MAX) : "";
+    const text = subjectsBody
+      ? short(`site deployed · ${shortSha} · ${subjectsBody}`, SITE_DEPLOY_TEXT_MAX)
+      : `site deployed · ${shortSha}`;
+    const repoUrl = clean(env.SITE_REPO_URL).replace(/\/+$/, "");
+    const commitUrl = repoUrl ? `${repoUrl}/commit/${sha}` : undefined;
+    const record: SiteDeployRecord = {
+      sha,
+      shortSha,
+      at,
+      text,
+      ...(commitUrl ? { url: commitUrl } : {}),
+    };
+    stored = [record, ...stored].slice(0, SITE_DEPLOYS_MAX);
+    try {
+      await kv.put(SITE_DEPLOYS_KEY, JSON.stringify(stored));
+    } catch {
+      // best-effort persist; observability surfaces failure
+    }
+  }
+
+  return stored.map((d) => ({
+    source: "site",
+    text: d.text,
+    at: d.at,
+    ...(d.url ? { url: d.url } : {}),
+  }));
+}
+
 async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
   const tasks: Array<[string, () => Promise<FeedItem[]>]> = [
     ["github", () => fetchGitHub(env, FEED_MAX_ITEMS)],
@@ -1192,6 +1276,7 @@ async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
     ["spotify", () => fetchSpotify(env)],
     ["x", () => fetchX(env, FEED_MAX_ITEMS)],
     ["youtube", () => fetchYouTube(env, FEED_MAX_ITEMS)],
+    ["site", () => fetchSite(env)],
   ];
 
   const results = await Promise.allSettled(tasks.map((task) => task[1]()));
@@ -1215,6 +1300,8 @@ async function buildFeedSnapshot(env: Env): Promise<FeedSnapshot> {
         return !!clean(env.X_USERNAME) && !!clean(env.X_BEARER_TOKEN);
       case "youtube":
         return !!clean(env.YT_CHANNEL_ID) && !!clean(env.YT_API_KEY);
+      case "site":
+        return !!clean(env.SITE_VERSION_URL);
       default:
         return false;
     }

@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -29,6 +31,18 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
+          VITE_BUILD_AT: ${{ github.event.head_commit.timestamp }}
+          VITE_BUILD_REPO_URL: https://github.com/${{ github.repository }}
+
+      - name: Write version manifest
+        if: github.event_name != 'pull_request'
+        run: node scripts/write-version.mjs
+        env:
+          BUILD_SHA: ${{ github.sha }}
+          BUILD_AT: ${{ github.event.head_commit.timestamp }}
+          BUILD_BEFORE: ${{ github.event.before }}
 
       - name: SPA fallback for GitHub Pages
         if: github.event_name != 'pull_request'
