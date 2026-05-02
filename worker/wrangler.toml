@@ -19,9 +19,17 @@ id = "5034b4f88e04478d84f90350268b5aa3"
 name = "STRING_ROOM"
 class_name = "StringRoom"
 
+[[durable_objects.bindings]]
+name = "CO_ROOM"
+class_name = "CoRoom"
+
 [[migrations]]
 tag = "v1-string-room"
 new_sqlite_classes = ["StringRoom"]
+
+[[migrations]]
+tag = "v2-co-room"
+new_sqlite_classes = ["CoRoom"]
 
 [triggers]
 crons = ["*/5 * * * *"]
@@ -61,6 +69,14 @@ namespace_id = "1007"
 [[ratelimits]]
 name = "RATE_LIMIT_STRING_SOCKET"
 namespace_id = "1004"
+
+  [ratelimits.simple]
+  limit = 12
+  period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_COROOM_SOCKET"
+namespace_id = "1008"
 
   [ratelimits.simple]
   limit = 12

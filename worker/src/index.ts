@@ -76,7 +76,9 @@ type Env = {
   RATE_LIMIT_GUESTBOOK_POST?: RateLimitBinding;
   RATE_LIMIT_CONTACT_POST?: RateLimitBinding;
   RATE_LIMIT_STRING_SOCKET?: RateLimitBinding;
+  RATE_LIMIT_COROOM_SOCKET?: RateLimitBinding;
   STRING_ROOM: DurableObjectNamespace;
+  CO_ROOM: DurableObjectNamespace;
 };
 
 type FeedSnapshot = {
@@ -1186,6 +1188,309 @@ export class StringRoom {
   }
 }
 
+// ---------- co-presence room (the back of /404) ----------
+
+type CoRoomMember = { who: string; joinedAt: number };
+type CoRoomLogEntry = {
+  startedAt: number;
+  endedAt: number;
+  durationMs: number;
+  peak: number;
+  members: string[]; // sorted distinct whos
+};
+
+const COROOM_NAME = "coroom:room-v1";
+const COROOM_LOG_KEY = "log-v1";
+const COROOM_LOG_MAX = 200;
+const COROOM_LEAVE_GRACE_MS = 8_000;
+const COROOM_INCOMING_MAX_BYTES = 256;
+
+interface CoRoomAttachment {
+  who: string;
+  joinedAt: number;
+  lastSeenAt: number;
+}
+
+function readCoRoomAttachment(ws: WebSocket): CoRoomAttachment | null {
+  try {
+    const value = ws.deserializeAttachment();
+    if (!value || typeof value !== "object") return null;
+    const att = value as CoRoomAttachment;
+    if (typeof att.who !== "string" || att.who.length === 0) return null;
+    return att;
+  } catch {
+    return null;
+  }
+}
+
+export class CoRoom {
+  private readonly state: DurableObjectState;
+  private readonly env: Env;
+  private log: CoRoomLogEntry[] = [];
+  private currentInstance: { startedAt: number; peak: number; seenWhos: Set<string> } | null = null;
+
+  constructor(state: DurableObjectState, env: Env) {
+    this.state = state;
+    this.env = env;
+    void this.state.blockConcurrencyWhile(async () => {
+      try {
+        const persisted = await this.state.storage.get<CoRoomLogEntry[]>(COROOM_LOG_KEY);
+        if (Array.isArray(persisted)) {
+          this.log = persisted
+            .filter(
+              (e): e is CoRoomLogEntry =>
+                !!e &&
+                Number.isFinite(e.startedAt) &&
+                Number.isFinite(e.endedAt) &&
+                Number.isFinite(e.peak)
+            )
+            .slice(0, COROOM_LOG_MAX);
+        }
+      } catch {
+        this.log = [];
+      }
+      // After hibernation wake, reconstruct in-memory instance from any sockets
+      // that survived. If no sockets remain, the instance state is correctly null.
+      const whos = this.distinctWhos();
+      if (whos.size >= 2) {
+        // We don't know the original startedAt; best-effort: use the earliest
+        // joinedAt across surviving sockets.
+        let startedAt = Date.now();
+        const seen = new Set<string>();
+        for (const ws of this.state.getWebSockets()) {
+          const att = readCoRoomAttachment(ws);
+          if (!att) continue;
+          if (att.joinedAt < startedAt) startedAt = att.joinedAt;
+          seen.add(att.who);
+        }
+        this.currentInstance = { startedAt, peak: seen.size, seenWhos: seen };
+      }
+    });
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.endsWith("/socket")) {
+      return new Response(JSON.stringify({ error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
+    const upgrade = request.headers.get("upgrade") || "";
+    if (upgrade.toLowerCase() !== "websocket") {
+      return new Response("expected websocket upgrade", { status: 426 });
+    }
+
+    const claimed = clean(url.searchParams.get("who")).toLowerCase();
+    const seed =
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      "anon";
+    const who = /^[0-9a-f]{6,16}$/i.test(claimed) ? claimed : await hashStringWho(seed);
+
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+
+    const now = Date.now();
+    const att: CoRoomAttachment = { who, joinedAt: now, lastSeenAt: now };
+    server.serializeAttachment(att);
+    this.state.acceptWebSocket(server);
+
+    // Determine instance lifecycle effects of this connection.
+    const whos = this.distinctWhos();
+    const wasOpen = this.currentInstance !== null;
+    let openedNow = false;
+    if (whos.size >= 2 && !this.currentInstance) {
+      this.currentInstance = { startedAt: now, peak: whos.size, seenWhos: new Set(whos) };
+      openedNow = true;
+    } else if (this.currentInstance) {
+      for (const w of whos) this.currentInstance.seenWhos.add(w);
+      if (whos.size > this.currentInstance.peak) this.currentInstance.peak = whos.size;
+    }
+
+    // Send hello to the new socket with full state.
+    const helloPayload = {
+      type: "hello",
+      who,
+      count: whos.size,
+      currentInstance: this.currentInstance
+        ? {
+            startedAt: this.currentInstance.startedAt,
+            peak: this.currentInstance.peak,
+            members: this.membersList(),
+          }
+        : null,
+      log: this.log,
+      serverNow: now,
+    };
+    try {
+      server.send(JSON.stringify(helloPayload));
+    } catch {
+      // ignore: socket may have closed pre-send
+    }
+
+    // Broadcast lifecycle to other sockets.
+    if (openedNow) {
+      this.broadcast(
+        JSON.stringify({
+          type: "open",
+          startedAt: this.currentInstance!.startedAt,
+          peak: this.currentInstance!.peak,
+          members: this.membersList(),
+          serverNow: now,
+        }),
+        server
+      );
+    } else if (wasOpen) {
+      this.broadcast(
+        JSON.stringify({
+          type: "presence",
+          count: whos.size,
+          peak: this.currentInstance!.peak,
+          members: this.membersList(),
+          serverNow: now,
+        }),
+        server
+      );
+    }
+    // If !wasOpen && !openedNow: count stayed at 1, no broadcast needed (no listeners).
+
+    // Cancel any pending grace alarm now that we have ≥1 connections.
+    if (whos.size >= 2) {
+      try {
+        await this.state.storage.deleteAlarm();
+      } catch {
+        // ignore
+      }
+    }
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    if (typeof raw !== "string") return;
+    if (raw.length === 0 || raw.length > COROOM_INCOMING_MAX_BYTES) return;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!parsed || typeof parsed !== "object") return;
+    const att = readCoRoomAttachment(ws);
+    if (!att) return;
+    att.lastSeenAt = Date.now();
+    if (String(parsed.type) === "ping") {
+      try {
+        ws.send(JSON.stringify({ type: "pong", t: att.lastSeenAt }));
+      } catch {
+        // ignore
+      }
+      ws.serializeAttachment(att);
+    }
+    // No other client messages accepted; door is opened by being there.
+  }
+
+  webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+    void this.handleDisconnect(ws);
+  }
+
+  webSocketError(ws: WebSocket, _error: unknown): void {
+    void this.handleDisconnect(ws);
+  }
+
+  async alarm(): Promise<void> {
+    const whos = this.distinctWhos();
+    if (this.currentInstance && whos.size < 2) {
+      const now = Date.now();
+      const entry: CoRoomLogEntry = {
+        startedAt: this.currentInstance.startedAt,
+        endedAt: now,
+        durationMs: Math.max(0, now - this.currentInstance.startedAt),
+        peak: this.currentInstance.peak,
+        members: [...this.currentInstance.seenWhos].sort(),
+      };
+      this.log.unshift(entry);
+      this.log = this.log.slice(0, COROOM_LOG_MAX);
+      try {
+        await this.state.storage.put(COROOM_LOG_KEY, this.log);
+      } catch {
+        // best-effort persist; will retry on next close
+      }
+      this.currentInstance = null;
+      this.broadcast(
+        JSON.stringify({ type: "close", entry, serverNow: now })
+      );
+    }
+    // If size >= 2, instance still alive; nothing to do.
+  }
+
+  private async handleDisconnect(ws: WebSocket): Promise<void> {
+    const att = readCoRoomAttachment(ws);
+    if (!att) return;
+    const whos = this.distinctWhos();
+    const now = Date.now();
+    if (this.currentInstance) {
+      // Inform remaining sockets of the count change. The instance itself stays
+      // open until grace expires; if a reconnect arrives before then, no close.
+      this.broadcast(
+        JSON.stringify({
+          type: "presence",
+          count: whos.size,
+          peak: this.currentInstance.peak,
+          members: this.membersList(),
+          serverNow: now,
+        }),
+        ws
+      );
+      if (whos.size < 2) {
+        try {
+          const existing = await this.state.storage.getAlarm();
+          if (existing == null) {
+            await this.state.storage.setAlarm(now + COROOM_LEAVE_GRACE_MS);
+          }
+        } catch {
+          // ignore alarm scheduling failure
+        }
+      }
+    }
+  }
+
+  private distinctWhos(): Set<string> {
+    const whos = new Set<string>();
+    for (const ws of this.state.getWebSockets()) {
+      const att = readCoRoomAttachment(ws);
+      if (att) whos.add(att.who);
+    }
+    return whos;
+  }
+
+  private membersList(): CoRoomMember[] {
+    const earliest = new Map<string, number>();
+    for (const ws of this.state.getWebSockets()) {
+      const att = readCoRoomAttachment(ws);
+      if (!att) continue;
+      const prev = earliest.get(att.who);
+      if (prev === undefined || att.joinedAt < prev) earliest.set(att.who, att.joinedAt);
+    }
+    return [...earliest.entries()]
+      .map(([who, joinedAt]) => ({ who, joinedAt }))
+      .sort((a, b) => a.joinedAt - b.joinedAt);
+  }
+
+  private broadcast(message: string, exclude?: WebSocket): void {
+    for (const ws of this.state.getWebSockets()) {
+      if (ws === exclude) continue;
+      try {
+        ws.send(message);
+      } catch {
+        // socket dead; runtime will reap
+      }
+    }
+  }
+}
+
 type SiteDeployRecord = {
   sha: string;
   shortSha: string;
@@ -1882,6 +2187,28 @@ export default {
       }
       const id = env.STRING_ROOM.idFromName(STRING_ROOM_NAME);
       const stub = env.STRING_ROOM.get(id);
+      return stub.fetch(request);
+    }
+
+    if (url.pathname === "/api/coroom/socket") {
+      const upgrade = request.headers.get("upgrade") || "";
+      if (upgrade.toLowerCase() !== "websocket") {
+        return new Response(JSON.stringify({ error: "expected_websocket_upgrade" }), {
+          status: 426,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!env.CO_ROOM) {
+        return new Response(JSON.stringify({ error: "coroom_unconfigured" }), {
+          status: 503,
+          headers: jsonHeaders(allowOrigin),
+        });
+      }
+      if (!(await checkRateLimit(env.RATE_LIMIT_COROOM_SOCKET, clientKey(request)))) {
+        return tooManyRequests(allowOrigin);
+      }
+      const id = env.CO_ROOM.idFromName(COROOM_NAME);
+      const stub = env.CO_ROOM.get(id);
       return stub.fetch(request);
     }
 

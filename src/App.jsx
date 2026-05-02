@@ -2793,7 +2793,55 @@ function ColophonPage() {
   );
 }
 
-function NotFoundPage() {
+const COROOM_PALETTE = [
+  [168, 36, 56], [192, 57, 43], [211, 84, 0], [184, 110, 33],
+  [127, 96, 0], [85, 122, 58], [39, 174, 96], [22, 160, 133],
+  [26, 140, 130], [31, 78, 121], [41, 128, 185], [58, 49, 133],
+  [108, 52, 131], [142, 68, 173], [162, 62, 140], [196, 82, 139],
+  [146, 52, 95], [80, 45, 73], [61, 44, 74], [38, 70, 83],
+  [42, 64, 69], [73, 56, 38], [60, 40, 22], [44, 62, 80]
+];
+
+function coRoomColor(who) {
+  const h = typeof who === 'string' && who.length >= 4 ? who : '0000';
+  const idx = (parseInt(h.slice(0, 4), 16) || 0) % COROOM_PALETTE.length;
+  const [r, g, b] = COROOM_PALETTE[idx];
+  return `rgb(${r},${g},${b})`;
+}
+
+function loadOrCreateCoRoomWho() {
+  try {
+    const saved = window.localStorage.getItem('prae:coroom:who');
+    if (saved && /^[0-9a-f]{12}$/i.test(saved)) return saved.toLowerCase();
+  } catch (_) {}
+  const chars = '0123456789abcdef';
+  let w = '';
+  for (let i = 0; i < 12; i++) w += chars[Math.floor(Math.random() * 16)];
+  try { window.localStorage.setItem('prae:coroom:who', w); } catch (_) {}
+  return w;
+}
+
+function formatCoRoomDuration(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return `${h}h ${String(rm).padStart(2, '0')}m`;
+  }
+  return `${String(m).padStart(2, '0')}m ${String(r).padStart(2, '0')}s`;
+}
+
+function formatCoRoomTimestamp(ms) {
+  if (!Number.isFinite(ms)) return '';
+  const d = new Date(ms);
+  const date = d.toISOString().slice(0, 10);
+  const time = d.toISOString().slice(11, 19);
+  return `${date} ${time} UTC`;
+}
+
+function NotFoundPlain() {
   return (
     <>
       <center>
@@ -2814,6 +2862,249 @@ function NotFoundPage() {
       </p>
     </>
   );
+}
+
+function CoRoomView({ currentInstance, log, count, peak, members }) {
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const startedAt = currentInstance?.startedAt || tick;
+  const durationMs = Math.max(0, tick - startedAt);
+  return (
+    <>
+      <center>
+        <p style={{ marginTop: '1.5em', marginBottom: '0.4em' }}><i>co-presence</i></p>
+        <p style={{ margin: '0.3em 0' }}>
+          {members.map((m) => (
+            <span
+              key={m.who}
+              title=""
+              style={{
+                display: 'inline-block',
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: coRoomColor(m.who),
+                margin: '0 4px',
+                verticalAlign: 'middle'
+              }}
+            />
+          ))}
+        </p>
+        <p style={{ margin: '0.2em 0' }}>
+          <small>
+            since {formatCoRoomTimestamp(startedAt)} · {formatCoRoomDuration(durationMs)}
+          </small>
+        </p>
+        <p style={{ margin: '0.2em 0' }}>
+          <small>
+            {count} present · peak {peak}
+          </small>
+        </p>
+      </center>
+
+      <hr />
+
+      <center>
+        <p style={{ marginBottom: '0.4em' }}><i>log</i></p>
+      </center>
+      {log.length === 0 ? (
+        <center>
+          <p><small>no prior instances on record.</small></p>
+        </center>
+      ) : (
+        <pre style={{
+          fontFamily: MONO_FONT_STACK,
+          fontSize: '0.85em',
+          margin: '0 auto',
+          maxWidth: '40em',
+          lineHeight: 1.5,
+          whiteSpace: 'pre',
+          overflowX: 'auto'
+        }}>
+{log.map((entry) => {
+  const started = formatCoRoomTimestamp(entry.startedAt);
+  const dur = formatCoRoomDuration(entry.durationMs);
+  const peakStr = String(entry.peak).padStart(2, ' ');
+  return `${started}   ${dur}   ${peakStr}\n`;
+}).join('')}
+        </pre>
+      )}
+    </>
+  );
+}
+
+function NotFoundPage() {
+  const [who] = useState(() => loadOrCreateCoRoomWho());
+  const [count, setCount] = useState(1);
+  const [peak, setPeak] = useState(1);
+  const [members, setMembers] = useState([]);
+  const [currentInstance, setCurrentInstance] = useState(null);
+  const [log, setLog] = useState([]);
+  const socketRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const pingTimerRef = useRef(null);
+  const backoffRef = useRef(800);
+
+  useEffect(() => {
+    let cancelled = false;
+    let ws = null;
+
+    const wsBase = (() => {
+      try {
+        const u = new URL(FEED_API_BASE);
+        u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+        return u.origin.replace(/\/+$/, '');
+      } catch (_) {
+        return FEED_API_BASE.replace(/^http(s?):\/\//i, (_m, s) => (s ? 'wss://' : 'ws://'));
+      }
+    })();
+    const url = `${wsBase}/api/coroom/socket?who=${encodeURIComponent(who)}`;
+
+    function clearTimers() {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (pingTimerRef.current) {
+        clearInterval(pingTimerRef.current);
+        pingTimerRef.current = null;
+      }
+    }
+
+    function applyHello(msg) {
+      const c = Number(msg.count) || 0;
+      setCount(c);
+      if (msg.currentInstance) {
+        setCurrentInstance({
+          startedAt: Number(msg.currentInstance.startedAt) || Date.now(),
+          peak: Number(msg.currentInstance.peak) || c
+        });
+        setPeak(Number(msg.currentInstance.peak) || c);
+        setMembers(Array.isArray(msg.currentInstance.members) ? msg.currentInstance.members : []);
+      } else {
+        setCurrentInstance(null);
+        setPeak(Math.max(1, c));
+        setMembers([]);
+      }
+      if (Array.isArray(msg.log)) setLog(msg.log);
+    }
+
+    function handleMessage(raw) {
+      let msg;
+      try { msg = JSON.parse(typeof raw === 'string' ? raw : ''); } catch (_) { return; }
+      if (!msg || typeof msg !== 'object') return;
+      switch (msg.type) {
+        case 'hello':
+          applyHello(msg);
+          return;
+        case 'open':
+          setCurrentInstance({
+            startedAt: Number(msg.startedAt) || Date.now(),
+            peak: Number(msg.peak) || 2
+          });
+          setPeak(Number(msg.peak) || 2);
+          if (Array.isArray(msg.members)) {
+            setMembers(msg.members);
+            setCount(msg.members.length);
+          }
+          return;
+        case 'presence':
+          if (Array.isArray(msg.members)) {
+            setMembers(msg.members);
+            setCount(msg.members.length);
+          } else if (Number.isFinite(msg.count)) {
+            setCount(Number(msg.count));
+          }
+          if (Number.isFinite(msg.peak)) setPeak(Number(msg.peak));
+          return;
+        case 'close':
+          if (msg.entry && typeof msg.entry === 'object') {
+            setLog((prev) => [msg.entry, ...prev].slice(0, 200));
+          }
+          setCurrentInstance(null);
+          setMembers([]);
+          setCount((c) => Math.min(c, 1));
+          return;
+        case 'pong':
+        default:
+          return;
+      }
+    }
+
+    function connect() {
+      if (cancelled) return;
+      try {
+        ws = new WebSocket(url);
+      } catch (_) {
+        scheduleReconnect();
+        return;
+      }
+      socketRef.current = ws;
+      ws.addEventListener('open', () => {
+        if (cancelled || ws !== socketRef.current) return;
+        backoffRef.current = 800;
+        if (pingTimerRef.current) clearInterval(pingTimerRef.current);
+        pingTimerRef.current = setInterval(() => {
+          if (!socketRef.current || socketRef.current.readyState !== 1) return;
+          try { socketRef.current.send(JSON.stringify({ type: 'ping', t: Date.now() })); } catch (_) {}
+        }, 25_000);
+      });
+      ws.addEventListener('message', (e) => {
+        if (cancelled || ws !== socketRef.current) return;
+        handleMessage(e.data);
+      });
+      ws.addEventListener('close', () => {
+        if (cancelled || ws !== socketRef.current) return;
+        socketRef.current = null;
+        if (pingTimerRef.current) {
+          clearInterval(pingTimerRef.current);
+          pingTimerRef.current = null;
+        }
+        scheduleReconnect();
+      });
+      ws.addEventListener('error', () => {
+        // close handler will fire next; nothing to do here.
+      });
+    }
+
+    function scheduleReconnect() {
+      if (cancelled) return;
+      if (reconnectTimerRef.current) return;
+      const delay = Math.min(15_000, Math.max(800, backoffRef.current));
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        backoffRef.current = Math.min(15_000, Math.max(800, backoffRef.current * 1.7));
+        connect();
+      }, delay);
+    }
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+      if (socketRef.current) {
+        try { socketRef.current.close(1000, 'unmount'); } catch (_) {}
+        socketRef.current = null;
+      }
+    };
+  }, [who]);
+
+  if (count >= 2) {
+    return (
+      <CoRoomView
+        currentInstance={currentInstance}
+        log={log}
+        count={count}
+        peak={peak}
+        members={members}
+      />
+    );
+  }
+  return <NotFoundPlain />;
 }
 
 function LegacyFeedHashRedirect() {
