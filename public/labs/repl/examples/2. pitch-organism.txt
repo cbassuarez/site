@@ -1,0 +1,19 @@
+tempo 92
+meter 4/4
+
+// pitch wildcards:
+// *      any pitch
+// *!     frozen random pitch
+// *4     random pitch in octave 4
+// *!4    frozen random pitch in octave 4
+// A*     random octave of A
+// E*!    frozen random octave of E
+
+string   *!4   (*4 *4)   A*   ~    |   *3   (C*! E*)   G*   ~
+attractor weather.visibility
+source   station KLAX
+speed    (1 1 1/2 1)
+force    mf    (* ~)     p    _    |   f    (* ~)       p    _
+decay    3.5
+pan      (* ~ _ right) (* ~ _ left)
+gain     0.7

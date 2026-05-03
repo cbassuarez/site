@@ -5,6 +5,7 @@ i'm seb. i make cybernetic music systems.
 
 the live surfaces:
   /labs/string    a shared string instrument
+  /labs/repl      a live-coding repl in score-grid notation
   /labs/feed      everything i did online today
   /labs/guestbook a place to leave a small mark
 
@@ -20,5 +21,8 @@ curl /room       /404 anteroom state
 curl /works      list of works
 curl /version    build label
 curl /contact    how to reach me
+curl /repl       what /labs/repl is + ssh-render usage
+
+ssh ssh.cbassuarez.com repl < patch.txt | mpv -    actually plays the patch
 
 — seb

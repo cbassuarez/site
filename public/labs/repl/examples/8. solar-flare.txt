@@ -1,0 +1,21 @@
+tempo 108
+meter 4/4
+
+// solar:
+// flare activity brightens tone, adds shimmer, saturation, and rupture pressure.
+
+string   *!5   (*5 *4)   E*!   ~   |   *4   (*5 B*)   G*!   ~
+attractor solar
+speed    (1 2 1 1/2)
+force    mf    (* ~)     p     _   |   f    (* ~)      p     _
+decay    2.4
+tone     bright
+crush    _ * ~ _
+pan      (* ~)
+gain     0.62
+
+sample   snm-*&16;   .   snm-*&16;   .
+attractor solar
+gain     quiet
+rate     *&8
+pan      right

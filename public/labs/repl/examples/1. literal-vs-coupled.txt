@@ -1,0 +1,19 @@
+tempo 88
+meter 4/4
+
+// same phrase, no coupling
+
+string   A3   (C4 E4)   G4   ~     |   A3   C4   (E4 G4 B4)   ~
+force    f    mf        p    p     |   ff   mf   p             p
+decay    4
+gain     0.68
+
+// same phrase, coupled.
+// literal values remain anchors; weather.dew colors the medium.
+
+string   A3   (C4 E4)   G4   ~     |   A3   C4   (E4 G4 B4)   ~
+attractor weather.dew
+source   station KLAX
+force    f    mf        p    p     |   ff   mf   p             p
+decay    4
+gain     0.68

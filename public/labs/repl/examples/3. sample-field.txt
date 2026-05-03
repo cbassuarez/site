@@ -1,0 +1,23 @@
+tempo 84
+meter 4/4
+
+// sample selectors:
+// snm-*        random sample from snm bank
+// snm-*&24     crossfade through snm over 24 seconds
+// snm-*&24!    frozen oscillating pair
+// ;            gate sample to slot/subdivision length
+
+sample   snm-*&24;   .   snm-*&24;   .
+attractor archive
+speed    (1 1/2 1 1/2)
+gain     0.6
+rate     (*&18 ~)
+pan      (* ~)
+start    *
+
+sample   snm-*/tub-*&32!   ~   .   ~
+attractor weather.dew
+source   station KLAX
+gain     quiet
+pan      center
+every    4 bars

@@ -1,0 +1,23 @@
+// notation reference.
+// uncomment lines or mutate values while listening.
+
+tempo 96
+meter 4/4
+
+// notes, groups, rests, sustains
+string   A3   (C4 E4)   .   ~
+force    f    mf        p   p
+decay    3
+pan      left center right center
+
+// pitch wildcards
+// string   *   *!   *4   *!4   A*   C*!
+
+// param operators
+// pan      *   ~    _    right
+// crush    _   *    ~    _
+// rate     *&12 ~   *&12 ~
+
+sample   snm-*   .   snm-*&20;   .
+gain     half
+pan      (* ~)

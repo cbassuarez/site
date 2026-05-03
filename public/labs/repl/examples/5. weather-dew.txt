@@ -1,0 +1,23 @@
+tempo 78
+meter 4/4
+
+// weather.dew:
+// density, humidity, pressure, and age become subtle coloration:
+// longer tails, haze, softened tone, pan drift.
+
+string   A3   (C4 E4)   ~   G4   |   C4   (E4 G4)   ~   B4
+attractor weather.dew
+source   station KLAX
+speed    (1 1 1/2 1)
+force    mp   (* ~)      p   _    |   mf   (* ~)      p   _
+decay    5
+tone     dark
+pan      (* ~ _ right)
+gain     0.66
+
+sample   snm-*&40;   ~   .   ~
+attractor weather.dew
+source   station KLAX
+gain     quiet
+rate     0.85
+pan      left

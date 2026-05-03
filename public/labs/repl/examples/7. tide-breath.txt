@@ -1,0 +1,21 @@
+tempo 64
+meter 4/4
+
+// tide:
+// periodicity bends gain, pan, wetness, and time pressure.
+
+string   A3   ~   (C4 E4)   ~   |   G3   ~   (B3 D4)   ~
+attractor tide
+source   station 9410660
+speed    (1/2 1 1/2 1)
+force    mp
+decay    6
+pan      center
+gain     0.7
+
+sample   snm-*&60;   ~   tub-*&60;   ~
+attractor tide
+source   station 9410660
+gain     0.5
+rate     (*&30 ~)
+pan      (*&24 ~)

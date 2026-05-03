@@ -21,6 +21,8 @@ import (
     "path/filepath"
     "sync"
     "syscall"
+
+    "github.com/cbassuarez/site/cli-server/repl"
 )
 
 type Config struct {
@@ -34,6 +36,7 @@ type Config struct {
 	GeminiKey     string
 	WorkerURL     string
 	LetterURL     string
+	ReplManifestURL string
 }
 
 func loadConfig() Config {
@@ -48,6 +51,7 @@ func loadConfig() Config {
 		GeminiKey:     envStr("GEMINI_KEY_PATH", "/secrets/gemini.key"),
 		WorkerURL:     envStr("WORKER_URL", "https://seb-feed.cbassuarez.workers.dev"),
 		LetterURL:     envStr("LETTER_URL", "https://cbassuarez.com/.well-known/cli-letter.txt"),
+		ReplManifestURL: envStr("REPL_MANIFEST_URL", "https://cbassuarez.com/labs/repl/samples/manifest.json"),
 	}
 }
 
@@ -56,6 +60,8 @@ func main() {
     log.SetFlags(log.LstdFlags | log.LUTC)
     materializeSecrets(cfg)
     content := NewContent(cfg.WorkerURL, cfg.LetterURL)
+    // Wire the REPL sample bank — lazy-loads the manifest on first SSH `repl` call.
+    content.SetSampleBank(repl.NewSampleBank(cfg.ReplManifestURL))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

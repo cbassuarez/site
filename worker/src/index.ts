@@ -2016,6 +2016,7 @@ i'm seb. i make cybernetic music systems.
 
 the live surfaces:
   /labs/string    a shared string instrument
+  /labs/repl      a live-coding repl in score-grid notation
   /labs/feed      everything i did online today
   /labs/guestbook a place to leave a small mark
 
@@ -2031,6 +2032,9 @@ curl /room       /404 anteroom state
 curl /works      list of works
 curl /version    build label
 curl /contact    how to reach me
+curl /repl       what /labs/repl is + ssh-render usage
+
+ssh ssh.cbassuarez.com repl < patch.txt | mpv -    actually plays the patch
 
 — seb
 `;
@@ -2043,7 +2047,8 @@ type CliPath =
   | "works"
   | "contact"
   | "version"
-  | "humans";
+  | "humans"
+  | "repl";
 
 const CLI_PATH_MAP: Record<string, CliPath | undefined> = {
   "/": "letter",
@@ -2056,12 +2061,14 @@ const CLI_PATH_MAP: Record<string, CliPath | undefined> = {
   "/cli/contact": "contact",
   "/cli/version": "version",
   "/cli/humans": "humans",
+  "/cli/repl": "repl",
   "/feed": "feed",
   "/string": "string",
   "/room": "room",
   "/works": "works",
   "/contact": "contact",
   "/version": "version",
+  "/repl": "repl",
 };
 
 function isCliClient(request: Request): boolean {
@@ -2268,12 +2275,66 @@ function renderCliWorks(): string {
     "the online (live) ones:",
     "",
     "  · /labs/string           shared string instrument.",
+    "  · /labs/repl             live-coding repl in score-grid notation.",
     "  · /labs/feed             a feed of what i did online today.",
     "  · /labs/guestbook        a place to leave a small mark.",
     "  · /404 (anteroom)        opens only when two strangers are",
     "                           simultaneously on a page that doesn't exist.",
     "",
     "more at https://cbassuarez.com/works",
+    "",
+  ].join("\n");
+}
+
+function renderCliRepl(): string {
+  return [
+    "/labs/repl — a live-coding piece in score-grid notation, powered by",
+    "             the cbassuarez voices. it runs in two places:",
+    "",
+    "  in your browser, at https://cbassuarez.com/labs/repl",
+    "    — the canonical surface. live transport viz, sample browser,",
+    "      hot-reload on Cmd-Enter, share-by-URL.",
+    "",
+    "  from your shell, over ssh — same patches, same DSL, rendered to a",
+    "  WAV stream you pipe into a local audio player:",
+    "",
+    "    ssh ssh.cbassuarez.com repl < patch.txt | mpv -",
+    "    ssh ssh.cbassuarez.com repl < patch.txt | ffplay -nodisp -autoexit -",
+    "    ssh ssh.cbassuarez.com repl < patch.txt | sox -t wav - -d",
+    "    ssh ssh.cbassuarez.com repl v1.<hash>   | mpv -",
+    "    ssh ssh.cbassuarez.com repl --help",
+    "",
+    "the language at a glance:",
+    "",
+    "  tempo 110",
+    "  meter 4/4",
+    "",
+    "  string  A3  C4  E4  G4    | A3  C4  E4  ~",
+    "  force   f   mf  p   f     | ff  mf  p   p",
+    "  decay   4",
+    "  crush   8",
+    "",
+    "  string  .   .   .   D3",
+    "  every   4 bars",
+    "  pan     left",
+    "",
+    "  sample  snm-*&30  .  .  .",
+    "  every   2 bars",
+    "",
+    "slot tokens:  notes (A3, C#4, Bb2), '.' (rest), '~' (sustain), or a",
+    "              sample id from the bank.",
+    "groups:       (a b c) subdivides one slot's time.",
+    "selectors:    bank-* (random per fire), bank-*! (frozen),",
+    "              bank-*&N (gradient), a/b (union of pools).",
+    "",
+    "sample bank — 300 one-shots, mirrored from /labs/chunk-surfer:",
+    "  main_b3        b3-01 .. b3-64       (64)",
+    "  THE TUB        tub-xither-forge ..  (44)",
+    "  amplifications amp-001 .. amp-064   (64)",
+    "  soundnoisemusic snm-001 .. snm-064  (64)",
+    "  lux_nova       lux-001 .. lux-064   (64)",
+    "",
+    "more at https://cbassuarez.com/labs/repl",
     "",
   ].join("\n");
 }
@@ -2389,6 +2450,9 @@ async function handleCliRequest(
     case "humans": {
       const body = await renderCliHumans(request);
       return cliTextResponse(body);
+    }
+    case "repl": {
+      return cliTextResponse(renderCliRepl() + buildCliFooter());
     }
   }
 }

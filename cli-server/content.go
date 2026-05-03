@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cbassuarez/site/cli-server/repl"
 )
 
 // FallbackLetter is compiled into the binary; it ships if the canonical letter
@@ -49,6 +51,8 @@ type Content struct {
 	letterAt  time.Time // last successful fetch
 	nextRetry time.Time // earliest time we may try fetching again after a failure
 	client    *http.Client
+
+	sampleBank *repl.SampleBank
 }
 
 func NewContent(workerURL, letterURL string) *Content {
@@ -58,6 +62,20 @@ func NewContent(workerURL, letterURL string) *Content {
 		letter:    FallbackLetter,
 		client:    &http.Client{Timeout: 5 * time.Second},
 	}
+}
+
+// SetSampleBank wires the REPL sample bank (lazy-loaded on first need).
+func (c *Content) SetSampleBank(b *repl.SampleBank) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sampleBank = b
+}
+
+// SampleBank is consumed by the SSH `repl` command for offline rendering.
+func (c *Content) SampleBank() *repl.SampleBank {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sampleBank
 }
 
 // Letter returns the canonical hand-typed letter, refreshed at most once per

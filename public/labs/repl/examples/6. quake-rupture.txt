@@ -1,0 +1,23 @@
+tempo 72
+meter 4/4
+
+// quake:
+// rupture and density add pressure, crush, pan instability, and sharper attacks.
+
+string   *!3   .   (*3 *3)   .   |   A2   .   *!4   .
+attractor quake
+source   feed all_day
+speed    (1 1/2 1 3/2)
+force    f
+decay    2.2
+crush    *
+pan      (* ~)
+gain     0.72
+
+sample   snm-*/tub-*&18;   .   .   .
+attractor quake
+source   feed all_day
+gain     *
+rate     *&10
+start    *
+every    2 bars

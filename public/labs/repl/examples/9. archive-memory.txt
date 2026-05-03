@@ -1,0 +1,21 @@
+tempo 82
+meter 4/4
+
+// archive:
+// the sample bank behaves like memory: aging, lineage, drift, and sediment.
+
+sample   snm-*&48;   ~   snm-*&48!   ~
+attractor archive
+speed    (1/2 1 1/2 1)
+gain     0.58
+rate     (*&24 ~)
+start    *
+pan      (* ~)
+
+string   A3   .   C4   .   |   E4   .   G4   .
+attractor archive
+force    mp
+decay    5.5
+tone     dark
+gain     0.45
+every    2 bars

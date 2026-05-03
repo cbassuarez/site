@@ -1,0 +1,89 @@
+// cbassuarez repl · /labs/string + cbass sample bank
+//   Cmd-Enter plays  ·  Esc stops  ·  Tab indents  ·  share via [share]
+//
+// this is seb's repl, a cybernetic art engine
+// wildcards choose samples; attractors act as cybernetic filters
+//
+// notation:
+//   |       bar divider
+//   .       rest
+//   ~       sustain previous note / hold previous value
+//   (...)   subdivide one slot's time evenly
+//   ;       gate sound to end of rhythmic unit (otherwise sounds are one-shots irrespective of rhythmic value end)
+//
+// wildcards:
+//   *       random pitch / sample / parameter value
+//   *!      frozen random value
+//   *4      random pitch in octave 4
+//   *!4     frozen random pitch in octave 4
+//   A*      random octave of A
+//   C*!     frozen random octave of C
+//
+// control streams:
+//   *       random legal value
+//   ~       hold previous resolved value
+//   _       reset to default
+//   *&16    drift between random values over 16 seconds
+//
+// samples:
+//   BANKNAME-*        random sample from BANKNAME bank
+//   BANKNAME-*&24     crossfade through BANKNAME bank over 24 seconds
+//   BANKNAME-*&24;    same, but gated to the current slot/subdivision (does not continue playing after rhythmic unit is done)
+//
+// attractors:
+//   attractor weather.dew  colors literal material as humid pressure
+//   attractor archive      biases sample memory / aging / lineage
+//   source station KLAX    asks weather.dew to use the KLAX station if available
+
+tempo 88
+meter 4/4
+
+// pitched organism.
+// the notes are partly fixed, partly chosen by the system.
+// weather.dew should subtly color even the literal values:
+// wetter tail, softened edge, small spatial drift.
+
+string   *!4   (*4 A*)   ~    C*!   |   *3   (*4 *!4)   G*   ~
+attractor weather.dew
+source   station KLAX
+speed    (1 1 1/2 pi/4)
+force    mf    (* ~)     p    _     |   f    (* ~)       p    _
+decay    4
+pan      (* ~ _ right) (* ~ _ left)
+tone     dark
+gain     0.72
+
+// sample organism.
+// selectors move through the bank as a field, not one sample at a time.
+// ';' gates the crossfaded samples to their slot length.
+// archive colors this as memory: slight aging, haze, lineage, drift.
+
+sample   snm-*&24;   ~   tub-*&32;   ~
+attractor archive
+speed    (1/2 1 1/2 1)
+gain     0.55
+rate     (*&16 ~)
+pan      (* ~)
+start    *
+
+// a low-frequency marker.
+// sparse, literal, and slow: confirms that ordinary blocks still work.
+// every 4 bars it places a fixed pitch inside the coupled scene.
+
+string   .   .   .   .   |   .   .   .   D3
+force    mp
+decay    5
+pan      left
+gain     0.48
+every    4 bars
+
+// rupture test, muted by default.
+// uncomment to hear the same sample field under seismic pressure.
+//
+// sample   snm-*/tub-*&20;   .   .   .
+// attractor quake
+// source   feed all_day
+// gain     quiet
+// rate     *&12
+// pan      (* ~)
+// every    4 bars

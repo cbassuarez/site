@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/cbassuarez/site/cli-server/repl"
 	"github.com/gliderlabs/ssh"
 )
 
@@ -73,7 +76,116 @@ func handleSSHSession(s ssh.Session, content *Content) {
 		fmt.Fprint(s, content.Letter())
 		return
 	}
-	// One-shot command mode: ssh ssh.cbassuarez.com feed
-	page := strings.Fields(cmd)[0]
+	args := strings.Fields(cmd)
+	page := args[0]
+	if page == "repl" {
+		handleSSHRepl(s, content, args[1:])
+		return
+	}
 	fmt.Fprint(s, content.RenderPage(page))
+}
+
+// handleSSHRepl renders a patch on stdin (or a hash arg) into a WAV stream.
+//
+//   ssh ssh.cbassuarez.com repl < patch.txt | mpv -
+//   ssh ssh.cbassuarez.com repl <hash>     | mpv -
+//   ssh ssh.cbassuarez.com repl --bars 16 < patch.txt | mpv -
+//   ssh ssh.cbassuarez.com repl --help
+func handleSSHRepl(s ssh.Session, content *Content, args []string) {
+	bars := repl.DefaultBars
+	var hashArg string
+	wantHelp := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--help" || a == "-h":
+			wantHelp = true
+		case a == "--bars" && i+1 < len(args):
+			n, err := strconv.Atoi(args[i+1])
+			if err == nil && n > 0 {
+				bars = n
+			}
+			i++
+		case strings.HasPrefix(a, "--bars="):
+			n, err := strconv.Atoi(strings.TrimPrefix(a, "--bars="))
+			if err == nil && n > 0 {
+				bars = n
+			}
+		case strings.HasPrefix(a, "v0.") || strings.HasPrefix(a, "v1.") || strings.HasPrefix(a, "#"):
+			hashArg = a
+		default:
+			// Unknown args are reserved; surface a hint on stderr.
+			fmt.Fprintf(s.Stderr(), "repl: unknown arg %q (try --help)\n", a)
+		}
+	}
+	if wantHelp {
+		fmt.Fprint(s.Stderr(), replHelpText())
+		return
+	}
+
+	var patchText string
+	if hashArg != "" {
+		text, err := repl.DecodeHash(hashArg)
+		if err != nil {
+			fmt.Fprintf(s.Stderr(), "repl: couldn't decode hash: %v\n", err)
+			return
+		}
+		patchText = text
+	} else {
+		body, err := io.ReadAll(io.LimitReader(s, 64*1024))
+		if err != nil {
+			fmt.Fprintf(s.Stderr(), "repl: couldn't read stdin: %v\n", err)
+			return
+		}
+		patchText = string(body)
+	}
+	if strings.TrimSpace(patchText) == "" {
+		fmt.Fprint(s.Stderr(), "repl: no patch given. pipe a patch on stdin or pass a v1.<hash> arg.\nrun `ssh ssh.cbassuarez.com repl --help` for the full usage.\n")
+		return
+	}
+
+	wav, err := repl.Render(patchText, content.SampleBank(), repl.RenderOptions{Bars: bars})
+	if err != nil {
+		// Parse errors come through here too.
+		fmt.Fprintf(s.Stderr(), "repl: %v\n", err)
+		return
+	}
+	if _, err := s.Write(wav); err != nil {
+		log.Printf("repl: write: %v", err)
+	}
+}
+
+func replHelpText() string {
+	return `cbassuarez repl — make music from the command line.
+
+usage:
+  ssh ssh.cbassuarez.com repl < patch.txt          render stdin, stream WAV on stdout
+  ssh ssh.cbassuarez.com repl --bars 16 < patch    render N bars (default 8, max ~30)
+  ssh ssh.cbassuarez.com repl <v1.hash>            render a previously-shared patch
+  ssh ssh.cbassuarez.com repl --help               this message
+
+pipe to a local audio player:
+  ssh ssh.cbassuarez.com repl < patch.txt | mpv -
+  ssh ssh.cbassuarez.com repl < patch.txt | ffplay -nodisp -autoexit -
+  ssh ssh.cbassuarez.com repl < patch.txt | sox -t wav - -d
+  ssh ssh.cbassuarez.com repl < patch.txt > out.wav    && play it later
+
+the DSL is the same one the browser REPL speaks. ` +
+		`a tiny example:
+
+  tempo 110
+  meter 4/4
+
+  string  A3   C4   E4   G4
+  force   f    mf   p    f
+  decay   4
+  crush   8
+
+  sample  snm-*&30  .  .  .
+  every   2 bars
+
+see https://cbassuarez.com/labs/repl for the full language and the 300-sample bank.
+
+output: 22050 Hz stereo 16-bit WAV.
+`
 }

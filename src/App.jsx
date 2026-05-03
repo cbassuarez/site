@@ -1053,6 +1053,40 @@ function StringLabPage() {
   );
 }
 
+function ReplLabPage() {
+  const isMobile = useIsMobile();
+
+  return (
+    <>
+      <center>
+        <h1>{SITE_DOMAIN}</h1>
+        <p>
+          <i>repl</i>
+        </p>
+        <p>
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs">labs</a> ] [ <a href="/labs/string">string</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+        </p>
+      </center>
+
+      <hr />
+
+      <iframe
+        title="cbassuarez REPL"
+        src="/labs/repl/index.html?v=20260503r5"
+        onLoad={(event) => wireIframeTopNavigation(event.currentTarget)}
+        style={{ width: '100%', height: isMobile ? '72vh' : '82vh', border: 0, display: 'block' }}
+      />
+      {isMobile ? (
+        <p>
+          <small>
+            mobile fallback: [ <a href="/labs/repl/index.html?v=20260503r5">open repl directly</a> ]
+          </small>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function ChunkSurferLabPage() {
   const isMobile = useIsMobile();
 
@@ -1229,7 +1263,7 @@ function GlobalFooter() {
               ]
             </span>
           ))}{' '}
-          [ <a href="/works">works</a> ] [ <a href="/recent">recent</a> ] [ <a href="/labs">labs</a> ] [ <a href="/about">about</a> ] [ <a href="/press">press</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/labs/feed">seb feed</a> / <a href="/labs/guestbook">guestbook</a> / <a href="/labs/chunk-surfer">chunk surfer</a> / <a href="/labs/string">string</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/access">access</a> ]
+          [ <a href="/works">works</a> ] [ <a href="/recent">recent</a> ] [ <a href="/labs">labs</a> ] [ <a href="/about">about</a> ] [ <a href="/press">press</a> ] [ <a href="/contact">contact</a> ] [ labs: <a href="/labs/feed">seb feed</a> / <a href="/labs/guestbook">guestbook</a> / <a href="/labs/chunk-surfer">chunk surfer</a> / <a href="/labs/string">string</a> / <a href="/labs/repl">repl</a> ] [ <a href="/colophon">colophon</a> ] [ <a href="/access">access</a> ]
         </small>
       </center>
     </>
@@ -2925,6 +2959,27 @@ function AccessPage() {
         </p>
       </div>
 
+      <p style={{ marginTop: '1.5em' }}>live pieces in the browser:</p>
+
+      <div>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/labs/string">/labs/string</a></code>
+          <span>shared string instrument, multi-visitor.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/labs/repl">/labs/repl</a></code>
+          <span>live-coding REPL in score-grid notation.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/labs/feed">/labs/feed</a></code>
+          <span>everything I did online today.</span>
+        </p>
+        <p style={rowStyle}>
+          <code style={labelStyle}><a href="/labs/guestbook">/labs/guestbook</a></code>
+          <span>a place to leave a small mark.</span>
+        </p>
+      </div>
+
       <p style={{ marginTop: '1.5em' }}>smaller endpoints for those building things:</p>
 
       <div>
@@ -3457,6 +3512,7 @@ export default function App() {
   const isLabsDirectoryPage = /^\/labs\/?$/i.test(pathname);
   const isLabsChildRoute = /^\/labs\/.+/i.test(pathname);
   const isStringPage = /^\/labs\/string\/?$/i.test(pathname);
+  const isReplPage = /^\/labs\/repl\/?$/i.test(pathname);
   const isTmaydLabsPage = pathname.startsWith('/labs/tell-me-about-your-day');
   const isRoomPage = /^\/room\/?$/i.test(pathname);
   const isLegacyFeedHash = pathname === '/' && /^#seb-feed$/i.test(hash);
@@ -3477,6 +3533,7 @@ export default function App() {
   isChunkSurferPage ||
   isLabsDirectoryPage ||
   isStringPage ||
+  isReplPage ||
   isTmaydLabsPage ||
   isLegacyFeedHash;
 
@@ -3495,6 +3552,8 @@ const isNotFoundRoute = !isKnownRoute;
     page = <RecentWorksPage />;
   } else if (isStringPage) {
     page = <StringLabPage />;
+  } else if (isReplPage) {
+    page = <ReplLabPage />;
   } else if (isLegacyFeedHash) {
     page = <LegacyFeedHashRedirect />;
     } else if (isRoomPage) {

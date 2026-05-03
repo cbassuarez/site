@@ -1,0 +1,19 @@
+tempo 96
+meter 4/4
+
+// speed is pattern-time.
+// rate is sample playback-time.
+// here the phrase is consumed at changing speeds.
+
+string   (*!4 *4 *4 *4) (*!4 *4 *4 *4) (*!4 *4 *4 *4) (*!4 *4 *4 *4)
+speed    (2 1 1/2 pi/4)
+force    mf
+decay    2.6
+pan      (* ~ _ right) (* ~ _ left)
+gain     0.68
+
+sample   snm-*&20;   .   .   .
+speed    *&12
+gain     quiet
+pan      right
+every    2 bars
