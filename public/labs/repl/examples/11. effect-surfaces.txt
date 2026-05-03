@@ -1,0 +1,17 @@
+// effect surfaces: a literal phrase through a material body.
+// compress stabilizes; space remembers; body/resonance/comb make a chamber.
+
+tempo 88
+meter 4/4
+
+string   A3   C4   E4   G4
+decay    4
+body     metal
+resonance 0.34
+comb     0.18
+space    0.28
+chorus   0.14
+excite   0.12
+compress 0.25
+pan      center
+gain     0.72

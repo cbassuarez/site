@@ -1,0 +1,18 @@
+// archive/scar: samples leave residue in the medium.
+// grain/scar are v1 memory-pressure surfaces here, not full buffer granulation yet.
+
+tempo 72
+meter 4/4
+
+sample   snm-*&32;   ~   tub-*&48;   ~
+attractor archive
+grain    0.35
+scar     0.25
+space    memory
+body     0.4
+comb     *~
+chorus   0.12
+compress 0.32
+rate     *~
+pan      *~
+gain     0.58

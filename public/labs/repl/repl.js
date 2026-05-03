@@ -7,9 +7,10 @@
 
   const editor = document.getElementById('editor');
   const statusEl = document.getElementById('status');
-  const playBtn = document.getElementById('play');
-  const stopBtn = document.getElementById('stop');
-  const shareBtn = document.getElementById('share');
+    const playBtn = document.getElementById('play');
+    const safePlayBtn = document.getElementById('safe-play');
+    const stopBtn = document.getElementById('stop');
+    const shareBtn = document.getElementById('share');
   const exampleSelect = document.getElementById('example-select');
   const errorList = document.getElementById('errors');
   const beatDotsEl = document.getElementById('beat-dots');
@@ -71,33 +72,70 @@
 
   // ---------------- evaluation ----------------
 
-  function evaluateAndRun() {
-    const text = editor.value;
-    const result = window.ReplDSL.parse(text);
-    if (!result.ok) {
-      showErrors(result.errors);
-      // Keep the previously-running program; don't yank audio out.
-      return;
-    }
-    clearErrors();
+    function evaluateAndRun() {
+      const text = editor.value;
+      const result = window.ReplDSL.parse(text);
+
+      if (!result.ok) {
+        showErrors(result.errors);
+        // Keep the previously-running program; don't yank audio out.
+        return;
+      }
+
+      clearErrors();
       lastGoodProgram = result.program;
+
       if (window.ReplAttractors && window.ReplAttractors.warm) {
         window.ReplAttractors.warm(result.program);
       }
+
       renderTransportShell(result.program);
+
       if (!scheduler) bootScheduler();
-    if (scheduler) {
+      if (!scheduler) return;
+
+      // Hard evaluate/play:
+      // - stop current audio first
+      // - install the newly parsed AST
+      // - start from transport zero
+      //
+      // This intentionally differs from safePlay(), because Cmd-Enter / [play]
+      // should rebuild runtime state and allow frozen random choices to reroll.
+      if (scheduler.isRunning()) {
+        scheduler.stop();
+      }
+
       scheduler.update(result.program);
-      if (!scheduler.isRunning()) scheduler.start();
+      scheduler.start();
     }
-  }
 
-  function stop() {
-    if (scheduler) scheduler.stop();
-  }
+    function safePlay() {
+      if (!scheduler) bootScheduler();
 
-  function bootScheduler() {
-    const audioCtx = window.StringVoice.ensureAudio();
+      if (!scheduler || !lastGoodProgram) {
+        evaluateAndRun();
+        return;
+      }
+
+      if (typeof scheduler.safeRestart === 'function') {
+        scheduler.safeRestart();
+      } else {
+        // Fallback for stale cached scheduler.js.
+        scheduler.stop();
+        scheduler.start();
+      }
+    }
+
+    function stop() {
+      if (scheduler) {
+        scheduler.stop();
+      }
+      setStatusLine();
+      clearActiveClasses();
+    }
+
+    function bootScheduler() {
+      const audioCtx = window.StringVoice.ensureAudio();
     if (!audioCtx) {
       showWarning('this browser doesn\'t support the Web Audio API');
       return;
@@ -213,12 +251,18 @@
 
   // ---------------- editor keybindings ----------------
 
-  editor.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      evaluateAndRun();
-      return;
-    }
+    editor.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        safePlay();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        evaluateAndRun();
+        return;
+      }
     if (e.key === 'Escape') {
       e.preventDefault();
       stop();
@@ -234,9 +278,10 @@
     }
   });
 
-  playBtn.addEventListener('click', evaluateAndRun);
-  stopBtn.addEventListener('click', stop);
-  shareBtn.addEventListener('click', shareCurrent);
+    playBtn.addEventListener('click', evaluateAndRun);
+    if (safePlayBtn) safePlayBtn.addEventListener('click', safePlay);
+    stopBtn.addEventListener('click', stop);
+    shareBtn.addEventListener('click', shareCurrent);
 
   // ---------------- examples loader ----------------
 
@@ -320,6 +365,7 @@
       if (!block) return surfaces;
 
       const params = block.params || {};
+        const effects = block.effects || {};
       const push = (name) => {
         if (!surfaces.includes(name)) surfaces.push(name);
       };
@@ -329,6 +375,9 @@
       for (const name of ['pan', 'gain', 'rate', 'start', 'crush', 'force', 'decay', 'tone', 'harm', 'octave']) {
         if (hasParamControlStream(params[name])) push(name);
       }
+        for (const name of ['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body']) {
+          if (effects[name]) push(name);
+        }
 
       if (block.voice === 'string') {
         const hasRandomPitch = blockHasTokenKind(block, (tok) => tok && tok.kind === 'note-random');
@@ -346,7 +395,8 @@
         // These surfaces are always under attractor pressure when coupled.
         if (block.attractor) {
             push('filter');
-            push('haze');
+            push('space');
+            push('body');
             push('color');
           push('gain');
           push('pan');
@@ -719,7 +769,7 @@
         }
 
         if (blk.surfacesEl) {
-          renderSurfaceChips(blk.surfacesEl, surfacesForBlock(block), Boolean(block.attractor));
+            renderSurfaceChips(blk.surfacesEl, surfacesForBlock(block), Boolean(block.attractor || (block.effects && Object.keys(block.effects).length)));
         }
 
         if (blk.everyEl) {

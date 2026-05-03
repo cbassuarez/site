@@ -10,10 +10,24 @@
 (function (root) {
   'use strict';
 
-  const VOICE_NAMES = new Set(['string', 'sample']);
+    const VOICE_NAMES = new Set(['string', 'sample']);
     const PARAM_NAMES = new Set(['force', 'decay', 'crush', 'pan', 'gain', 'tone', 'harm', 'octave', 'every', 'rate', 'start', 'speed']);
+    const EFFECT_NAMES = new Set(['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body']);
     const BLOCK_DIRECTIVES = new Set(['attractor', 'source']);
     const FILE_DIRECTIVES = new Set(['tempo', 'meter']);
+
+    const EFFECT_MODE_NAMES = {
+      compress: new Set(['feedback', 'glue', 'clamp']),
+      space: new Set(['memory', 'weather', 'room', 'horizon']),
+      resonance: new Set(['pitch', 'memory', 'body']),
+      comb: new Set(['pitch', 'body', 'rupture']),
+      grain: new Set(['memory', 'scatter', 'freeze']),
+      chorus: new Set(['drift', 'swarm', 'shimmer']),
+      excite: new Set(['solar', 'rupture', 'electric']),
+      blur: new Set(['weather', 'smoke', 'haze']),
+      scar: new Set(['memory', 'rupture', 'ghost']),
+      body: new Set(['wood', 'metal', 'glass', 'room', 'tub', 'paper', 'stone']),
+    };
 
   const FORCE_NAMED = { pp: 0.18, p: 0.32, mp: 0.50, mf: 0.70, f: 0.88, ff: 1.05, fff: 1.20 };
   const PAN_NAMED = { left: -0.7, center: 0, right: 0.7 };
@@ -203,6 +217,7 @@
       return /^[a-z][a-z0-9_-]*$/.test(tok)
         && !VOICE_NAMES.has(tok)
         && !PARAM_NAMES.has(tok)
+        && !EFFECT_NAMES.has(tok)
         && !BLOCK_DIRECTIVES.has(tok);
     }
 
@@ -284,10 +299,16 @@
           continue;
         }
 
-          if (/^[a-z][a-z0-9_-]*$/.test(part) && !VOICE_NAMES.has(part) && !PARAM_NAMES.has(part) && !BLOCK_DIRECTIVES.has(part)) {
-          pieces.push({ kind: 'concrete', name: part });
-          continue;
-        }
+          if (
+            /^[a-z][a-z0-9_-]*$/.test(part)
+            && !VOICE_NAMES.has(part)
+            && !PARAM_NAMES.has(part)
+            && !EFFECT_NAMES.has(part)
+            && !BLOCK_DIRECTIVES.has(part)
+          ) {
+            pieces.push({ kind: 'concrete', name: part });
+            continue;
+          }
 
         return null;
       }
@@ -524,6 +545,17 @@
 
     function parseParamOperator(raw) {
       const tok = String(raw || '').trim();
+        
+        if (tok === '*~') {
+          return {
+            ok: true,
+            value: {
+              kind: 'param-op',
+              op: 'gesture-random',
+              raw: tok,
+            },
+          };
+        }
 
       if (tok === '*') {
         return { ok: true, value: { kind: 'param-op', op: 'random', raw: tok } };
@@ -675,7 +707,36 @@
           return { ok: false, message: `unknown parameter '${name}'` };
       }
     }
+    
+    function resolveEffect(name, raw) {
+      const paramOperator = parseParamOperator(raw);
+      if (paramOperator) return paramOperator;
 
+      const lower = String(raw || '').toLowerCase();
+      const num = parseNumericExpression(raw);
+
+      if (Number.isFinite(num)) {
+        return { ok: true, value: clamp(num, 0, 1) };
+      }
+
+      const modes = EFFECT_MODE_NAMES[name];
+      if (modes && modes.has(lower)) {
+        return {
+          ok: true,
+          value: {
+            kind: 'effect-mode',
+            effect: name,
+            mode: lower,
+            raw,
+          },
+        };
+      }
+
+      return {
+        ok: false,
+        message: `${name} '${raw}' — use 0..1, *, ~, _, *!, *&N, *~, or a supported named mode`,
+      };
+    }
     // Build a parameter/control stream from the same paren-aware token stream
     // used by voice rows. Groups do not create time by themselves; they only
     // make control rhythms readable. The result is flattened before storage so
@@ -689,13 +750,14 @@
     // ParamNode:
     //   { kind: 'leaf', value }
     //   { kind: 'group', children: [ParamNode] }
-    function parseParamStream(tokens, paramName, lineNumber) {
+    function parseParamStream(tokens, paramName, lineNumber, resolver) {
       const errors = [];
       const nodes = [];
       let pos = 0;
+        const resolveValue = typeof resolver === 'function' ? resolver : resolveParam;
 
       function parseValue(tok) {
-        const r = resolveParam(paramName, tok);
+          const r = resolveValue(paramName, tok);
         if (!r.ok) {
           errors.push({ line: lineNumber, message: r.message });
           return { kind: 'leaf', value: null, invalid: true };
@@ -921,6 +983,7 @@
             slotsPerBar: Math.max(1, Math.floor(slots.length / bars)),
             bars,
             params: {},
+            effects: {},
             speed: { kind: 'scalar', value: 1 },
             attractor: null,
             source: {},
@@ -967,6 +1030,39 @@
             currentBlock.paramLines[`source.${parsed.key}`] = lineNumber;
             continue;
           }
+        }
+        
+        // ---- effect surface line ----
+        if (EFFECT_NAMES.has(head)) {
+          if (!currentBlock) {
+            errors.push({ line: lineNumber, message: `effect '${head}' has no voice above it — start a voice block first (string ... or sample ...)` });
+            continue;
+          }
+
+          const valueTokens = tokenizeSlotLine(tail);
+          if (valueTokens.length === 0) {
+            errors.push({ line: lineNumber, message: `${head} needs at least one value` });
+            continue;
+          }
+
+          const parsedEffects = parseParamStream(valueTokens, head, lineNumber, resolveEffect);
+          if (parsedEffects.errors.length) {
+            for (const e of parsedEffects.errors) errors.push(e);
+            continue;
+          }
+
+          const resolved = flattenParamNodes(parsedEffects.nodes);
+          if (resolved.length === 0) {
+            errors.push({ line: lineNumber, message: `${head} needs at least one value` });
+            continue;
+          }
+
+          currentBlock.effects[head] = resolved.length === 1
+            ? { kind: 'scalar', value: resolved[0] }
+            : { kind: 'vector', values: resolved };
+
+          currentBlock.paramLines[head] = lineNumber;
+          continue;
         }
 
       // ---- parameter line ----
@@ -1039,7 +1135,7 @@
       // ---- unknown ----
       errors.push({
         line: lineNumber,
-          message: `don't recognize '${head}' — start a voice line (string ..., sample ...), set a parameter (force, decay, speed, ...), or set an attractor/source`,
+          message: `don't recognize '${head}' — start a voice line (string ..., sample ...), set a parameter/effect row, or set an attractor/source`,
       });
     }
 

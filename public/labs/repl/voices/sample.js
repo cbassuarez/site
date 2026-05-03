@@ -26,6 +26,90 @@
     if (!Number.isFinite(n)) return lo;
     return n < lo ? lo : n > hi ? hi : n;
   }
+    
+    function isParamGesture(v) {
+      return v && typeof v === 'object' && v.kind === 'param-gesture';
+    }
+
+    function numericParamValue(v, fallback) {
+      if (isParamGesture(v)) {
+        const from = Number(v.from);
+        return Number.isFinite(from) ? from : fallback;
+      }
+
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function randomBetween(lo, hi) {
+      return lo + Math.random() * (hi - lo);
+    }
+
+    function applyAudioParamValue(param, value, time, duration, lo, hi, fallback) {
+      if (!param) return;
+
+      const start = Number.isFinite(time) ? time : 0;
+      const min = Number.isFinite(lo) ? lo : -Infinity;
+      const max = Number.isFinite(hi) ? hi : Infinity;
+      const fb = Number.isFinite(fallback) ? fallback : 0;
+
+      if (isParamGesture(value)) {
+        const dur = Number(duration);
+        const end = start + (Number.isFinite(dur) && dur > 0 ? dur : 0.25);
+        const mode = value.mode || value.op || '';
+
+        if (mode === 'continuous-random') {
+          const gestureLo = Number.isFinite(Number(value.lo)) ? Number(value.lo) : min;
+          const gestureHi = Number.isFinite(Number(value.hi)) ? Number(value.hi) : max;
+          const safeLo = Number.isFinite(gestureLo) ? gestureLo : min;
+          const safeHi = Number.isFinite(gestureHi) ? gestureHi : max;
+          const rateHz = Number.isFinite(Number(value.rateHz)) ? Number(value.rateHz) : 8;
+          const step = Math.max(0.025, Math.min(0.25, 1 / rateHz));
+
+          let t = start;
+          let current = clamp(numericParamValue(value, fb), safeLo, safeHi);
+
+          try {
+            param.cancelScheduledValues(start);
+            param.setValueAtTime(current, start);
+
+            while (t < end - 0.0001) {
+              const nextT = Math.min(end, t + step);
+              const next = clamp(randomBetween(safeLo, safeHi), safeLo, safeHi);
+              param.linearRampToValueAtTime(next, Math.max(start + 0.006, nextT));
+              current = next;
+              t = nextT;
+            }
+
+            return;
+          } catch (_) {
+            try { param.value = current; } catch (__) {}
+            return;
+          }
+        }
+
+        const from = clamp(numericParamValue(value.from, fb), min, max);
+        const to = clamp(numericParamValue(value.to, from), min, max);
+
+        try {
+          param.cancelScheduledValues(start);
+          param.setValueAtTime(from, start);
+          param.linearRampToValueAtTime(to, Math.max(start + 0.006, end));
+          return;
+        } catch (_) {
+          try { param.value = from; } catch (__) {}
+          return;
+        }
+      }
+
+      const scalar = clamp(numericParamValue(value, fb), min, max);
+
+      try {
+        param.setValueAtTime(scalar, start);
+      } catch (_) {
+        try { param.value = scalar; } catch (__) {}
+      }
+    }
 
   function loadManifest(url) {
     if (_manifestPromise) return _manifestPromise;
@@ -152,25 +236,36 @@
 
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
-    src.playbackRate.value = clamp(opts.rate != null ? opts.rate : 1, 0.25, 4);
+      const rateVal = clamp(numericParamValue(opts.rate, 1), 0.25, 4);
+      const rateGestureDuration = Number.isFinite(Number(opts.rateGestureDuration)) && Number(opts.rateGestureDuration) > 0
+        ? Number(opts.rateGestureDuration)
+        : null;
+
+      applyAudioParamValue(src.playbackRate, opts.rate, time, rateGestureDuration, 0.25, 4, rateVal);
 
       const gainNode = audioCtx.createGain();
-      const targetGain = clamp(opts.gain != null ? opts.gain : 1, 0, 1.5);
+      const targetGain = clamp(numericParamValue(opts.gain, 1), 0, 1.5);
       gainNode.gain.value = targetGain;
 
       let signal = src;
       signal.connect(gainNode);
       signal = gainNode;
 
-    if (audioCtx.createStereoPanner) {
-      const pan = audioCtx.createStereoPanner();
-      pan.pan.value = clamp(opts.pan || 0, -1, 1);
-      signal.connect(pan);
-      signal = pan;
-    }
+      if (audioCtx.createStereoPanner) {
+        const pan = audioCtx.createStereoPanner();
+        const panVal = clamp(numericParamValue(opts.pan, 0), -1, 1);
+        const panGestureDuration = Number.isFinite(Number(opts.panGestureDuration)) && Number(opts.panGestureDuration) > 0
+          ? Number(opts.panGestureDuration)
+          : null;
+
+        applyAudioParamValue(pan.pan, opts.pan, time, panGestureDuration, -1, 1, panVal);
+
+        signal.connect(pan);
+        signal = pan;
+      }
     signal.connect(masterBus);
 
-      const start = clamp(opts.start || 0, 0, Math.max(0, buffer.duration - 0.01));
+      const start = clamp(numericParamValue(opts.start, 0), 0, Math.max(0, buffer.duration - 0.01));
       const remaining = Math.max(0.001, buffer.duration - start);
       const rawGateDuration = Number(opts.gateDuration);
       const gateDuration = Number.isFinite(rawGateDuration) && rawGateDuration > 0
@@ -220,7 +315,7 @@
 
       for (const src of Array.from(_activeSources)) {
         try {
-          src.stop(t);
+          src.stop(t + 0.025);
         } catch {
           // Ignore sources that already ended or were already stopped.
         }

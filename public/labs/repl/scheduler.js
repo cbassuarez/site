@@ -128,23 +128,38 @@
         if (!block || !block._attractorBus) return;
 
         const bus = block._attractorBus;
-        const nodes = [
-          bus.input,
-          bus.preGain,
-          bus.filter,
-          bus.saturator,
-          bus.dryGain,
-          bus.delay,
-          bus.delayFeedback,
-          bus.wetGain,
-          bus.output,
-        ];
+          const nodes = [
+            bus.input,
+            bus.preGain,
+            bus.filter,
+            bus.resonanceA,
+            bus.resonanceB,
+            bus.saturator,
+            bus.exciterHighpass,
+            bus.exciterShaper,
+            bus.exciterGain,
+            bus.combDelay,
+            bus.combDamp,
+            bus.combFeedback,
+            bus.combGain,
+            bus.chorusDelay,
+            bus.chorusGain,
+            bus.chorusLfoDepth,
+            bus.dryGain,
+            bus.compressor,
+            bus.delay,
+            bus.delayFeedback,
+            bus.wetGain,
+            bus.output,
+          ];
 
         for (const node of nodes) {
           if (!node || typeof node.disconnect !== 'function') continue;
           try { node.disconnect(); } catch (_) {}
         }
-
+          if (bus.chorusLfo && typeof bus.chorusLfo.stop === 'function') {
+            try { bus.chorusLfo.stop(); } catch (_) {}
+          }
         block._attractorBus = null;
       }
 
@@ -191,6 +206,16 @@
         tick();
         timer = setInterval(tick, LOOKAHEAD_MS);
       }
+      
+      function stopAllVoices() {
+        if (typeof root.SampleVoice !== 'undefined' && root.SampleVoice.stopAll) {
+          root.SampleVoice.stopAll(audioCtx.currentTime);
+        }
+
+        if (typeof root.StringVoice !== 'undefined' && root.StringVoice.stopAll) {
+          root.StringVoice.stopAll(audioCtx.currentTime);
+        }
+      }
 
       function stop() {
         running = false;
@@ -199,9 +224,7 @@
           timer = null;
         }
 
-        if (typeof root.SampleVoice !== 'undefined' && root.SampleVoice.stopAll) {
-          root.SampleVoice.stopAll(audioCtx.currentTime);
-        }
+          stopAllVoices();
 
         if (program) {
             for (const block of program.blocks) {
@@ -209,6 +232,43 @@
               clearBlockRuntimeState(block);
             }
         }
+      }
+      
+      function safeRestart() {
+        running = false;
+
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+
+          stopAllVoices();
+
+        running = true;
+        originTime = audioCtx.currentTime + 0.05;
+
+        if (program) {
+          for (const block of program.blocks) {
+            block._scheduledThrough = 0;
+            block._speedSlotIdx = 0;
+            block._speedNextTime = originTime;
+            block._lastDispatchedSlotIdx = 0;
+            block._lastDispatchedTime = null;
+            block._lastDispatchedDuration = null;
+
+            // Preserve frozen/random runtime state:
+            // - leaf _frozenRandomPitch
+            // - sample selector _frozenPick / _frozenPair
+            // - param/effect frozen states
+            // - drift states
+            // - attractor smoothing / organism state
+            //
+            // This is the safe replay path, not a hard evaluate.
+          }
+        }
+
+        tick();
+        timer = setInterval(tick, LOOKAHEAD_MS);
       }
 
       function update(newProgram) {
@@ -273,6 +333,108 @@
       function randomChoice(values) {
         if (!values || values.length === 0) return null;
         return values[Math.floor(Math.random() * values.length)];
+      }
+      
+      function isEffectMode(v) {
+        return v && typeof v === 'object' && v.kind === 'effect-mode';
+      }
+
+      function hasBlockEffects(block) {
+        return Boolean(block && block.effects && Object.keys(block.effects).length > 0);
+      }
+
+      function effectModeAmount(name, mode) {
+        const m = String(mode || '').toLowerCase();
+
+        switch (name) {
+          case 'compress':
+            if (m === 'feedback') return 0.55;
+            if (m === 'glue') return 0.28;
+            if (m === 'clamp') return 0.75;
+            return 0.35;
+
+          case 'space':
+            if (m === 'memory') return 0.55;
+            if (m === 'weather') return 0.45;
+            if (m === 'room') return 0.32;
+            if (m === 'horizon') return 0.62;
+            return 0.35;
+
+          case 'resonance':
+            if (m === 'pitch') return 0.48;
+            if (m === 'memory') return 0.58;
+            if (m === 'body') return 0.42;
+            return 0.35;
+
+          case 'comb':
+            if (m === 'pitch') return 0.42;
+            if (m === 'body') return 0.36;
+            if (m === 'rupture') return 0.55;
+            return 0.30;
+
+          case 'grain':
+            if (m === 'memory') return 0.42;
+            if (m === 'scatter') return 0.55;
+            if (m === 'freeze') return 0.48;
+            return 0.30;
+
+          case 'chorus':
+            if (m === 'drift') return 0.32;
+            if (m === 'swarm') return 0.52;
+            if (m === 'shimmer') return 0.38;
+            return 0.24;
+
+          case 'excite':
+            if (m === 'solar') return 0.48;
+            if (m === 'rupture') return 0.38;
+            if (m === 'electric') return 0.44;
+            return 0.22;
+
+          case 'blur':
+            if (m === 'weather') return 0.40;
+            if (m === 'smoke') return 0.55;
+            if (m === 'haze') return 0.46;
+            return 0.30;
+
+          case 'scar':
+            if (m === 'memory') return 0.38;
+            if (m === 'rupture') return 0.52;
+            if (m === 'ghost') return 0.44;
+            return 0.25;
+
+          case 'body':
+            if (m === 'wood') return 0.38;
+            if (m === 'metal') return 0.55;
+            if (m === 'glass') return 0.50;
+            if (m === 'room') return 0.36;
+            if (m === 'tub') return 0.62;
+            if (m === 'paper') return 0.34;
+            if (m === 'stone') return 0.46;
+            return 0.35;
+
+          default:
+            return 0;
+        }
+      }
+
+      function effectModeName(v) {
+        return isEffectMode(v) ? String(v.mode || '') : '';
+      }
+
+      function numericSurfaceValue(v, name, fallback) {
+        if (isEffectMode(v)) return effectModeAmount(name, v.mode);
+        if (isParamGesture(v)) return numericParamValue(v, fallback);
+
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function surfaceEndValue(v, name, fallback) {
+        if (isEffectMode(v)) return effectModeAmount(name, v.mode);
+        if (isParamGesture(v)) return gestureEndValue(v, fallback);
+
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
       }
       
       function blockAttractor(block) {
@@ -707,13 +869,34 @@
       }
 
       function ensureAttractorBus(block) {
-        if (!block || !block.attractor) return null;
+        if (!block || (!block.attractor && !hasBlockEffects(block))) return null;
         if (block._attractorBus) return block._attractorBus;
 
         const input = audioCtx.createGain();
         const preGain = audioCtx.createGain();
+
         const filter = audioCtx.createBiquadFilter();
+        const resonanceA = audioCtx.createBiquadFilter();
+        const resonanceB = audioCtx.createBiquadFilter();
+
         const saturator = audioCtx.createWaveShaper();
+
+        const exciterHighpass = audioCtx.createBiquadFilter();
+        const exciterShaper = audioCtx.createWaveShaper();
+        const exciterGain = audioCtx.createGain();
+
+        const combDelay = audioCtx.createDelay(0.12);
+        const combDamp = audioCtx.createBiquadFilter();
+        const combFeedback = audioCtx.createGain();
+        const combGain = audioCtx.createGain();
+
+        const chorusDelay = audioCtx.createDelay(0.06);
+        const chorusGain = audioCtx.createGain();
+        const chorusLfo = audioCtx.createOscillator();
+        const chorusLfoDepth = audioCtx.createGain();
+
+        const compressor = audioCtx.createDynamicsCompressor();
+
         const dryGain = audioCtx.createGain();
         const delay = audioCtx.createDelay(1.25);
         const delayFeedback = audioCtx.createGain();
@@ -721,29 +904,92 @@
         const output = audioCtx.createGain();
 
         filter.type = 'lowpass';
-        filter.frequency.value = 6200;
-        filter.Q.value = 0.8;
+        filter.frequency.value = 12000;
+        filter.Q.value = 0.7;
+
+        resonanceA.type = 'peaking';
+        resonanceA.frequency.value = 220;
+        resonanceA.Q.value = 0.8;
+        resonanceA.gain.value = 0;
+
+        resonanceB.type = 'peaking';
+        resonanceB.frequency.value = 880;
+        resonanceB.Q.value = 0.8;
+        resonanceB.gain.value = 0;
+
         saturator.curve = makeSaturationCurve(0.001);
         saturator.oversample = '2x';
+
+        exciterHighpass.type = 'highpass';
+        exciterHighpass.frequency.value = 3200;
+        exciterShaper.curve = makeSaturationCurve(0.08);
+        exciterShaper.oversample = '2x';
+        exciterGain.gain.value = 0;
+
+        combDelay.delayTime.value = 0.018;
+        combDamp.type = 'lowpass';
+        combDamp.frequency.value = 4200;
+        combFeedback.gain.value = 0;
+        combGain.gain.value = 0;
+
+        chorusDelay.delayTime.value = 0.012;
+        chorusGain.gain.value = 0;
+        chorusLfo.type = 'sine';
+        chorusLfo.frequency.value = 0.18;
+        chorusLfoDepth.gain.value = 0.001;
+        chorusLfo.connect(chorusLfoDepth);
+        chorusLfoDepth.connect(chorusDelay.delayTime);
+        try { chorusLfo.start(); } catch (_) {}
+
+        compressor.threshold.value = -12;
+        compressor.knee.value = 12;
+        compressor.ratio.value = 1.5;
+        compressor.attack.value = 0.012;
+        compressor.release.value = 0.28;
+
         preGain.gain.value = 1;
         dryGain.gain.value = 1;
         delay.delayTime.value = 0.18;
-        delayFeedback.gain.value = 0.08;
+        delayFeedback.gain.value = 0.05;
         wetGain.gain.value = 0;
         output.gain.value = 1;
 
         input.connect(preGain);
         preGain.connect(filter);
-        filter.connect(saturator);
+        filter.connect(resonanceA);
+        resonanceA.connect(resonanceB);
+        resonanceB.connect(saturator);
 
-        saturator.connect(dryGain);
+        // Main dry path.
+        saturator.connect(compressor);
+        compressor.connect(dryGain);
         dryGain.connect(output);
 
-        saturator.connect(delay);
+        // Space / blur path.
+        compressor.connect(delay);
         delay.connect(delayFeedback);
         delayFeedback.connect(delay);
         delay.connect(wetGain);
         wetGain.connect(output);
+
+        // Comb/body path.
+        filter.connect(combDelay);
+        combDelay.connect(combDamp);
+        combDamp.connect(combFeedback);
+        combFeedback.connect(combDelay);
+        combDelay.connect(combGain);
+        combGain.connect(output);
+
+        // Chorus/motion path.
+        saturator.connect(chorusDelay);
+        chorusDelay.connect(chorusGain);
+        chorusGain.connect(output);
+
+        // Exciter/energy path.
+        saturator.connect(exciterHighpass);
+        exciterHighpass.connect(exciterShaper);
+        exciterShaper.connect(exciterGain);
+        exciterGain.connect(output);
 
         output.connect(masterBus);
 
@@ -751,13 +997,28 @@
           input,
           preGain,
           filter,
+          resonanceA,
+          resonanceB,
           saturator,
+          exciterHighpass,
+          exciterShaper,
+          exciterGain,
+          combDelay,
+          combDamp,
+          combFeedback,
+          combGain,
+          chorusDelay,
+          chorusGain,
+          chorusLfo,
+          chorusLfoDepth,
+          compressor,
           dryGain,
           delay,
           delayFeedback,
           wetGain,
           output,
           _lastSaturation: 0,
+          _lastExciterCurve: 0,
         };
 
         return block._attractorBus;
@@ -773,32 +1034,283 @@
           try { param.value = value; } catch (__) {}
         }
       }
+      
+      function randomBetweenClamped(lo, hi) {
+        const a = Number(lo);
+        const b = Number(hi);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+        return a + Math.random() * (b - a);
+      }
 
-      function updateAttractorBus(block, mod, time) {
-        if (!block || !block.attractor || !mod) return masterBus;
+      function applyContinuousRandomAudioParam(param, gesture, time, duration, lo, hi, fallback) {
+        if (!param || !isParamGesture(gesture)) return false;
+
+        const start = Number.isFinite(time) ? Math.max(audioCtx.currentTime, time) : audioCtx.currentTime;
+        const dur = Number.isFinite(duration) && duration > 0 ? duration : 0.5;
+        const end = start + dur;
+
+        const min = Number.isFinite(lo) ? lo : Number(gesture.lo);
+        const max = Number.isFinite(hi) ? hi : Number(gesture.hi);
+        const safeLo = Number.isFinite(min) ? min : 0;
+        const safeHi = Number.isFinite(max) ? max : 1;
+
+        const rateHz = Number.isFinite(Number(gesture.rateHz)) ? Number(gesture.rateHz) : 8;
+        const step = Math.max(0.025, Math.min(0.25, 1 / rateHz));
+
+        let current = clamp(numericParamValue(gesture.from, fallback), safeLo, safeHi);
+        let t = start;
+
+        try {
+          param.cancelScheduledValues(start);
+          param.setValueAtTime(current, start);
+
+          while (t < end - 0.0001) {
+            const nextT = Math.min(end, t + step);
+            const next = clamp(randomBetweenClamped(safeLo, safeHi), safeLo, safeHi);
+            param.linearRampToValueAtTime(next, Math.max(start + 0.006, nextT));
+            current = next;
+            t = nextT;
+          }
+
+          return true;
+        } catch (_) {
+          try { param.value = current; } catch (__) {}
+          return true;
+        }
+      }
+
+      function updateAttractorBus(block, mod, effects, time) {
+        if (!block || (!block.attractor && !hasBlockEffects(block))) return masterBus;
 
         const bus = ensureAttractorBus(block);
         if (!bus) return masterBus;
 
-        setAudioParam(bus.preGain.gain, mod.preGain, time, 0.08);
-        setAudioParam(bus.filter.frequency, mod.filterFreq, time, 0.12);
-        setAudioParam(bus.filter.Q, mod.filterQ, time, 0.10);
-        setAudioParam(bus.dryGain.gain, mod.dryGain, time, 0.10);
-        setAudioParam(bus.delay.delayTime, mod.delayTime, time, 0.14);
-        setAudioParam(bus.delayFeedback.gain, mod.delayFeedback, time, 0.16);
-        setAudioParam(bus.wetGain.gain, mod.wetGain, time, 0.12);
+          const e = effects || {};
+          const modes = e._modes || {};
+          const signals = mod && mod.signals ? mod.signals : null;
 
-        if (Math.abs((bus._lastSaturation || 0) - mod.saturation) > 0.025) {
-          bus.saturator.curve = makeSaturationCurve(mod.saturation);
-          bus._lastSaturation = mod.saturation;
+          const combGesture = isParamGesture(e._rawComb) && e._rawComb.mode === 'continuous-random'
+            ? e._rawComb
+            : null;
+
+          const spaceGesture = isParamGesture(e._rawSpace) && e._rawSpace.mode === 'continuous-random'
+            ? e._rawSpace
+            : null;
+
+        const intensity = signals ? signals.intensity : 0;
+        const volatility = signals ? signals.volatility : 0;
+        const pressure = signals ? signals.pressure : 0;
+        const density = signals ? signals.density : 0;
+        const periodicity = signals ? signals.periodicity : 0;
+        const rupture = signals ? signals.rupture : 0;
+        const depth = mod ? mod.depth : 0;
+
+        const body = clamp((e.body || 0) + depth * 0.18, 0, 1);
+        const resonance = clamp((e.resonance || 0) + body * 0.35 + depth * (periodicity * 0.18 + density * 0.10), 0, 1);
+          const combBase = combGesture
+            ? numericParamValue(combGesture, 0)
+            : (e.comb || 0);
+          const comb = clamp(combBase + body * 0.28 + depth * (pressure * 0.16 + rupture * 0.10), 0, 1);
+        const excite = clamp((e.excite || 0) + (mod ? mod.saturation * 0.55 : 0) + depth * intensity * 0.14, 0, 1);
+        const chorus = clamp((e.chorus || 0) + depth * volatility * 0.12, 0, 1);
+        const blur = clamp((e.blur || 0) + depth * density * 0.18, 0, 1);
+        const scar = clamp((e.scar || 0) + depth * (rupture * 0.20 + density * 0.08), 0, 1);
+        const grain = clamp((e.grain || 0) + depth * (volatility * 0.12 + density * 0.08), 0, 1);
+          const spaceBase = spaceGesture
+            ? numericParamValue(spaceGesture, 0)
+            : (e.space || 0);
+          const space = clamp(spaceBase + (mod ? mod.wetGain : 0) + blur * 0.18 + scar * 0.10, 0, 1);
+        const compress = clamp((e.compress || 0) + depth * (density * 0.18 + rupture * 0.12), 0, 1);
+
+        let filterFreq = mod ? mod.filterFreq : 12000;
+        let filterQ = mod ? mod.filterQ : 0.7;
+        let saturation = mod ? mod.saturation : 0;
+        let preGain = mod ? mod.preGain : 1;
+        let dryGain = mod ? mod.dryGain : 1;
+
+        // Body modes.
+        const bodyMode = modes.body || '';
+        if (bodyMode === 'wood') {
+          filterFreq *= 0.78;
+          filterQ += body * 0.8;
+        } else if (bodyMode === 'metal') {
+          filterFreq *= 1.18;
+          filterQ += body * 4.2;
+          saturation += body * 0.08;
+        } else if (bodyMode === 'glass') {
+          filterFreq *= 1.28;
+          filterQ += body * 5.0;
+          saturation += body * 0.05;
+        } else if (bodyMode === 'paper') {
+          filterFreq *= 0.55;
+          filterQ += body * 1.4;
+        } else if (bodyMode === 'stone') {
+          filterFreq *= 0.62;
+          filterQ += body * 2.2;
+          preGain *= 0.96;
+        } else if (bodyMode === 'tub') {
+          filterFreq *= 0.86;
+          filterQ += body * 2.8;
+          saturation += body * 0.10;
+        }
+
+        filterFreq *= 1 - blur * 0.42;
+        filterQ += resonance * 3.2 + comb * 1.3;
+        saturation += excite * 0.24 + scar * 0.10;
+
+        const resonanceBase = bodyMode === 'metal' ? 330 : bodyMode === 'glass' ? 1240 : bodyMode === 'stone' ? 146 : bodyMode === 'paper' ? 520 : 220;
+        const resonanceAHz = clamp(resonanceBase * (1 + pressure * 0.45), 80, 6000);
+        const resonanceBHz = clamp(resonanceAHz * (bodyMode === 'glass' ? 3.01 : 2.02), 160, 9000);
+        const resonanceGain = clamp(resonance * 8.5 + body * 2.5, 0, 11);
+        const resonanceQ = clamp(0.6 + resonance * 9 + rupture * 3, 0.4, 18);
+
+        const combDelayTime = clamp(
+          0.006 + (1 - pressure) * 0.026 + slowCycle(block, time, 0.07 + periodicity * 0.08, 5.2) * comb * 0.004,
+          0.003,
+          0.075
+        );
+        const combFeedback = clamp(comb * 0.38 + body * 0.14 + rupture * depth * 0.12, 0, 0.72);
+        const combGain = clamp(comb * 0.28 + body * 0.12, 0, 0.48);
+
+        const chorusDelayTime = clamp(0.008 + chorus * 0.018, 0.004, 0.045);
+        const chorusRate = clamp(0.08 + periodicity * 0.35 + volatility * 0.8 + chorus * 0.35, 0.04, 2.8);
+        const chorusDepth = clamp(0.0005 + chorus * (0.0025 + volatility * 0.004), 0, 0.012);
+        const chorusGain = clamp(chorus * 0.28 + grain * 0.08, 0, 0.45);
+
+        const exciteGain = clamp(excite * 0.22 + grain * 0.06, 0, 0.34);
+        const exciteCutoff = clamp(2200 + intensity * 3600 + excite * 2800, 1400, 9000);
+
+        const delayTime = clamp((mod ? mod.delayTime : 0.18) + space * 0.18 + blur * 0.10, 0.04, 0.95);
+        const delayFeedback = clamp((mod ? mod.delayFeedback : 0.04) + space * 0.22 + scar * 0.16 + grain * 0.08, 0, 0.58);
+        const wetGain = clamp((mod ? mod.wetGain : 0) + space * 0.34 + blur * 0.16 + grain * 0.08, 0, 0.55);
+        dryGain = clamp(dryGain - space * 0.18 - blur * 0.10, 0.58, 1);
+
+        const threshold = -8 - compress * 28 - density * depth * 8;
+        const ratio = 1 + compress * 7 + rupture * depth * 3;
+        const attack = clamp(0.018 - compress * 0.012 - rupture * 0.006, 0.002, 0.05);
+        const release = clamp(0.34 + density * 0.24 - rupture * 0.10, 0.08, 0.85);
+
+        setAudioParam(bus.preGain.gain, clamp(preGain, 0.65, 1.45), time, 0.08);
+        setAudioParam(bus.filter.frequency, clamp(filterFreq, 120, 15000), time, 0.12);
+        setAudioParam(bus.filter.Q, clamp(filterQ, 0.2, 18), time, 0.10);
+
+        setAudioParam(bus.resonanceA.frequency, resonanceAHz, time, 0.16);
+        setAudioParam(bus.resonanceA.Q, resonanceQ, time, 0.14);
+        setAudioParam(bus.resonanceA.gain, resonanceGain, time, 0.14);
+        setAudioParam(bus.resonanceB.frequency, resonanceBHz, time, 0.18);
+        setAudioParam(bus.resonanceB.Q, resonanceQ * 0.72, time, 0.16);
+        setAudioParam(bus.resonanceB.gain, resonanceGain * 0.55, time, 0.16);
+
+          if (combGesture) {
+            applyContinuousRandomAudioParam(
+              bus.combDelay.delayTime,
+              {
+                ...combGesture,
+                from: combDelayTime,
+                lo: 0.003,
+                hi: 0.075,
+                rateHz: Number.isFinite(Number(combGesture.rateHz)) ? Number(combGesture.rateHz) : 5,
+              },
+              time,
+              1.25,
+              0.003,
+              0.075,
+              combDelayTime
+            );
+
+            applyContinuousRandomAudioParam(
+              bus.combFeedback.gain,
+              {
+                ...combGesture,
+                from: combFeedback,
+                lo: 0,
+                hi: 0.72,
+                rateHz: Number.isFinite(Number(combGesture.rateHz)) ? Number(combGesture.rateHz) * 0.75 : 4,
+              },
+              time,
+              1.25,
+              0,
+              0.72,
+              combFeedback
+            );
+          } else {
+            setAudioParam(bus.combDelay.delayTime, combDelayTime, time, 0.10);
+            setAudioParam(bus.combFeedback.gain, combFeedback, time, 0.12);
+          }
+
+          setAudioParam(bus.combDamp.frequency, clamp(1200 + (1 - blur) * 5200, 600, 9000), time, 0.14);
+          setAudioParam(bus.combGain.gain, combGain, time, 0.12);
+
+        setAudioParam(bus.chorusDelay.delayTime, chorusDelayTime, time, 0.12);
+        setAudioParam(bus.chorusLfo.frequency, chorusRate, time, 0.18);
+        setAudioParam(bus.chorusLfoDepth.gain, chorusDepth, time, 0.18);
+        setAudioParam(bus.chorusGain.gain, chorusGain, time, 0.12);
+
+        setAudioParam(bus.exciterHighpass.frequency, exciteCutoff, time, 0.12);
+        setAudioParam(bus.exciterGain.gain, exciteGain, time, 0.10);
+
+        setAudioParam(bus.compressor.threshold, threshold, time, 0.08);
+        setAudioParam(bus.compressor.ratio, clamp(ratio, 1, 12), time, 0.08);
+        setAudioParam(bus.compressor.attack, attack, time, 0.08);
+        setAudioParam(bus.compressor.release, release, time, 0.12);
+
+        setAudioParam(bus.dryGain.gain, dryGain, time, 0.10);
+          if (spaceGesture) {
+            applyContinuousRandomAudioParam(
+              bus.delayFeedback.gain,
+              {
+                ...spaceGesture,
+                from: delayFeedback,
+                lo: 0,
+                hi: 0.58,
+                rateHz: Number.isFinite(Number(spaceGesture.rateHz)) ? Number(spaceGesture.rateHz) : 3,
+              },
+              time,
+              1.5,
+              0,
+              0.58,
+              delayFeedback
+            );
+
+            applyContinuousRandomAudioParam(
+              bus.wetGain.gain,
+              {
+                ...spaceGesture,
+                from: wetGain,
+                lo: 0,
+                hi: 0.55,
+                rateHz: Number.isFinite(Number(spaceGesture.rateHz)) ? Number(spaceGesture.rateHz) * 0.75 : 2.25,
+              },
+              time,
+              1.5,
+              0,
+              0.55,
+              wetGain
+            );
+          } else {
+            setAudioParam(bus.delayFeedback.gain, delayFeedback, time, 0.16);
+            setAudioParam(bus.wetGain.gain, wetGain, time, 0.12);
+          }
+
+          setAudioParam(bus.delay.delayTime, delayTime, time, 0.14);
+
+        if (Math.abs((bus._lastSaturation || 0) - saturation) > 0.025) {
+          bus.saturator.curve = makeSaturationCurve(clamp(saturation, 0, 0.55));
+          bus._lastSaturation = saturation;
+        }
+
+        const exciteCurveAmount = clamp(0.08 + excite * 0.32 + scar * 0.10, 0.01, 0.48);
+        if (Math.abs((bus._lastExciterCurve || 0) - exciteCurveAmount) > 0.025) {
+          bus.exciterShaper.curve = makeSaturationCurve(exciteCurveAmount);
+          bus._lastExciterCurve = exciteCurveAmount;
         }
 
         return bus.input;
       }
 
-      function outputBusForBlock(block, time, mod) {
-        if (!block || !block.attractor || !mod) return masterBus;
-        return updateAttractorBus(block, mod, time);
+      function outputBusForBlock(block, time, mod, effects) {
+        if (!block || (!block.attractor && !hasBlockEffects(block))) return masterBus;
+        return updateAttractorBus(block, mod, effects, time);
       }
 
       function applyAttractorToParams(block, params, voice, time, duration, mod) {
@@ -807,20 +1319,49 @@
         const out = { ...params };
 
         if (voice === 'string') {
-          out.force = clamp((out.force == null ? 0.7 : out.force) * mod.forceMul, 0, 1.25);
-          out.decay = clamp((out.decay == null ? 4.2 : out.decay) * mod.decayMul, 0.4, 8);
-          out.crush = clamp(Math.round((out.crush || 0) + mod.crushAdd), 0, 16);
-          out.tone = clamp((out.tone == null ? 0.6 : out.tone) * mod.toneMul, 0, 1);
-          out.harm = clamp(Math.round((out.harm == null ? 2 : out.harm) + mod.harmAdd), 0, 5);
-          out.octave = clamp(Math.round((out.octave || 0) + mod.octaveAdd), -2, 2);
-          out.pan = clamp((out.pan || 0) + mod.panOffset, -1, 1);
-          out.gain = clamp((out.gain == null ? 1 : out.gain) * mod.gainMul, 0, 1.5);
+            out.force = clamp(numericParamValue(out.force, 0.7) * mod.forceMul, 0, 1.25);
+            out.decay = clamp(numericParamValue(out.decay, 4.2) * mod.decayMul, 0.4, 8);
+            out.crush = clamp(Math.round(numericParamValue(out.crush, 0) + mod.crushAdd), 0, 16);
+            out.tone = clamp(numericParamValue(out.tone, 0.6) * mod.toneMul, 0, 1);
+            out.harm = clamp(Math.round(numericParamValue(out.harm, 2) + mod.harmAdd), 0, 5);
+            out.octave = clamp(Math.round(numericParamValue(out.octave, 0) + mod.octaveAdd), -2, 2);
+
+            if (isParamGesture(out.pan)) {
+              out.pan = {
+                ...out.pan,
+                from: clamp(numericParamValue(out.pan.from, 0) + mod.panOffset, -1, 1),
+                to: clamp(numericParamValue(out.pan.to, 0) + mod.panOffset, -1, 1),
+              };
+            } else {
+              out.pan = clamp(numericParamValue(out.pan, 0) + mod.panOffset, -1, 1);
+            }
+
+            out.gain = clamp(numericParamValue(out.gain, 1) * mod.gainMul, 0, 1.5);
         } else if (voice === 'sample') {
-          out.gain = clamp((out.gain == null ? 1 : out.gain) * mod.gainMul, 0, 1.5);
-          out.pan = clamp((out.pan || 0) + mod.panOffset, -1, 1);
-          out.rate = clamp((out.rate == null ? 1 : out.rate) * mod.rateMul, 0.25, 4);
-          out.start = Math.max(0, (out.start || 0) + mod.startOffset);
-          out.gateMul = mod.gateMul;
+            out.gain = clamp(numericParamValue(out.gain, 1) * mod.gainMul, 0, 1.5);
+
+            if (isParamGesture(out.pan)) {
+              out.pan = {
+                ...out.pan,
+                from: clamp(numericParamValue(out.pan.from, 0) + mod.panOffset, -1, 1),
+                to: clamp(numericParamValue(out.pan.to, 0) + mod.panOffset, -1, 1),
+              };
+            } else {
+              out.pan = clamp(numericParamValue(out.pan, 0) + mod.panOffset, -1, 1);
+            }
+
+            if (isParamGesture(out.rate)) {
+              out.rate = {
+                ...out.rate,
+                from: clamp(numericParamValue(out.rate.from, 1) * mod.rateMul, 0.25, 4),
+                to: clamp(numericParamValue(out.rate.to, 1) * mod.rateMul, 0.25, 4),
+              };
+            } else {
+              out.rate = clamp(numericParamValue(out.rate, 1) * mod.rateMul, 0.25, 4);
+            }
+
+            out.start = Math.max(0, numericParamValue(out.start, 0) + mod.startOffset);
+            out.gateMul = mod.gateMul;
         }
 
         return out;
@@ -829,9 +1370,198 @@
       function isParamAtom(v) {
         return v && typeof v === 'object' && v.kind === 'param-op';
       }
+      
+      function isParamGesture(v) {
+        return v && typeof v === 'object' && v.kind === 'param-gesture';
+      }
+
+      function numericParamValue(v, fallback) {
+        if (isParamGesture(v)) {
+          const from = Number(v.from);
+          return Number.isFinite(from) ? from : fallback;
+        }
+
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function randomBetween(lo, hi) {
+        return lo + Math.random() * (hi - lo);
+      }
+
+      function gestureEndValue(v, fallback) {
+        if (isParamGesture(v)) {
+          const to = Number(v.to);
+          if (Number.isFinite(to)) return to;
+
+          const from = Number(v.from);
+          if (Number.isFinite(from)) return from;
+
+          const lo = Number(v.lo);
+          const hi = Number(v.hi);
+          if (Number.isFinite(lo) && Number.isFinite(hi)) return (lo + hi) * 0.5;
+
+          return fallback;
+        }
+
+        return numericParamValue(v, fallback);
+      }
+
+      function avoidTinyGesture(from, to, lo, hi, minDistance) {
+        let a = Number(from);
+        let b = Number(to);
+
+        if (!Number.isFinite(a)) a = lo;
+        if (!Number.isFinite(b)) b = hi;
+
+        a = clamp(a, lo, hi);
+        b = clamp(b, lo, hi);
+
+        const min = Number.isFinite(minDistance) ? minDistance : 0;
+
+        if (Math.abs(b - a) >= min) {
+          return { from: a, to: b };
+        }
+
+        // Push the destination away from the source while staying in range.
+        if (a <= (lo + hi) / 2) {
+          b = clamp(a + min, lo, hi);
+        } else {
+          b = clamp(a - min, lo, hi);
+        }
+
+        return { from: a, to: b };
+      }
+
+      function randomParamGesture(name, fallback, block) {
+        const defaultValue = defaultForParam(name, fallback);
+
+        if (name === 'pan') {
+          const from = attractorBiasRange(block, 'pan', -1, 1);
+
+          return {
+            kind: 'param-gesture',
+            op: 'continuous-random',
+            mode: 'continuous-random',
+            param: name,
+            from,
+            lo: -1,
+            hi: 1,
+            rateHz: 9,
+            smoothing: 0.035,
+            raw: '*~',
+          };
+        }
+
+        if (name === 'rate') {
+          const from = attractorBiasRange(block, 'rate', 0.75, 1.25);
+
+          return {
+            kind: 'param-gesture',
+            op: 'continuous-random',
+            mode: 'continuous-random',
+            param: name,
+            from,
+            lo: 0.75,
+            hi: 1.25,
+            rateHz: 6,
+            smoothing: 0.055,
+            raw: '*~',
+          };
+        }
+
+        if (name === 'comb') {
+          const from = attractorBiasRange(block, 'comb', 0.04, 0.62);
+
+          return {
+            kind: 'param-gesture',
+            op: 'continuous-random',
+            mode: 'continuous-random',
+            param: name,
+            from,
+            lo: 0.04,
+            hi: 0.62,
+            rateHz: 5,
+            smoothing: 0.075,
+            raw: '*~',
+          };
+        }
+
+        if (name === 'space') {
+          const from = attractorBiasRange(block, 'space', 0.08, 0.72);
+
+          return {
+            kind: 'param-gesture',
+            op: 'continuous-random',
+            mode: 'continuous-random',
+            param: name,
+            from,
+            lo: 0.08,
+            hi: 0.72,
+            rateHz: 3,
+            smoothing: 0.11,
+            raw: '*~',
+          };
+        }
+
+        // Unsupported gesture surfaces parse successfully, but resolve as a normal
+        // random point for now. This keeps the grammar forward-compatible without
+        // breaking current numeric params.
+        const value = randomParamValue(name, defaultValue, block);
+        return {
+          kind: 'param-gesture',
+          op: 'continuous-random',
+          mode: 'continuous-random',
+          param: name,
+          from: value,
+          lo: value,
+          hi: value,
+          rateHz: 1,
+          smoothing: 0.1,
+          raw: '*~',
+        };
+      }
+
+      function gestureDurationForEvent(paramName, value, voice, params, gateDuration, slotDuration) {
+        if (!isParamGesture(value)) return null;
+
+        const gated = Number(gateDuration);
+        if (Number.isFinite(gated) && gated > 0) {
+          return Math.max(0.006, gated);
+        }
+
+        const dur = Number(slotDuration);
+        const slot = Number.isFinite(dur) && dur > 0 ? dur : 0.25;
+
+        if (paramName === 'pan') {
+          if (voice === 'string') {
+            const decay = numericParamValue(params && params.decay, 4.2);
+            return clamp(Math.min(decay, 5.0), 0.08, 5.0);
+          }
+
+          return clamp(Math.min(slot * 2, 4.0), 0.05, 4.0);
+        }
+
+        if (paramName === 'rate') {
+          return clamp(Math.min(slot * 2, 3.0), 0.05, 3.0);
+        }
+
+        return clamp(slot, 0.05, 2.0);
+      }
 
       function defaultForParam(name, fallback) {
         switch (name) {
+            case 'compress':
+            case 'space':
+            case 'resonance':
+            case 'comb':
+            case 'grain':
+            case 'chorus':
+            case 'excite':
+            case 'blur':
+            case 'scar':
+            case 'body':
+              return 0;
           case 'force': return 0.7;
           case 'decay': return 4.2;
           case 'crush': return 0;
@@ -868,7 +1598,17 @@
 
           case 'octave':
             return Math.round(clamp(value, -1, 1));
-
+        case 'compress':
+        case 'space':
+        case 'resonance':
+        case 'comb':
+        case 'grain':
+        case 'chorus':
+        case 'excite':
+        case 'blur':
+        case 'scar':
+        case 'body':
+          return clamp(value, 0, 1);
           default:
             return value;
         }
@@ -928,7 +1668,36 @@
           case 'blur':
           case 'corrode':
             return randomBetween(0, 1);
+            
+        case 'compress':
+          return attractorBiasRange(block, 'compress', 0.12, 0.65);
 
+        case 'space':
+          return attractorBiasRange(block, 'space', 0.08, 0.72);
+
+        case 'resonance':
+          return attractorBiasRange(block, 'resonance', 0.05, 0.72);
+
+        case 'comb':
+          return attractorBiasRange(block, 'comb', 0.04, 0.62);
+
+        case 'grain':
+          return attractorBiasRange(block, 'grain', 0.02, 0.58);
+
+        case 'chorus':
+          return attractorBiasRange(block, 'chorus', 0.03, 0.48);
+
+        case 'excite':
+          return attractorBiasRange(block, 'excite', 0.02, 0.52);
+
+        case 'blur':
+          return attractorBiasRange(block, 'blur', 0.02, 0.62);
+
+        case 'scar':
+          return attractorBiasRange(block, 'scar', 0.01, 0.50);
+
+        case 'body':
+          return attractorBiasRange(block, 'body', 0.08, 0.70);
           default:
             return fallback;
         }
@@ -971,6 +1740,14 @@
             paramState.last = value;
             return value;
           }
+            case 'gesture-random': {
+              const gesture = randomParamGesture(name, defaultValue, block);
+
+              // `~` after `*~` should hold the gesture's endpoint, not replay the gesture.
+              paramState.last = gestureEndValue(gesture, defaultValue);
+
+              return gesture;
+            }
 
           case 'hold': {
             return paramState.last !== undefined ? paramState.last : defaultValue;
@@ -1051,6 +1828,43 @@
         return fallback;
       }
 
+      function effectForIndex(block, name, index, fallback, time) {
+        const p = block.effects && block.effects[name];
+        if (!p) return fallback;
+
+        if (p.kind === 'scalar') {
+          return resolveParamAtom(block, name, p.value, fallback, index, true, time);
+        }
+
+        if (p.kind === 'vector') {
+          const len = p.values.length;
+          if (!len) return fallback;
+          const valueIndex = ((index % len) + len) % len;
+          return resolveParamAtom(block, name, p.values[valueIndex], fallback, valueIndex, false, time);
+        }
+
+        return fallback;
+      }
+
+      function resolveEffectsForEvent(block, eventIndex, time) {
+        const names = ['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body'];
+        const out = {};
+        const modes = {};
+
+        for (const name of names) {
+          const raw = effectForIndex(block, name, eventIndex, 0, time);
+          out[name] = clamp(numericSurfaceValue(raw, name, 0), 0, 1);
+
+          const mode = effectModeName(raw);
+          if (mode) modes[name] = mode;
+
+          const rawKey = '_raw' + name.charAt(0).toUpperCase() + name.slice(1);
+          out[rawKey] = raw;
+        }
+
+        out._modes = modes;
+        return out;
+      }
       function resolveParamsForEvent(block, eventIndex, time) {
         return {
           force: paramForIndex(block, 'force', eventIndex, 0.7, time),
@@ -1208,14 +2022,18 @@
 
             const eventIndex = ((ctx.leafBase + leafIndex) % ctx.leafTotal + ctx.leafTotal) % ctx.leafTotal;
             const baseParams = resolveParamsForEvent(ctx.block, eventIndex, time);
+            const effects = resolveEffectsForEvent(ctx.block, eventIndex, time);
             const attractorMod = attractorModForBlock(ctx.block, time);
             const params = applyAttractorToParams(ctx.block, baseParams, ctx.voice, time, duration, attractorMod);
-            const eventBus = outputBusForBlock(ctx.block, time, attractorMod);
+            const eventBus = outputBusForBlock(ctx.block, time, attractorMod, effects);
 
             const gated = tokenIsGated(tok);
             const gateDuration = gated
               ? duration * (Number.isFinite(params.gateMul) ? params.gateMul : 1)
               : null;
+
+            const panGestureDuration = gestureDurationForEvent('pan', params.pan, ctx.voice, params, gateDuration, duration);
+            const rateGestureDuration = gestureDurationForEvent('rate', params.rate, ctx.voice, params, gateDuration, duration);
 
             if (ctx.voice === 'string') {
               if (typeof root.StringVoice === 'undefined') return;
@@ -1245,6 +2063,7 @@
                   pan: params.pan,
                   gain: params.gain,
                   gateDuration,
+                  panGestureDuration,
                 });
               return;
             }
@@ -1284,6 +2103,8 @@
                   rate: params.rate,
                   start: params.start,
                   gateDuration,
+                  panGestureDuration,
+                  rateGestureDuration,
                 });
             }
 
@@ -1609,14 +2430,15 @@
       return { bar, beat, transport: elapsed, blockStates };
     }
 
-    return {
-      start,
-      stop,
-      update,
-      onMissingSample,
-      now,
-      isRunning: () => running,
-    };
+      return {
+        start,
+        stop,
+        safeRestart,
+        update,
+        onMissingSample,
+        now,
+        isRunning: () => running,
+      };
   }
 
   root.ReplScheduler = { create };

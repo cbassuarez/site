@@ -362,7 +362,9 @@
     <h1><i>cbassuarez repl</i></h1>
     <p class="lede">
       a live-coding piece in score-grid notation, played through the cbassuarez voices.
-      <code>Cmd-Enter</code> (<code>Ctrl-Enter</code>) to play; <code>Esc</code> to stop.
+      <code>Cmd-Enter</code> (<code>Ctrl-Enter</code>) to evaluate/play;
+      <code>Cmd-Shift-Enter</code> for safe play;
+      <code>Esc</code> to stop.
     </p>
 
     <div class="status" id="status">idle</div>
@@ -380,9 +382,11 @@
     </div>
 
     <div class="controls">
-      <span class="bracket">[</span> <button id="play" type="button">play</button> <span class="bracket">]</span>
-      <span class="sep">·</span>
-      <span class="bracket">[</span> <button id="stop" type="button">stop</button> <span class="bracket">]</span>
+        <span class="bracket">[</span> <button id="play" type="button" title="Cmd-Enter: evaluate and restart; frozen random choices may reroll">play</button> <span class="bracket">]</span>
+        <span class="sep">·</span>
+        <span class="bracket">[</span> <button id="safe-play" type="button" title="Cmd-Shift-Enter: restart transport without unlocking frozen random choices">safe play</button> <span class="bracket">]</span>
+        <span class="sep">·</span>
+        <span class="bracket">[</span> <button id="stop" type="button" title="Esc: stop all currently sounding voices">stop</button> <span class="bracket">]</span>
       <span class="sep">·</span>
       <span class="bracket">[</span> <button id="share" type="button">share</button> <span class="bracket">]</span>
       <span class="sep">·</span>
@@ -400,6 +404,9 @@
         <option value="8. solar-flare.txt">solar flare</option>
         <option value="9. archive-memory.txt">archive memory</option>
         <option value="10. notation-reference.txt">notation reference</option>
+        <option value="11. effect-surfaces.txt">effect surfaces</option>
+        <option value="12. weather-body.txt">weather body</option>
+        <option value="13. archive-scar.txt">archive scar</option>
       </select>
       <span class="bracket">]</span>
       <span class="sep">·</span>
@@ -518,14 +525,21 @@
         <a href="/colophon">/colophon</a> · <a href="/access">/access</a>
       </p>
       <p>
-        Parameter rows are control streams. In addition to literal values, params accept
-        <code>*</code> for a new random legal value, <code>~</code> to hold the previous
-        resolved value, <code>_</code> to reset to the parameter default,
-        <code>*!</code> for a frozen random value at that param position, and
-        <code>*&amp;N</code> for a drifting random window over <code>N</code> seconds.
-        Params may also use parentheses like voice rows: <code>decay (* 1 1 1)</code>
-        is equivalent to <code>decay * 1 1 1</code>, but keeps nested control rhythms
-        visually aligned with nested notes or samples.
+      Parameter rows are control streams. In addition to literal values, params accept
+      <code>*</code> to roll a random value when the transport reaches that operator,
+      <code>~</code> to hold the previous resolved value,
+      <code>_</code> to reset to the parameter default,
+      <code>*!</code> to roll once the first time transport reaches that operator and then lock it until re-evaluation,
+      <code>*~</code> for continuous random motion while the event is sounding, and
+      <code>*&amp;N</code> for a drifting random window over <code>N</code> seconds.
+      </p>
+      
+      <p>
+        <code>[play]</code> / <code>Cmd-Enter</code> is a hard evaluate: it reparses the editor,
+        restarts transport, and frozen random choices may reroll. <code>[safe play]</code> /
+        <code>Cmd-Shift-Enter</code> restarts transport without unlocking <code>*!</code>,
+        frozen sample selectors, or frozen random param/effect states. Plain <code>*</code>
+        still rerolls whenever transport reaches it.
       </p>
 
       <pre><code>string (*!4 *4 *4 *4) (*!4 *4 *4 *4)
@@ -620,13 +634,53 @@
       may lengthen, soften, haze, or spatially drift it according to the current normalized
       signal state.
     </p>
+    <p><strong>effect surfaces</strong></p>
+    <p>
+      Effect rows are not plugin inserts; they are regulatory surfaces on the block.
+      <code>compress</code> stabilizes, <code>space</code> remembers,
+      <code>resonance</code> and <code>comb</code> form a body,
+      <code>chorus</code> thickens motion, <code>excite</code> adds edge,
+      <code>blur</code> softens contour, and <code>grain</code>/<code>scar</code>
+      add residue and memory pressure.
+    </p>
+    <p>
+      These rows accept the same control-stream operators as params:
+      <code>*</code>, <code>~</code>, <code>_</code>, <code>*!</code>,
+      <code>*&amp;N</code>, <code>*~</code>, and parentheses.
+    </p>
+
+    <pre><code>string   A3   C4   E4   G4
+    decay    4
+    body     metal
+    space    0.28
+    compress 0.25
+    chorus   0.14</code></pre>
+
+    <pre><code>string   *!4   (*4 A*)   ~   C*!
+    attractor weather.dew
+    body     0.5
+    space    *&amp;24
+    blur     0.28
+    comb     *~
+    compress 0.3
+    pan      *~</code></pre>
+
+    <pre><code>sample   snm-*&amp;32;   ~   tub-*&amp;48;   ~
+    attractor archive
+    grain    0.35
+    scar     0.25
+    space    memory
+    body     0.4
+    comb     *~
+    rate     *~
+    pan      *~</code></pre>
   </main>
 
-  <script src="./voices/string.js?v=20260503r5"></script>
-  <script src="./voices/sample.js?v=20260503r5"></script>
-  <script src="./dsl.js?v=20260503r5"></script>
+  <script src="./voices/string.js?v=20260503r10"></script>
+  <script src="./voices/sample.js?v=20260503r10"></script>
+  <script src="./dsl.js?v=20260503r7"></script>
   <script src="./attractors.js?v=20260503r6"></script>
-  <script src="./scheduler.js?v=20260503r6"></script>
-  <script src="./repl.js?v=20260503r6" defer></script>
+  <script src="./scheduler.js?v=20260503r10"></script>
+  <script src="./repl.js?v=20260503r10" defer></script>
 </body>
 </html>

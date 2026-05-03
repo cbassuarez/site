@@ -19,7 +19,8 @@
   // Harmonic-mode lookup (DSL: simple/pair/triad/rich → 1..4).
   const HARM_MODE = { simple: 1, pair: 2, triad: 3, rich: 4 };
 
-  const _bitcrushCurves = new Map();
+    const _bitcrushCurves = new Map();
+    const _activeVoices = new Set();
   function getBitcrushCurve(bits) {
     if (_bitcrushCurves.has(bits)) return _bitcrushCurves.get(bits);
     const samples = 8192;
@@ -32,6 +33,11 @@
     _bitcrushCurves.set(bits, curve);
     return curve;
   }
+    
+    function unregisterVoice(active) {
+      if (!active) return;
+      _activeVoices.delete(active);
+    }
 
   function clamp(v, lo, hi) {
     const n = Number(v);
@@ -39,6 +45,86 @@
     return n < lo ? lo : n > hi ? hi : n;
   }
   function clamp01(v) { return clamp(v, 0, 1); }
+    
+    function isParamGesture(v) {
+      return v && typeof v === 'object' && v.kind === 'param-gesture';
+    }
+
+    function numericParamValue(v, fallback) {
+      if (isParamGesture(v)) {
+        const from = Number(v.from);
+        return Number.isFinite(from) ? from : fallback;
+      }
+
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function applyAudioParamValue(param, value, time, duration, lo, hi, fallback) {
+      if (!param) return;
+
+      const start = Number.isFinite(time) ? time : 0;
+      const min = Number.isFinite(lo) ? lo : -Infinity;
+      const max = Number.isFinite(hi) ? hi : Infinity;
+      const fb = Number.isFinite(fallback) ? fallback : 0;
+
+      if (isParamGesture(value)) {
+        const dur = Number(duration);
+        const end = start + (Number.isFinite(dur) && dur > 0 ? dur : 0.25);
+        const mode = value.mode || value.op || '';
+
+        if (mode === 'continuous-random') {
+          const gestureLo = Number.isFinite(Number(value.lo)) ? Number(value.lo) : min;
+          const gestureHi = Number.isFinite(Number(value.hi)) ? Number(value.hi) : max;
+          const safeLo = Number.isFinite(gestureLo) ? gestureLo : min;
+          const safeHi = Number.isFinite(gestureHi) ? gestureHi : max;
+          const rateHz = Number.isFinite(Number(value.rateHz)) ? Number(value.rateHz) : 8;
+          const step = Math.max(0.025, Math.min(0.25, 1 / rateHz));
+
+          let t = start;
+          let current = clamp(numericParamValue(value, fb), safeLo, safeHi);
+
+          try {
+            param.cancelScheduledValues(start);
+            param.setValueAtTime(current, start);
+
+            while (t < end - 0.0001) {
+              const nextT = Math.min(end, t + step);
+              const next = clamp(randomBetween(safeLo, safeHi), safeLo, safeHi);
+              param.linearRampToValueAtTime(next, Math.max(start + 0.006, nextT));
+              current = next;
+              t = nextT;
+            }
+
+            return;
+          } catch (_) {
+            try { param.value = current; } catch (__) {}
+            return;
+          }
+        }
+
+        const from = clamp(numericParamValue(value.from, fb), min, max);
+        const to = clamp(numericParamValue(value.to, from), min, max);
+
+        try {
+          param.cancelScheduledValues(start);
+          param.setValueAtTime(from, start);
+          param.linearRampToValueAtTime(to, Math.max(start + 0.006, end));
+          return;
+        } catch (_) {
+          try { param.value = from; } catch (__) {}
+          return;
+        }
+      }
+
+      const scalar = clamp(numericParamValue(value, fb), min, max);
+
+      try {
+        param.setValueAtTime(scalar, start);
+      } catch (_) {
+        try { param.value = scalar; } catch (__) {}
+      }
+    }
 
   // Reverse-engineer x01 (pluck position 0..1) from a desired pitch in Hz.
   // The string lab maps x01 → frequency exponentially across the band,
@@ -121,20 +207,34 @@
     const freq = Number(opts.freq);
     if (!Number.isFinite(freq) || freq <= 0) return;
     const time = Number.isFinite(opts.time) ? Math.max(opts.time, audioCtx.currentTime) : audioCtx.currentTime;
+        const activeVoice = {
+          oscillators: [],
+          env: null,
+          pending: 0,
+          startTime: time,
+        };
+        _activeVoices.add(activeVoice);
+        
+        const force = clamp01(numericParamValue(opts.force, 0.7));
+        const decaySec = clamp(numericParamValue(opts.decay, 4.2), 0.4, 8);
 
-    const force = clamp01(opts.force != null ? opts.force : 0.7);
-    const decaySec = clamp(opts.decay != null ? opts.decay : 4.2, 0.4, 8);
-    const crushBits = (() => {
-      const n = Number(opts.crush);
-      if (!Number.isFinite(n) || n <= 0) return 0;
-      return clamp(Math.round(n), 4, 16);
-    })();
-    const toneBright = clamp01(opts.tone != null ? opts.tone : 0.6);
-    const harm = resolveHarm(opts.harm != null ? opts.harm : 2);
-    const octaveShift = clamp(Math.round(opts.octave || 0), -2, 2);
-    const detuneCents = clamp(Number(opts.detune) || 0, -50, 50);
-        const panVal = clamp(Number(opts.pan) || 0, -1, 1);
-        const gainVal = clamp(opts.gain != null ? opts.gain : 1, 0, 1.5);
+        const crushBits = (() => {
+          const n = numericParamValue(opts.crush, 0);
+          if (!Number.isFinite(n) || n <= 0) return 0;
+          return clamp(Math.round(n), 4, 16);
+        })();
+
+        const toneBright = clamp01(numericParamValue(opts.tone, 0.6));
+        const harm = resolveHarm(numericParamValue(opts.harm, 2));
+        const octaveShift = clamp(Math.round(numericParamValue(opts.octave, 0)), -2, 2);
+        const detuneCents = clamp(numericParamValue(opts.detune, 0), -50, 50);
+
+        const panVal = clamp(numericParamValue(opts.pan, 0), -1, 1);
+        const panGestureDuration = Number.isFinite(Number(opts.panGestureDuration)) && Number(opts.panGestureDuration) > 0
+          ? Number(opts.panGestureDuration)
+          : null;
+
+        const gainVal = clamp(numericParamValue(opts.gain, 1), 0, 1.5);
         const rawGateDuration = Number(opts.gateDuration);
         const gateDuration = Number.isFinite(rawGateDuration) && rawGateDuration > 0
           ? rawGateDuration
@@ -147,6 +247,7 @@
     const pickBrightness = clamp(0.45 + Math.abs(x01 - 0.5) * 1.2 + force * 0.35, 0.2, 1.55);
 
         const env = audioCtx.createGain();
+        activeVoice.env = env;
         const attackSec = VOICE_ATTACK_S * (1.48 - toneBright * 0.75);
         const attackEnd = time + Math.max(0.003, attackSec);
         const gainScale = clamp(gainVal * (0.68 + edgeGain * 0.42 + force * 0.26), 0, 1.25);
@@ -175,17 +276,35 @@
           : naturalStopTime;
         const sourceStopTime = Math.max(time + 0.02, Math.min(naturalStopTime, gatedStopTime));
 
-    function addPartial(f, partialGain, harmonicN) {
-      const osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, time);
-      const pg = audioCtx.createGain();
-      const pickMode = 0.20 + 0.80 * Math.abs(Math.sin(Math.PI * harmonicN * x01));
-      pg.gain.value = partialGain * pickMode;
-      osc.connect(pg).connect(env);
-        osc.start(time);
-        osc.stop(sourceStopTime);
-    }
+        function addPartial(f, partialGain, harmonicN) {
+          const osc = audioCtx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, time);
+
+          const pg = audioCtx.createGain();
+          const pickMode = 0.20 + 0.80 * Math.abs(Math.sin(Math.PI * harmonicN * x01));
+          pg.gain.value = partialGain * pickMode;
+
+          osc.connect(pg).connect(env);
+
+          activeVoice.pending += 1;
+          activeVoice.oscillators.push(osc);
+
+          osc.onended = () => {
+            activeVoice.pending -= 1;
+            if (activeVoice.pending <= 0) {
+              unregisterVoice(activeVoice);
+            }
+          };
+
+          try {
+            osc.start(time);
+            osc.stop(sourceStopTime);
+          } catch (_) {
+            activeVoice.pending -= 1;
+            unregisterVoice(activeVoice);
+          }
+        }
     addPartial(playFreq, 1, 1);
     if (harm >= 1) addPartial(playFreq * 2, 0.12 + pickBrightness * 0.22, 2);
     if (harm >= 2) addPartial(playFreq * 3, 0.04 + pickBrightness * 0.18, 3);
@@ -207,19 +326,51 @@
     signal.connect(filter);
     signal = filter;
 
-    if (audioCtx.createStereoPanner) {
-      const pan = audioCtx.createStereoPanner();
-      pan.pan.setValueAtTime(panVal, time);
-      signal.connect(pan);
-      signal = pan;
-    }
+        if (audioCtx.createStereoPanner) {
+          const pan = audioCtx.createStereoPanner();
+          applyAudioParamValue(pan.pan, opts.pan, time, panGestureDuration, -1, 1, panVal);
+          signal.connect(pan);
+          signal = pan;
+        }
     signal.connect(masterBus);
   }
+    function stopAll(when) {
+      const t = Number.isFinite(when)
+        ? Math.max(when, _audioCtx ? _audioCtx.currentTime : 0)
+        : (_audioCtx ? _audioCtx.currentTime : 0);
 
-  root.StringVoice = {
-    ensureAudio,
-    getMasterBus,
-    resume,
-    playString,
-  };
+      for (const active of Array.from(_activeVoices)) {
+        if (!active) continue;
+
+        const startTime = Number.isFinite(active.startTime) ? active.startTime : t;
+        const oscStopTime = Math.max(t + 0.025, startTime + 0.001);
+
+        if (active.env && active.env.gain) {
+          try {
+            active.env.gain.cancelScheduledValues(t);
+            active.env.gain.setValueAtTime(active.env.gain.value || 0, t);
+            active.env.gain.linearRampToValueAtTime(0, t + 0.025);
+          } catch (_) {
+            try { active.env.gain.value = 0; } catch (__) {}
+          }
+        }
+
+        for (const osc of active.oscillators || []) {
+          try {
+            osc.stop(oscStopTime);
+          } catch (_) {
+            // Already stopped, never started, or already given a stop time.
+          }
+        }
+
+        unregisterVoice(active);
+      }
+    }
+    root.StringVoice = {
+      ensureAudio,
+      getMasterBus,
+      resume,
+      playString,
+      stopAll,
+    };
 })(window);

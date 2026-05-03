@@ -1,0 +1,20 @@
+// weather enters the medium:
+// a simple wildcard string is humidified, blurred, and spatially drifted.
+
+tempo 88
+meter 4/4
+
+string   *!4   (*4 A*)   ~   C*!   |   *3   (*4 *!4)   G*   ~
+attractor weather.dew
+source   station KLAX
+speed    (1 1 1/2 pi/4)
+body     0.48
+space    *&24
+blur     0.28
+comb     *~
+chorus   0.16
+compress 0.3
+force    mf    (* ~)     p    _     |   f    (* ~)       p    _
+decay    4
+pan      (*~ ~ _ right) (*~ ~ _ left)
+gain     0.72
