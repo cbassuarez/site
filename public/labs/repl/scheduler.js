@@ -32,6 +32,7 @@
       const missingSampleSeen = new Set();
       let onMissingCallback = null;
       let runtimeEpoch = 0;
+      let runtimeEventSeq = 0;
       const pendingEditorPulseTimers = new Set();
 
       function nextRuntimeEpoch(reason) {
@@ -83,6 +84,34 @@
         return tok.kind || '';
       }
 
+      function visualDurationForLeaf(state, durationSeconds) {
+        const stateName = String(state || 'hit').toLowerCase();
+        const durMs = Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) * 1000 : 0;
+        if (stateName === 'rest') return Math.max(70, Math.min(125, durMs * 0.22 || 95));
+        if (stateName === 'held') return Math.max(90, Math.min(260, durMs * 0.38 || 150));
+        return Math.max(110, Math.min(280, durMs * 0.32 || 180));
+      }
+
+      function emitBlockPositionPulse(block, time, detail) {
+        if (!block) return;
+        emitEditorPulseAt({
+          kind: 'block-position',
+          eventId: ++runtimeEventSeq,
+          line: blockLine(block),
+          blockId: block._blockId || null,
+          blockOrdinal: Number.isFinite(Number(block._blockOrdinal)) ? Number(block._blockOrdinal) : null,
+          voice: block.voice,
+          slotsPerBar: Number(block.slotsPerBar) || null,
+          slotsTotal: Array.isArray(block.slots) ? block.slots.length : null,
+          scheduledAt: time,
+          slotIndex: detail && Number.isFinite(Number(detail.slotIndex)) ? Number(detail.slotIndex) : null,
+          blockSlotIndex: detail && Number.isFinite(Number(detail.blockSlotIndex)) ? Number(detail.blockSlotIndex) : null,
+          cycleSlotIndex: detail && Number.isFinite(Number(detail.cycleSlotIndex)) ? Number(detail.cycleSlotIndex) : null,
+          cycleLengthSlots: detail && Number.isFinite(Number(detail.cycleLengthSlots)) ? Number(detail.cycleLengthSlots) : null,
+          isSilentAdvance: Boolean(detail && detail.isSilentAdvance),
+        }, time);
+      }
+
       function emitLeafPulse(block, time, detail) {
         if (!block) return;
         const count = Math.max(1, Number(detail && detail.leafCount) || Number(block._leafTotal) || 1);
@@ -90,20 +119,29 @@
         const index = Number.isFinite(rawIndex)
           ? ((Math.floor(rawIndex) % count) + count) % count
           : 0;
+        const state = detail && detail.state ? detail.state : 'hit';
+        const duration = detail && detail.duration;
         emitEditorPulseAt({
           kind: 'leaf',
+          type: 'leaf-fired',
+          eventId: ++runtimeEventSeq,
           line: blockLine(block),
-          blockId: block.id || block.line || null,
+          blockId: block._blockId || null,
+          blockOrdinal: Number.isFinite(Number(block._blockOrdinal)) ? Number(block._blockOrdinal) : null,
           voice: block.voice,
+          slotsTotal: Array.isArray(block.slots) ? block.slots.length : null,
           leafIndex: index,
           leafCount: count,
           leafPath: detail && Array.isArray(detail.leafPath) ? detail.leafPath.slice() : [],
-          slotIndex: detail && detail.slotIndex,
+          slotIndex: detail && Number.isFinite(Number(detail.slotIndex)) ? Number(detail.slotIndex) : null,
           sourceLeafIndex: detail && Number.isFinite(Number(detail.sourceLeafIndex)) ? Number(detail.sourceLeafIndex) : null,
-          state: detail && detail.state ? detail.state : 'hit',
+          state,
           token: detail && detail.token ? detail.token : '',
           scheduledAt: time,
-          duration: detail && detail.duration,
+          duration,
+          visualDurationMs: detail && Number.isFinite(Number(detail.visualDurationMs))
+            ? Number(detail.visualDurationMs)
+            : visualDurationForLeaf(state, duration),
           intensity: detail && detail.intensity != null ? detail.intensity : 1,
         }, time);
       }
@@ -111,6 +149,17 @@
       function blockLine(block) {
         const n = block && Number(block.line);
         return Number.isFinite(n) && n > 0 ? n : null;
+      }
+
+      function blockIdentityFor(block, ordinal) {
+        // Identity is "voice@line#ordinal". The line+voice pair survives
+        // re-parses of the same source; the ordinal disambiguates two sample
+        // blocks on the same line during a hot-swap. The editor uses this
+        // string verbatim to gate which line a leaf event may paint.
+        const voice = block && block.voice ? String(block.voice) : 'block';
+        const line = blockLine(block);
+        const lineKey = line == null ? 'noline' : `L${line}`;
+        return `${voice}@${lineKey}#${Number(ordinal) || 0}`;
       }
 
       function rowLine(block, name) {
@@ -269,6 +318,8 @@
         block._lastDispatchedSlotIdx = 0;
         block._lastDispatchedTime = null;
         block._lastDispatchedDuration = null;
+        block._everyCycleId = null;
+        block._everyPatternBase = null;
         block._attractorSmoothed = null;
         block._organism = null;
           block._fadeState = null;
@@ -382,7 +433,14 @@
 
         nextRuntimeEpoch('update');
         program = newProgram;
-        for (const block of program.blocks) {
+        // Every block gets a stable identity for the lifetime of this program.
+        // The editor uses { epoch, blockId } to reject any pulse whose owning
+        // block was replaced by a hot-swap, and to refuse cross-block leaf
+        // resolution when one voice subdivides faster than another.
+        for (let i = 0; i < program.blocks.length; i++) {
+          const block = program.blocks[i];
+          block._blockOrdinal = i;
+          block._blockId = blockIdentityFor(block, i);
           if (block._scheduledThrough == null) block._scheduledThrough = 0;
           clearBlockRuntimeState(block);
           block._leafOffsets = null;
@@ -2466,23 +2524,74 @@
     // slot index. Returns:
     //   - { slotIndex, silent: false, inBlockIdx } if the phrase is firing
     //   - { slotIndex, silent: true } if 'every' has us in the silent portion
-    function resolveBlockPosition(block, topSlotIdx, time) {
-      if (block.every) {
-        let periodSlots;
-        if (block.every.unit === 'bars') {
-          periodSlots = block.every.count * block.slotsPerBar;
-        } else {
-          const slotsPerBeat = block.slotsPerBar / program.meter.num;
-          periodSlots = Math.max(1, Math.round(block.every.count * slotsPerBeat));
-        }
-        const positionInPeriod = ((topSlotIdx % periodSlots) + periodSlots) % periodSlots;
-        if (positionInPeriod >= block.slots.length) {
-          return { slotIndex: topSlotIdx, silent: true };
-        }
-        return { slotIndex: topSlotIdx, silent: false, inBlockIdx: liveLeafIndex(block, positionInPeriod, time) };
+    function everyPeriodSlots(block) {
+      if (!block || !block.every) return Math.max(1, block && block.slots ? block.slots.length : 1);
+      if (block.every.unit === 'bars') {
+        return Math.max(1, Math.round(block.every.count * block.slotsPerBar));
       }
-      const inBlockIdx = ((topSlotIdx % block.slots.length) + block.slots.length) % block.slots.length;
-      return { slotIndex: topSlotIdx, silent: false, inBlockIdx: liveLeafIndex(block, inBlockIdx, time) };
+      const slotsPerBeat = block.slotsPerBar / program.meter.num;
+      return Math.max(1, Math.round(block.every.count * slotsPerBeat));
+    }
+
+    // Resolve the active phrase position for a block. `patternSlotIdx` is the
+    // block-owned pattern cursor. `absoluteSlotIdx` is the unwarped musical grid
+    // position. Keeping both is the important guarantee: speed may consume this
+    // block's phrase faster/slower, but `every N bars/beats` remains an absolute
+    // musical gate and never inherits another voice's denser subdivision.
+    //
+    // When `mutateEveryState` is false, the function is a pure read — used by
+    // the visualizer's `now()` call, which runs at 60fps and must NOT mutate
+    // the every-cycle anchor. Only the scheduler's dispatch loop is allowed to
+    // commit a new patternBase, because the patternBase is what aligns the
+    // phrase to its absolute musical gate.
+    function resolveBlockPosition(block, patternSlotIdx, time, absoluteSlotIdx, mutateEveryState) {
+      if (block.every) {
+        const periodSlots = everyPeriodSlots(block);
+        const absIdx = Number.isFinite(Number(absoluteSlotIdx)) ? Math.max(0, Math.floor(Number(absoluteSlotIdx))) : Math.max(0, Math.floor(Number(patternSlotIdx) || 0));
+        const cycleId = Math.floor(absIdx / periodSlots);
+
+        if (mutateEveryState !== false && block._everyCycleId !== cycleId) {
+          block._everyCycleId = cycleId;
+          block._everyPatternBase = Math.max(0, Math.floor(Number(patternSlotIdx) || 0));
+        }
+
+        // Use the stored patternBase if it's already aligned with this cycleId;
+        // otherwise compute a hypothetical phraseSlot from the current cursor
+        // without touching block state.
+        const storedBase = Number.isFinite(Number(block._everyPatternBase)) ? Number(block._everyPatternBase) : 0;
+        const patternBase = (block._everyCycleId === cycleId)
+          ? storedBase
+          : Math.max(0, Math.floor(Number(patternSlotIdx) || 0));
+        const phraseSlot = Math.max(0, Math.floor(Number(patternSlotIdx) || 0) - patternBase);
+
+        if (phraseSlot >= block.slots.length) {
+          return {
+            slotIndex: patternSlotIdx,
+            absoluteSlotIndex: absIdx,
+            silent: true,
+            everyCycleId: cycleId,
+            phraseSlot,
+          };
+        }
+
+        return {
+          slotIndex: patternSlotIdx,
+          absoluteSlotIndex: absIdx,
+          silent: false,
+          inBlockIdx: liveLeafIndex(block, phraseSlot, time),
+          everyCycleId: cycleId,
+          phraseSlot,
+        };
+      }
+
+      const inBlockIdx = ((patternSlotIdx % block.slots.length) + block.slots.length) % block.slots.length;
+      return {
+        slotIndex: patternSlotIdx,
+        absoluteSlotIndex: Number.isFinite(Number(absoluteSlotIdx)) ? Math.max(0, Math.floor(Number(absoluteSlotIdx))) : patternSlotIdx,
+        silent: false,
+        inBlockIdx: liveLeafIndex(block, inBlockIdx, time),
+        phraseSlot: inBlockIdx,
+      };
     }
 
       function liveLeafIndex(block, baseIndex, time) {
@@ -2993,17 +3102,31 @@
         });
       }
 
-      function dispatchTopSlot(block, slotIdx, slotAbsTime, slotDuration, speed) {
+      function dispatchTopSlot(block, slotIdx, slotAbsTime, slotDuration, speed, absoluteSlotIdx) {
         ensureLeafOffsets(block);
 
-        const pos = resolveBlockPosition(block, slotIdx, slotAbsTime);
+        const absSlotIdx = Number.isFinite(Number(absoluteSlotIdx))
+          ? Math.max(0, Math.floor(Number(absoluteSlotIdx)))
+          : Math.max(0, Math.floor(Number(slotIdx) || 0));
+        const pos = resolveBlockPosition(block, slotIdx, slotAbsTime, absSlotIdx, true);
+        const cycleLengthSlots = block && block.every
+          ? everyPeriodSlots(block)
+          : Math.max(1, block.slots.length || 1);
+        emitBlockPositionPulse(block, slotAbsTime, {
+          slotIndex: slotIdx,
+          blockSlotIndex: pos && !pos.silent ? pos.inBlockIdx : null,
+          cycleSlotIndex: ((absSlotIdx % cycleLengthSlots) + cycleLengthSlots) % cycleLengthSlots,
+          cycleLengthSlots,
+          isSilentAdvance: Boolean(pos && pos.silent),
+        });
         if (pos.silent) return;
 
         const inBlockIdx = pos.inBlockIdx;
         const node = block.slots[inBlockIdx];
         if (!node) return;
 
-        const phraseRepeat = block.slots.length > 0 ? Math.floor(slotIdx / block.slots.length) : 0;
+        const phraseSlot = Number.isFinite(Number(pos && pos.phraseSlot)) ? Math.max(0, Math.floor(Number(pos.phraseSlot))) : inBlockIdx;
+        const phraseRepeat = block.slots.length > 0 ? Math.floor(phraseSlot / block.slots.length) : 0;
         const leafBase = phraseRepeat * block._leafTotal + (block._leafOffsets[inBlockIdx] || 0);
 
         dispatchSlotTree(node, slotAbsTime, slotDuration, {
@@ -3062,43 +3185,58 @@
 
           let guard = 0;
 
-          // Each block advances from its own next top-level slot time. Nested
-          // groups subdivide only the duration of that one slot; they never
-          // create extra top-level opportunities for neighboring voices. This
-          // is the critical independence guarantee for cases like:
-          //   string  * (* *) . ~
-          //   sample  * ~     . .
-          // where the sample sustain must remain one sample-owned slot, not two
-          // leaves copied from the string subdivision.
+          // PER-BLOCK PHRASE CURSOR — INDEPENDENCE INVARIANT.
+          //
+          // Each block advances on its own grid of `baseSlotSec = barSec /
+          // block.slotsPerBar`. Nothing outside this loop may read or write
+          // `block._speedSlotIdx` / `block._speedNextTime` while we tick;
+          // nested groups subdivide only the duration of one slot, never the
+          // top-level cadence; `speed` only compresses the per-slot dispatch
+          // duration, never the slot rate. That guarantees a low-density
+          // sample row stays at sample's slotsPerBar even while a sibling
+          // string row has a 4x-nested group inside one of its slots:
+          //   string  (*!4 *4 *4 *4) . . .   →  16 string leaves/bar
+          //   sample   snm . . .             →  4 sample leaves/bar
+          // The sample row receives 4 commits per bar regardless of what
+          // string subdivides, because we never advance `block._speedSlotIdx`
+          // off any other block's clock.
           while (block._speedNextTime < horizonAbs && guard < 2048) {
             const slotIdx = Math.max(0, Math.floor(block._speedSlotIdx));
-            const slotAbsTime = block._speedNextTime;
-            const speed = speedForSlot(block, slotIdx, slotAbsTime);
-            const slotDuration = baseSlotSec / speed;
-
-            if (!Number.isFinite(slotDuration) || slotDuration <= 0) {
-              block._speedNextTime += baseSlotSec;
+            const slotAbsTime = originTime + slotIdx * baseSlotSec;
+            if (slotAbsTime < nowAbs - 0.002) {
               block._speedSlotIdx = slotIdx + 1;
+              block._speedNextTime = originTime + block._speedSlotIdx * baseSlotSec;
+              block._scheduledThrough = block._speedSlotIdx;
               guard++;
               continue;
             }
 
-            if (slotAbsTime + 0.001 >= nowAbs) {
-              dispatchTopSlot(block, slotIdx, slotAbsTime, slotDuration, speed);
-              block._lastDispatchedSlotIdx = slotIdx;
-              block._lastDispatchedTime = slotAbsTime;
-              block._lastDispatchedDuration = slotDuration;
-            }
+            const speed = speedForSlot(block, slotIdx, slotAbsTime);
+            const speedDuration = baseSlotSec / speed;
+            const eventDuration = Number.isFinite(speedDuration) && speedDuration > 0
+              ? Math.min(baseSlotSec, speedDuration)
+              : baseSlotSec;
 
-            block._speedNextTime = slotAbsTime + slotDuration;
+            const absoluteSlotIdx = Math.max(0, Math.floor(((slotAbsTime - originTime) / baseSlotSec) + 0.000001));
+            dispatchTopSlot(block, slotIdx, slotAbsTime, eventDuration, speed, absoluteSlotIdx);
+            block._lastDispatchedSlotIdx = slotIdx;
+            block._lastDispatchedTime = slotAbsTime;
+            block._lastDispatchedDuration = eventDuration;
+
+            // Always advance by exactly one block-local grid step. Re-deriving
+            // from `originTime + slotIdx * baseSlotSec` (instead of
+            // accumulating slotAbsTime + something) keeps the cursor pinned to
+            // the musical grid even when speed/random/attractor params skew
+            // the per-slot dispatch duration.
             block._speedSlotIdx = slotIdx + 1;
+            block._speedNextTime = originTime + block._speedSlotIdx * baseSlotSec;
             block._scheduledThrough = block._speedSlotIdx;
             guard++;
           }
 
           if (guard >= 2048) {
             // Avoid locking the audio thread if a pathological speed state sneaks in.
-            block._speedNextTime = nowAbs + baseSlotSec;
+            block._speedNextTime = originTime + (Math.max(0, Math.floor(block._speedSlotIdx || 0)) + 1) * baseSlotSec;
           }
         }
       }
@@ -3135,7 +3273,8 @@
             ? block._lastDispatchedDuration
             : (barSec / block.slotsPerBar);
           const subProgress = clamp((audioCtx.currentTime - lastTime) / lastDur, 0, 1);
-          const pos = resolveBlockPosition(block, slotIdx, audioCtx.currentTime);
+          // Pure read for the visualizer; never mutates the block's every-state.
+          const pos = resolveBlockPosition(block, slotIdx, audioCtx.currentTime, undefined, false);
             const attractor = block.attractor
               ? (attractorSignalsForBlock(block, audioCtx.currentTime) || blockAttractor(block))
               : null;

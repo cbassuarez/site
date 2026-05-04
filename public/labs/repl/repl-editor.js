@@ -495,22 +495,18 @@
     return false;
   }
 
-  function locateLeafTokenRange(lineText, payload) {
+  // Note: this earlier definition is shadowed below by the tree-based variant
+  // (see `function locateLeafTokenRange(lineText, payload)` later). The later
+  // definition is the one the receiver uses; both strict-drop on out-of-range
+  // identity now.
+  function locateLeafTokenRangeFlat(lineText, payload) {
     const ranges = leafTokenRangesForLine(lineText);
     if (!ranges.length) return null;
-
     const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
     const token = payload && payload.token;
     const matches = token ? ranges.filter((range) => leafTokenMatchesEvent(range.text, token)) : [];
-    if (matches.length) {
-      return matches[leafIndex % matches.length];
-    }
-
-    // Nested rhythms can produce more runtime leaves than visible source tokens.
-    // When spans are unavailable, use the nearest visible leaf token rather than
-    // painting across the full editor width by percentage. This keeps the stamp
-    // attached to code-space instead of screen-space.
-    return ranges[Math.min(ranges.length - 1, leafIndex % ranges.length)];
+    if (matches.length) return matches[Math.min(matches.length - 1, leafIndex)];
+    return null;
   }
 
   function sanitizeLeafClass(value) {
@@ -604,7 +600,14 @@
   function payloadVoiceMatchesLine(lineText, payload) {
     const lineVoice = voiceHeadForLeafLine(lineText);
     const eventVoice = String((payload && payload.voice) || '').toLowerCase();
-    if (!lineVoice || !eventVoice) return true;
+    // Strict: a leaf/block-position pulse only paints lines that own a voice
+    // declaration matching the event's voice. The previous permissive
+    // "either side empty → accept" rule could let a sample-block event land
+    // on a non-voice row (or vice versa) when an event's voice tag was
+    // missing, which is a cross-block contamination vector. Voice events
+    // must arrive on a real voice line.
+    if (!eventVoice) return false;
+    if (!lineVoice) return false;
     return lineVoice === eventVoice;
   }
 
@@ -618,33 +621,49 @@
     const selectIndexedLeaf = (leaves, index) => {
       if (!Array.isArray(leaves) || !leaves.length) return null;
       const safeIndex = Math.max(0, Math.floor(Number(index) || 0));
-      const selected = leaves[Math.min(leaves.length - 1, safeIndex)];
+      // Strict: never wrap modulo. A sourceLeafIndex outside the slot's leaf
+      // count means the event is for a different shape of phrase than what
+      // this line currently shows — drop it instead of painting a neighbor.
+      if (safeIndex >= leaves.length) return null;
+      const selected = leaves[safeIndex];
       if (!wantsRest) return selected || null;
       if (selected && isRestRange(selected)) return selected;
       // Rest/sustain events must stay attached to an actual visible rest cell.
       // Do not silently fall through to a neighboring note; that is what made
       // stale/nonexistent plates appear when patches changed.
-      const restLeaves = leaves.filter(isRestRange);
-      if (!restLeaves.length) return null;
-      return restLeaves[Math.min(restLeaves.length - 1, safeIndex)];
+      return null;
     };
+
+    const slotIndex = Number(payload && payload.slotIndex);
+    const sourceLeafIndex = Number(payload && payload.sourceLeafIndex);
+
+    // Reject events whose top-level slot index is out of range for the line.
+    // This is the primary defense against cross-voice subdivision inheritance:
+    // a string block with 4 top-level slots that emit slotIndex 0..3 may not
+    // paint a sample block whose visible line shows 16 nested cells, and
+    // vice versa. Both blocks own their own slot count; the editor refuses
+    // to translate one block's index into the other block's range space.
+    if (Number.isFinite(slotIndex) && slotIndex >= 0 && slotIndex >= tree.length) {
+      return null;
+    }
 
     // The scheduler sends sourceLeafIndex: the leaf ordinal inside the
     // top-level source slot that actually dispatched. Prefer that over global
     // eventIndex or token text; repeated notes and repeated random leaves are
-    // otherwise indistinguishable by text. Rest-like `~` events are allowed
-    // through this path as long as the resolved source leaf is also rest-like.
-    const slotIndex = Number(payload && payload.slotIndex);
-    const sourceLeafIndex = Number(payload && payload.sourceLeafIndex);
+    // otherwise indistinguishable by text.
     if (Number.isFinite(slotIndex) && slotIndex >= 0 && Number.isFinite(sourceLeafIndex) && sourceLeafIndex >= 0) {
       const slot = tree[slotIndex];
       const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
       const selected = selectIndexedLeaf(slotLeaves, sourceLeafIndex);
       if (selected) return selected;
-      if (wantsRest) return null;
+      // Strict drop: if the source slot exists but the sub-leaf does not,
+      // do not fall through to a path/flat fallback — the event does not
+      // map onto a real cell of *this* line.
+      return null;
     }
 
     // Path fallback: preserves nested position when sourceLeafIndex is absent.
+    // Still gated on the slot being in range for this line's visible tree.
     const path = payload && Array.isArray(payload.leafPath) ? payload.leafPath : null;
     const byPath = path && path.length ? leafRangeAtPath(tree, path, 0) : null;
     if (byPath && (!wantsRest || isRestRange(byPath))) return byPath;
@@ -657,20 +676,15 @@
       const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
       const selected = selectIndexedLeaf(slotLeaves, 0);
       if (selected) return selected;
-      if (wantsRest) return null;
+      return null;
     }
 
-    // Last-resort fallback only: global flattened index. This intentionally no
-    // longer uses token-text matching, because repeated leaves made the wrong
-    // identical-looking token light up. Rest-like events still resolve to an
-    // actual rest-like source cell instead of being dropped.
-    const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
-    if (wantsRest) {
-      const restLeaves = flat.filter(isRestRange);
-      return restLeaves.length ? restLeaves[leafIndex % restLeaves.length] : null;
-    }
-    const selected = flat[leafIndex % flat.length];
-    return selected && isRestRange(selected) ? null : selected;
+    // No slot index, no path, no source leaf index — we have no committed
+    // identity to anchor on. The previous code wrapped a global leafIndex
+    // by `flat.length`, which guaranteed *some* token would light up even
+    // for events that didn't actually belong to this line's pattern shape.
+    // Drop instead.
+    return null;
   }
 
   function findCurrentBlockLines(state) {
@@ -779,8 +793,16 @@
       this.meters = new Map();
       this.leafStates = new Map();
       this.leafPlates = new Map();
+      // line → blockId most-recently observed on a block-position pulse for
+      // that line. Used to reject leaf events whose owning block's identity
+      // doesn't match the current owner of the line — a defense in depth
+      // against a hot-swapped or re-shaped block painting through stale
+      // identity.
+      this.lineOwners = new Map();
       this.pendingLeafFrame = null;
       this.timer = null;
+      this.currentEpoch = null;
+      this.seenLeafEvents = new Set();
       this.overlay = document.createElement('div');
       this.overlay.className = 'cs-leaf-highlight-layer';
       this.overlay.setAttribute('aria-hidden', 'true');
@@ -796,6 +818,8 @@
     clearLeafRuntime() {
       this.leafStates.clear();
       this.leafPlates.clear();
+      this.seenLeafEvents.clear();
+      this.lineOwners.clear();
       if (this.pendingLeafFrame != null) {
         cancelAnimationFrame(this.pendingLeafFrame);
         this.pendingLeafFrame = null;
@@ -805,23 +829,74 @@
       try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
     }
 
+    removeLeafPlate(line) {
+      const key = String(line);
+      this.leafPlates.delete(key);
+      if (!this.overlay) return;
+      const plate = this.overlay.querySelector(`[data-leaf-plate="${key}"]`);
+      if (plate && plate.parentNode) plate.parentNode.removeChild(plate);
+    }
+
     receive(payload) {
       if (payload && payload.kind === 'reset') {
+        this.currentEpoch = Number.isFinite(Number(payload.epoch)) ? Number(payload.epoch) : null;
         this.pulses.clear();
         this.meters.clear();
         this.clearLeafRuntime();
         return;
       }
+      if (payload && Number.isFinite(Number(payload.epoch))) {
+        const epoch = Number(payload.epoch);
+        if (this.currentEpoch != null && epoch !== this.currentEpoch) return;
+        this.currentEpoch = epoch;
+      }
       const line = Math.max(1, Number(payload && payload.line) | 0);
       if (!line || line > this.view.state.doc.lines) return;
       const now = Date.now();
       const intensity = clamp01(payload.intensity == null ? 1 : payload.intensity);
+      if (payload && payload.kind === 'block-position') {
+        // A block can advance through silent time, rests, or a longer-than-bar
+        // cycle without firing a new token. Clear the old plate on the owning
+        // line so the editor never displays "last event" as "current event".
+        const lineText = this.view.state.doc.line(line).text;
+        if (!payloadVoiceMatchesLine(lineText, payload)) return;
+        // Record this block as the current owner of this line. Subsequent
+        // leaf events whose blockId mismatches this owner are rejected as
+        // cross-block strays. Block-position is the canonical "I own this
+        // line" signal because it fires once per top-slot of the owning
+        // block, regardless of speed/every gating.
+        const ownerId = payload.blockId == null ? null : String(payload.blockId);
+        if (ownerId) this.lineOwners.set(line, ownerId);
+        this.leafStates.delete(line);
+        this.removeLeafPlate(line);
+        this.requestRefresh();
+        return;
+      }
       if (payload && payload.kind === 'leaf') {
+        const eventId = payload.eventId == null ? '' : `${payload.epoch || ''}:${payload.eventId}`;
+        if (eventId && this.seenLeafEvents.has(eventId)) return;
+        if (eventId) this.seenLeafEvents.add(eventId);
+        if (this.seenLeafEvents.size > 512) this.seenLeafEvents.clear();
         const count = Math.max(1, Number(payload.leafCount) | 0);
         const index = Math.max(0, Math.min(count - 1, Number(payload.leafIndex) | 0));
         const previous = this.leafStates.get(line) || {};
         const lineText = this.view.state.doc.line(line).text;
         if (!payloadVoiceMatchesLine(lineText, payload)) return;
+        // BlockId guard: if a line has a recorded owner from block-position,
+        // reject leaf events claiming a different blockId. Without this
+        // guard, a stale event could land on a hot-swapped line and paint
+        // through the new block's tokens.
+        const eventBlockId = payload.blockId == null ? null : String(payload.blockId);
+        const ownerId = this.lineOwners.get(line) || null;
+        if (ownerId && eventBlockId && ownerId !== eventBlockId) return;
+        if (eventBlockId && !ownerId) this.lineOwners.set(line, eventBlockId);
+        // SlotIndex sanity: scheduler stamps slotsTotal = the owning block's
+        // top-level slot count. If slotIndex falls outside that range, the
+        // event cannot belong to this block — refuse it.
+        const totalSlots = Number(payload.slotsTotal);
+        const evtSlot = Number(payload.slotIndex);
+        if (Number.isFinite(totalSlots) && totalSlots > 0
+            && Number.isFinite(evtSlot) && (evtSlot < 0 || evtSlot >= totalSlots)) return;
         const range = locateLeafTokenRange(lineText, payload);
         if (!range || !range.text) return;
         const payloadToken = normalizeLeafToken(payload && payload.token);
@@ -838,9 +913,12 @@
         // faster nested group in another voice fires, which reads as if the
         // faster leaf leaked into every block. Keep sounding leaves slightly
         // longer, but make rest plates deliberately quiet and brief.
-        const visualMs = isRestEvent
-          ? 135
-          : Math.max(160, Math.min(320, Number(payload.duration) * 420 || CS_LEAF_RECENT_MS));
+        const visualFromPayload = Number(payload && payload.visualDurationMs);
+        const visualMs = Number.isFinite(visualFromPayload)
+          ? Math.max(70, Math.min(360, visualFromPayload))
+          : (isRestEvent
+              ? 110
+              : Math.max(150, Math.min(300, Number(payload.duration) * 360 || CS_LEAF_RECENT_MS)));
         const leafState = {
           leafCount: count,
           currentIndex: index,
