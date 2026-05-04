@@ -31,18 +31,6 @@
     let originTime = 0;
       const missingSampleSeen = new Set();
       let onMissingCallback = null;
-      let runtimeEpoch = 0;
-      const pendingEditorPulseTimers = new Set();
-
-      function nextRuntimeEpoch(reason) {
-        runtimeEpoch += 1;
-        for (const id of Array.from(pendingEditorPulseTimers)) {
-          try { root.clearTimeout(id); } catch (_) {}
-        }
-        pendingEditorPulseTimers.clear();
-        emitEditorPulse({ kind: 'reset', reason: reason || 'runtime', epoch: runtimeEpoch });
-        return runtimeEpoch;
-      }
 
       function emitEditorPulse(payload) {
         const bus = root.ReplEditorPulse;
@@ -55,28 +43,18 @@
         const delayMs = Number.isFinite(when)
           ? Math.max(0, (when - audioCtx.currentTime) * 1000)
           : 0;
-        const epoch = runtimeEpoch;
-        const event = { ...(payload || {}), epoch };
         if (delayMs > 4 && typeof root.setTimeout === 'function') {
-          const id = root.setTimeout(() => {
-            pendingEditorPulseTimers.delete(id);
-            if (epoch !== runtimeEpoch || !running) return;
-            emitEditorPulse(event);
-          }, Math.min(delayMs, 1000));
-          pendingEditorPulseTimers.add(id);
+          root.setTimeout(() => emitEditorPulse(payload), Math.min(delayMs, 1000));
           return;
         }
-        if (epoch !== runtimeEpoch || !running) return;
-        emitEditorPulse(event);
+        emitEditorPulse(payload);
       }
 
       function leafTokenLabel(tok) {
         if (!tok) return '';
         if (tok.raw) return String(tok.raw);
-        if (tok.kind === 'rest') return tok.raw ? String(tok.raw) : '.';
-        if (tok.kind === 'sustain') return tok.raw ? String(tok.raw) : '~';
+        if (tok.kind === 'rest') return '~';
         if (tok.kind === 'note' && tok.value) return tok.value.name || String(tok.value.freq || 'note');
-        if (tok.kind === 'note-random' && tok.value && tok.value.raw) return String(tok.value.raw);
         if (tok.kind === 'note-random') return '*';
         if (tok.kind === 'sample') return tok.value || 'sample';
         if (tok.kind === 'sample-selector' && tok.value) return tok.value.raw || 'sample';
@@ -86,10 +64,7 @@
       function emitLeafPulse(block, time, detail) {
         if (!block) return;
         const count = Math.max(1, Number(detail && detail.leafCount) || Number(block._leafTotal) || 1);
-        const rawIndex = Number(detail && detail.leafIndex);
-        const index = Number.isFinite(rawIndex)
-          ? ((Math.floor(rawIndex) % count) + count) % count
-          : 0;
+        const index = Math.max(0, Math.min(count - 1, Number(detail && detail.leafIndex) || 0));
         emitEditorPulseAt({
           kind: 'leaf',
           line: blockLine(block),
@@ -97,9 +72,8 @@
           voice: block.voice,
           leafIndex: index,
           leafCount: count,
-          leafPath: detail && Array.isArray(detail.leafPath) ? detail.leafPath.slice() : [],
+          leafPath: detail && detail.leafPath ? detail.leafPath : [],
           slotIndex: detail && detail.slotIndex,
-          sourceLeafIndex: detail && Number.isFinite(Number(detail.sourceLeafIndex)) ? Number(detail.sourceLeafIndex) : null,
           state: detail && detail.state ? detail.state : 'hit',
           token: detail && detail.token ? detail.token : '',
           scheduledAt: time,
@@ -291,7 +265,6 @@
         if (running) return;
         running = true;
         originTime = audioCtx.currentTime + 0.05;
-        nextRuntimeEpoch('start');
         if (program) {
             for (const block of program.blocks) {
               block._scheduledThrough = 0;
@@ -321,8 +294,7 @@
           timer = null;
         }
 
-        nextRuntimeEpoch('stop');
-        stopAllVoices();
+          stopAllVoices();
 
         if (program) {
             for (const block of program.blocks) {
@@ -340,8 +312,7 @@
           timer = null;
         }
 
-        nextRuntimeEpoch('replay');
-        stopAllVoices();
+          stopAllVoices();
 
         running = true;
         originTime = audioCtx.currentTime + 0.05;
@@ -380,7 +351,6 @@
           }
         }
 
-        nextRuntimeEpoch('update');
         program = newProgram;
         for (const block of program.blocks) {
           if (block._scheduledThrough == null) block._scheduledThrough = 0;
@@ -396,13 +366,14 @@
         }
       if (running && oldBarSec) {
         const newBarSec = barSeconds(program);
-        const now = audioCtx.currentTime;
-        const elapsed = now - originTime;
+        const elapsed = audioCtx.currentTime - originTime;
         const elapsedBars = elapsed / oldBarSec;
-        originTime = now - elapsedBars * newBarSec;
+        originTime = audioCtx.currentTime - elapsedBars * newBarSec;
           for (const block of program.blocks) {
+            block._scheduledThrough = 0;
             clearBlockRuntimeState(block);
-            alignBlockCursorToGrid(block, now, newBarSec);
+            block._speedSlotIdx = Math.max(0, Math.floor((audioCtx.currentTime - originTime) / (newBarSec / block.slotsPerBar)));
+            block._speedNextTime = Math.max(audioCtx.currentTime, originTime);
           }
       }
     }
@@ -414,43 +385,6 @@
       missingSampleSeen.add(name);
       if (onMissingCallback) onMissingCallback(name);
     }
-
-      function alignBlockCursorToGrid(block, referenceTime, barSecValue) {
-        if (!block) return;
-        const secPerBar = Number(barSecValue);
-        const slotsPerBar = Math.max(1, Number(block.slotsPerBar) || 1);
-        const slotSec = secPerBar / slotsPerBar;
-        const ref = Number.isFinite(Number(referenceTime)) ? Number(referenceTime) : audioCtx.currentTime;
-
-        if (!Number.isFinite(slotSec) || slotSec <= 0 || !Number.isFinite(originTime)) {
-          block._speedSlotIdx = Math.max(0, Math.floor(Number(block._speedSlotIdx) || 0));
-          block._speedNextTime = Math.max(ref, originTime || ref);
-          return;
-        }
-
-        // Per-block cursor recovery. This is intentionally NOT based on the
-        // densest voice in the program: every block owns its own top-level
-        // cursor, while nested groups only subdivide their own parent slot.
-        const elapsed = Math.max(0, ref - originTime);
-        let slotIdx = Math.max(0, Math.floor((elapsed + 0.000001) / slotSec));
-        let slotTime = originTime + slotIdx * slotSec;
-
-        // If the candidate slot is already behind the audio clock, skip it
-        // instead of emitting catch-up leaves at the same instant as another
-        // voice's subdivision. This prevents lower-density rows from appearing
-        // to inherit faster nested rhythms after evaluate/hot swap.
-        while (slotTime < ref - 0.002) {
-          slotIdx += 1;
-          slotTime = originTime + slotIdx * slotSec;
-        }
-
-        block._speedSlotIdx = slotIdx;
-        block._speedNextTime = slotTime;
-        block._scheduledThrough = slotIdx;
-        block._lastDispatchedSlotIdx = null;
-        block._lastDispatchedTime = null;
-        block._lastDispatchedDuration = null;
-      }
 
       function clamp(v, lo, hi) {
         const n = Number(v);
@@ -2427,10 +2361,10 @@
       function ensureSpeedCursor(block) {
         if (!Number.isFinite(block._speedSlotIdx)) block._speedSlotIdx = 0;
         if (!Number.isFinite(block._speedNextTime)) {
-          alignBlockCursorToGrid(block, audioCtx.currentTime, program ? barSeconds(program) : 0);
+          block._speedNextTime = Math.max(originTime, audioCtx.currentTime);
         }
       }
-
+      
       function countLeaves(node) {
         if (!node) return 0;
         if (node.kind === 'leaf') return 1;
@@ -2553,24 +2487,20 @@
           const tok = node.token;
           const leafIndex = ctx.leafCursor.index;
           ctx.leafCursor.index += 1;
-          const sourceLeafCursor = ctx.sourceLeafCursor || ctx.leafCursor;
-          const sourceLeafIndex = sourceLeafCursor.index;
-          if (sourceLeafCursor !== ctx.leafCursor) sourceLeafCursor.index += 1;
           const eventIndex = ((ctx.leafBase + leafIndex) % ctx.leafTotal + ctx.leafTotal) % ctx.leafTotal;
           const leafPath = Array.isArray(ctx.leafPath) ? ctx.leafPath.slice() : [];
           const tokenLabel = leafTokenLabel(tok);
 
-          if (tok.kind === 'rest' || tok.kind === 'sustain') {
+          if (tok.kind === 'rest') {
             emitLeafPulse(ctx.block, time, {
               leafIndex: eventIndex,
               leafCount: ctx.leafTotal,
               leafPath,
               slotIndex: ctx.slotIndex,
-              sourceLeafIndex,
-              state: tok.kind === 'sustain' ? 'held' : 'rest',
-              token: tokenLabel || '~',
+              state: 'rest',
+              token: tokenLabel,
               duration,
-              intensity: tok.kind === 'sustain' ? 0.12 : 0.08,
+              intensity: 0.08,
             });
             return;
           }
@@ -2588,16 +2518,15 @@
               time,
               duration,
             };
-            const emitPlayedLeafPulse = (intensity) => emitLeafPulse(ctx.block, time, {
+            emitLeafPulse(ctx.block, time, {
               leafIndex: eventIndex,
               leafCount: ctx.leafTotal,
               leafPath,
               slotIndex: ctx.slotIndex,
-              sourceLeafIndex,
               state: attractorMod ? 'mutated' : 'hit',
               token: tokenLabel,
               duration,
-              intensity: intensity == null ? Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))) : intensity,
+              intensity: Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))),
             });
             const eventBus = outputBusForBlock(ctx.block, time, attractorMod, effects);
 
@@ -2610,7 +2539,6 @@
             const rateGestureDuration = gestureDurationForEvent('rate', params.rate, ctx.voice, params, gateDuration, duration);
 
             if (ctx.voice === 'input') {
-              emitPlayedLeafPulse(Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))));
               syncInputBlock(ctx.block, eventBus, params, time);
               return;
             }
@@ -2629,13 +2557,11 @@
 
               if (!note || !Number.isFinite(note.freq)) return;
 
-                const stringLeafIntensity = Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1)));
-                emitPlayedLeafPulse(stringLeafIntensity);
                 emitEditorPulse({
                   kind: 'voice',
                   line: blockLine(ctx.block),
                   voice: 'string',
-                  intensity: stringLeafIntensity,
+                  intensity: Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))),
                 });
 
                 root.StringVoice.playString({
@@ -2673,10 +2599,12 @@
 
               const items = Array.isArray(plan) ? plan : [plan];
 
-              const sampleLeafIntensity = Math.max(0.16, Math.min(1, numericParamValue(params.gain, 1)));
-              let emittedSampleLeaf = false;
-              let validSamplePlan = false;
-              let scheduledSampleAudio = false;
+              emitEditorPulse({
+                kind: 'sample',
+                line: blockLine(ctx.block),
+                voice: 'sample',
+                intensity: Math.max(0.16, Math.min(1, numericParamValue(params.gain, 1))),
+              });
 
             for (const item of items) {
               if (!item || !item.name) continue;
@@ -2686,10 +2614,9 @@
                 continue;
               }
 
-              validSamplePlan = true;
               const gainMul = Number.isFinite(item.gainMul) ? item.gainMul : 1;
 
-                const didScheduleSample = root.SampleVoice.playSample({
+                root.SampleVoice.playSample({
                   audioCtx,
                   masterBus: eventBus,
                   time,
@@ -2701,26 +2628,7 @@
                   gateDuration,
                   panGestureDuration,
                   rateGestureDuration,
-                }) === true;
-
-              if (didScheduleSample) scheduledSampleAudio = true;
-            }
-
-            // Visual leaf activity is a scheduler/readout event, not a proof that
-            // the lazy sample buffer was already decoded. Random selectors can
-            // otherwise keep selecting not-yet-cached files and appear dead while
-            // their rests still pulse. Emit exactly one sample leaf pulse for the
-            // selected valid sample leaf, after the plan is known to reference the
-            // manifest. Missing selectors remain silent/unhighlighted.
-            if (validSamplePlan && !emittedSampleLeaf) {
-              emitPlayedLeafPulse(scheduledSampleAudio ? sampleLeafIntensity : Math.max(0.1, sampleLeafIntensity * 0.72));
-              emitEditorPulse({
-                kind: 'sample',
-                line: blockLine(ctx.block),
-                voice: 'sample',
-                intensity: scheduledSampleAudio ? sampleLeafIntensity : Math.max(0.1, sampleLeafIntensity * 0.72),
-              });
-              emittedSampleLeaf = true;
+                });
             }
 
             return;
@@ -3012,7 +2920,6 @@
           leafBase,
           leafTotal: block._leafTotal,
           leafCursor: { index: 0 },
-          sourceLeafCursor: { index: 0 },
           leafPath: [inBlockIdx],
           slotIndex: inBlockIdx,
           speed,
@@ -3062,14 +2969,6 @@
 
           let guard = 0;
 
-          // Each block advances from its own next top-level slot time. Nested
-          // groups subdivide only the duration of that one slot; they never
-          // create extra top-level opportunities for neighboring voices. This
-          // is the critical independence guarantee for cases like:
-          //   string  * (* *) . ~
-          //   sample  * ~     . .
-          // where the sample sustain must remain one sample-owned slot, not two
-          // leaves copied from the string subdivision.
           while (block._speedNextTime < horizonAbs && guard < 2048) {
             const slotIdx = Math.max(0, Math.floor(block._speedSlotIdx));
             const slotAbsTime = block._speedNextTime;

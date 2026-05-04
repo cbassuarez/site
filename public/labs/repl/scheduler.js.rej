@@ -1,0 +1,63 @@
+@@ -2487,14 +2536,38 @@
+           const tok = node.token;
+           const leafIndex = ctx.leafCursor.index;
+           ctx.leafCursor.index += 1;
++          const eventIndex = ((ctx.leafBase + leafIndex) % ctx.leafTotal + ctx.leafTotal) % ctx.leafTotal;
++          const leafPath = Array.isArray(ctx.leafPath) ? ctx.leafPath.slice() : [];
++          const tokenLabel = leafTokenLabel(tok);
++
++          if (tok.kind === 'rest') {
++            emitLeafPulse(ctx.block, time, {
++              leafIndex: eventIndex,
++              leafCount: ctx.leafTotal,
++              leafPath,
++              slotIndex: ctx.slotIndex,
++              state: 'rest',
++              token: tokenLabel,
++              duration,
++              intensity: 0.08,
++            });
++            return;
++          }
+ 
+-          if (tok.kind === 'rest') return;
+-
+-            const eventIndex = ((ctx.leafBase + leafIndex) % ctx.leafTotal + ctx.leafTotal) % ctx.leafTotal;
+             const baseParams = resolveParamsForEvent(ctx.block, eventIndex, time);
+             const effects = resolveEffectsForEvent(ctx.block, eventIndex, time);
+             const attractorMod = attractorModForBlock(ctx.block, time);
+             const params = applyAttractorToParams(ctx.block, baseParams, ctx.voice, time, duration, attractorMod);
++            emitLeafPulse(ctx.block, time, {
++              leafIndex: eventIndex,
++              leafCount: ctx.leafTotal,
++              leafPath,
++              slotIndex: ctx.slotIndex,
++              state: attractorMod ? 'mutated' : 'hit',
++              token: tokenLabel,
++              duration,
++              intensity: Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))),
++            });
+             const eventBus = outputBusForBlock(ctx.block, time, attractorMod, effects);
+ 
+             const gated = tokenIsGated(tok);
+@@ -2610,7 +2683,10 @@
+ 
+           const subDur = duration / n;
+           for (let i = 0; i < n; i++) {
+-            dispatchSlotTree(node.children[i], time + i * subDur, subDur, ctx);
++            dispatchSlotTree(node.children[i], time + i * subDur, subDur, {
++              ...ctx,
++              leafPath: (Array.isArray(ctx.leafPath) ? ctx.leafPath : []).concat(i),
++            });
+           }
+         }
+       }
+@@ -2884,6 +2960,8 @@
+           leafBase,
+           leafTotal: block._leafTotal,
+           leafCursor: { index: 0 },
++          leafPath: [inBlockIdx],
++          slotIndex: inBlockIdx,
+         });
+       }
+ 

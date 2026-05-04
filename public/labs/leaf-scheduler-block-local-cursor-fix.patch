@@ -1,0 +1,203 @@
+diff --git a/repl/repl-editor.js b/repl/repl-editor.js
+index 84bf342..8af9816 100644
+--- a/repl/repl-editor.js
++++ b/repl/repl-editor.js
+@@ -1260,21 +1260,12 @@
+       contain: 'layout style paint',
+     },
+     '.cm-line.cs-leaf-line-active': {
+-      backgroundImage: 'linear-gradient(90deg, rgba(255,212,0,0.14) 0, rgba(255,212,0,0.14) 5px, transparent 5px, transparent 100%)',
+-      backgroundBlendMode: 'normal',
+-      boxShadow: 'inset 0 -2px 0 rgba(255,212,0,0.62)',
+-    },
+-    '.cm-line.cs-leaf-line-active.cs-line-sample, .cm-line.cs-leaf-line-active.cs-pulse-sample': {
+-      backgroundImage: 'linear-gradient(90deg, rgba(227,52,47,0.14) 0, rgba(227,52,47,0.14) 5px, transparent 5px, transparent 100%)',
+-      boxShadow: 'inset 0 -2px 0 rgba(227,52,47,0.62)',
+-    },
+-    '.cm-line.cs-leaf-line-active.cs-line-input, .cm-line.cs-leaf-line-active.cs-pulse-input': {
+-      backgroundImage: 'linear-gradient(90deg, rgba(0,87,255,0.14) 0, rgba(0,87,255,0.14) 5px, transparent 5px, transparent 100%)',
+-      boxShadow: 'inset 0 -2px 0 rgba(0,87,255,0.62)',
++      backgroundImage: 'none',
++      boxShadow: 'none',
+     },
+     '.cm-line.cs-leaf-state-rest': {
+-      backgroundImage: 'linear-gradient(90deg, rgba(7,7,7,0.08) 0, rgba(7,7,7,0.08) 5px, transparent 5px, transparent 100%)',
+-      boxShadow: 'inset 0 -2px 0 rgba(7,7,7,0.42)',
++      backgroundImage: 'none',
++      boxShadow: 'none',
+     },
+     '.cs-leaf-highlight-plate': {
+       position: 'absolute',
+diff --git a/repl/scheduler.js b/repl/scheduler.js
+index f85fa7b..65bcba4 100644
+--- a/repl/scheduler.js
++++ b/repl/scheduler.js
+@@ -266,7 +266,6 @@
+         block._speedState = {};
+         block._speedSlotIdx = 0;
+         block._speedNextTime = null;
+-        block._gridSlotIdx = null;
+         block._lastDispatchedSlotIdx = 0;
+         block._lastDispatchedTime = null;
+         block._lastDispatchedDuration = null;
+@@ -298,7 +297,6 @@
+               block._scheduledThrough = 0;
+               clearBlockRuntimeState(block);
+               block._speedSlotIdx = 0;
+-              block._gridSlotIdx = 0;
+               block._speedNextTime = originTime;
+             }
+         }
+@@ -352,7 +350,6 @@
+           for (const block of program.blocks) {
+             block._scheduledThrough = 0;
+             block._speedSlotIdx = 0;
+-            block._gridSlotIdx = 0;
+             block._speedNextTime = originTime;
+             block._lastDispatchedSlotIdx = 0;
+             block._lastDispatchedTime = null;
+@@ -393,7 +390,6 @@
+           block._leafTotal = null;
+           ensureLeafOffsets(block);
+           block._speedSlotIdx = 0;
+-          block._gridSlotIdx = 0;
+           block._speedNextTime = running
+             ? Math.max(audioCtx.currentTime, originTime)
+             : originTime;
+@@ -428,29 +424,29 @@
+ 
+         if (!Number.isFinite(slotSec) || slotSec <= 0 || !Number.isFinite(originTime)) {
+           block._speedSlotIdx = Math.max(0, Math.floor(Number(block._speedSlotIdx) || 0));
+-          block._gridSlotIdx = block._speedSlotIdx;
+           block._speedNextTime = Math.max(ref, originTime || ref);
+           return;
+         }
+ 
++        // Per-block cursor recovery. This is intentionally NOT based on the
++        // densest voice in the program: every block owns its own top-level
++        // cursor, while nested groups only subdivide their own parent slot.
+         const elapsed = Math.max(0, ref - originTime);
+-        let slotIdx = Math.floor(elapsed / slotSec);
++        let slotIdx = Math.max(0, Math.floor((elapsed + 0.000001) / slotSec));
+         let slotTime = originTime + slotIdx * slotSec;
+ 
+-        // Never schedule a top-level slot late just because the program was
+-        // hot-swapped in the middle of a beat. That was causing every block to
+-        // emit a leaf pulse at the same browser-clock instant after evaluate,
+-        // which made slower sample rests appear to follow faster string
+-        // subdivisions. Resume each block on its own next grid boundary.
+-        if (slotTime < ref - 0.002) {
++        // If the candidate slot is already behind the audio clock, skip it
++        // instead of emitting catch-up leaves at the same instant as another
++        // voice's subdivision. This prevents lower-density rows from appearing
++        // to inherit faster nested rhythms after evaluate/hot swap.
++        while (slotTime < ref - 0.002) {
+           slotIdx += 1;
+           slotTime = originTime + slotIdx * slotSec;
+         }
+ 
+-        block._speedSlotIdx = Math.max(0, slotIdx);
+-        block._gridSlotIdx = block._speedSlotIdx;
+-        block._speedNextTime = Math.max(originTime, slotTime);
+-        block._scheduledThrough = block._speedSlotIdx;
++        block._speedSlotIdx = slotIdx;
++        block._speedNextTime = slotTime;
++        block._scheduledThrough = slotIdx;
+         block._lastDispatchedSlotIdx = null;
+         block._lastDispatchedTime = null;
+         block._lastDispatchedDuration = null;
+@@ -2435,26 +2431,6 @@
+         }
+       }
+ 
+-      function ensureGridSlotCursor(block, nowAbs, barSecValue) {
+-        if (!block) return 0;
+-        const slotsPerBar = Math.max(1, Number(block.slotsPerBar) || 1);
+-        const secPerBar = Number(barSecValue);
+-        const baseSlotSec = secPerBar / slotsPerBar;
+-
+-        if (!Number.isFinite(baseSlotSec) || baseSlotSec <= 0 || !Number.isFinite(originTime)) {
+-          if (!Number.isFinite(block._gridSlotIdx)) block._gridSlotIdx = Math.max(0, Math.floor(Number(block._speedSlotIdx) || 0));
+-          return Math.max(0, Math.floor(Number(block._gridSlotIdx) || 0));
+-        }
+-
+-        if (!Number.isFinite(block._gridSlotIdx)) {
+-          const ref = Number.isFinite(Number(nowAbs)) ? Number(nowAbs) : audioCtx.currentTime;
+-          const elapsed = Math.max(0, ref - originTime);
+-          block._gridSlotIdx = Math.max(0, Math.floor((elapsed + 0.000001) / baseSlotSec));
+-        }
+-
+-        return Math.max(0, Math.floor(Number(block._gridSlotIdx) || 0));
+-      }
+-      
+       function countLeaves(node) {
+         if (!node) return 0;
+         if (node.kind === 'leaf') return 1;
+@@ -3078,23 +3054,31 @@
+               syncInputBlock(block, eventBus, params, nowAbs);
+             }
+ 
+-          let slotIdx = ensureGridSlotCursor(block, nowAbs, barSec);
++          // If the cursor is somehow behind the transport origin, snap it forward.
++          if (block._speedNextTime < originTime) {
++            block._speedNextTime = originTime;
++            block._speedSlotIdx = 0;
++          }
++
+           let guard = 0;
+ 
+-          // Schedule top-level slots from the absolute bar grid, not from the
+-          // previous slot's possibly-warped duration. Nested groups may still
+-          // subdivide their own slot, and speed still affects event duration /
+-          // surface state, but one voice can no longer drag another-looking
+-          // visual rhythm by accumulating a drifting cursor. This is the core
+-          // independence guarantee: every block owns its own top-level grid
+-          // cursor, and every emitted leaf belongs to exactly that block/slot.
+-          while (originTime + slotIdx * baseSlotSec < horizonAbs && guard < 2048) {
+-            const slotAbsTime = originTime + slotIdx * baseSlotSec;
++          // Each block advances from its own next top-level slot time. Nested
++          // groups subdivide only the duration of that one slot; they never
++          // create extra top-level opportunities for neighboring voices. This
++          // is the critical independence guarantee for cases like:
++          //   string  * (* *) . ~
++          //   sample  * ~     . .
++          // where the sample sustain must remain one sample-owned slot, not two
++          // leaves copied from the string subdivision.
++          while (block._speedNextTime < horizonAbs && guard < 2048) {
++            const slotIdx = Math.max(0, Math.floor(block._speedSlotIdx));
++            const slotAbsTime = block._speedNextTime;
+             const speed = speedForSlot(block, slotIdx, slotAbsTime);
+             const slotDuration = baseSlotSec / speed;
+ 
+             if (!Number.isFinite(slotDuration) || slotDuration <= 0) {
+-              slotIdx += 1;
++              block._speedNextTime += baseSlotSec;
++              block._speedSlotIdx = slotIdx + 1;
+               guard++;
+               continue;
+             }
+@@ -3106,20 +3090,15 @@
+               block._lastDispatchedDuration = slotDuration;
+             }
+ 
+-            slotIdx += 1;
++            block._speedNextTime = slotAbsTime + slotDuration;
++            block._speedSlotIdx = slotIdx + 1;
++            block._scheduledThrough = block._speedSlotIdx;
+             guard++;
+           }
+ 
+-          block._gridSlotIdx = slotIdx;
+-          block._speedSlotIdx = slotIdx;
+-          block._speedNextTime = originTime + slotIdx * baseSlotSec;
+-          block._scheduledThrough = slotIdx;
+-
+           if (guard >= 2048) {
+             // Avoid locking the audio thread if a pathological speed state sneaks in.
+-            block._gridSlotIdx = slotIdx + 1;
+-            block._speedSlotIdx = block._gridSlotIdx;
+-            block._speedNextTime = originTime + block._gridSlotIdx * baseSlotSec;
++            block._speedNextTime = nowAbs + baseSlotSec;
+           }
+         }
+       }

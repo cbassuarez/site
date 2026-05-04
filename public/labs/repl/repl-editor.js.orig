@@ -22,7 +22,7 @@
   const CM = root.CMRepl;
   const {
     EditorState, Compartment, Prec, StateEffect,
-    EditorView, keymap, drawSelection, highlightActiveLine, placeholder, Decoration, ViewPlugin, RangeSetBuilder,
+    EditorView, keymap, drawSelection, highlightActiveLine, placeholder, Decoration, ViewPlugin, RangeSetBuilder, WidgetType,
     defaultKeymap, history, historyKeymap, indentLess,
     HighlightStyle, syntaxHighlighting, StreamLanguage, bracketMatching,
     autocompletion, completionKeymap, acceptCompletion, completionStatus, startCompletion,
@@ -339,6 +339,8 @@
   const csPulseNudge = StateEffect.define();
   const CS_PULSE_MS = 780;
   const CS_METER_MS = 460;
+  const CS_LEAF_RECENT_MS = 720;
+  const CS_LEAF_MAX_CELLS = 32;
 
   function clamp01(v) {
     const n = Number(v);
@@ -440,6 +442,72 @@
     return ranges;
   }
 
+
+  function sanitizeLeafClass(value) {
+    return String(value || '')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .toLowerCase() || 'event';
+  }
+
+  function leafStateClass(value) {
+    const state = sanitizeLeafClass(value || 'hit');
+    if (state === 'rest' || state === 'skipped' || state === 'mutated' || state === 'held') return state;
+    return 'hit';
+  }
+
+
+  function normalizeLeafToken(value) {
+    return String(value || '')
+      .trim()
+      .replace(/π/g, 'pi')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
+  function isLeafStructuralToken(value) {
+    return /^(?:\(|\)|\||;)$/.test(String(value || '').trim());
+  }
+
+  function isLeafTokenRange(range) {
+    if (!range || range.comment || range.isHead) return false;
+    const raw = String(range.text || '').trim();
+    if (!raw || isLeafStructuralToken(raw)) return false;
+    return true;
+  }
+
+  function leafTokenRangesForLine(lineText) {
+    return tokenRanges(lineText).filter(isLeafTokenRange);
+  }
+
+  function leafTokenMatchesEvent(rangeText, eventToken) {
+    const token = normalizeLeafToken(eventToken);
+    if (!token) return false;
+    const raw = normalizeLeafToken(rangeText);
+    if (raw === token) return true;
+    if (token === 'note' && /^[a-g][b#]?-?\d+$/.test(raw)) return true;
+    if (token === 'sample' && /^[a-z0-9_:-]+-(?:\*&\d+!?|\*!?|[a-z0-9_-]+)$/.test(raw)) return true;
+    if (token === '*' && /^\*/.test(raw)) return true;
+    return false;
+  }
+
+  function locateLeafTokenRange(lineText, payload) {
+    const ranges = leafTokenRangesForLine(lineText);
+    if (!ranges.length) return null;
+
+    const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
+    const token = payload && payload.token;
+    const matches = token ? ranges.filter((range) => leafTokenMatchesEvent(range.text, token)) : [];
+    if (matches.length) {
+      return matches[leafIndex % matches.length];
+    }
+
+    // Nested rhythms can produce more runtime leaves than visible source tokens.
+    // When spans are unavailable, use the nearest visible leaf token rather than
+    // painting across the full editor width by percentage. This keeps the stamp
+    // attached to code-space instead of screen-space.
+    return ranges[Math.min(ranges.length - 1, leafIndex % ranges.length)];
+  }
+
   function findCurrentBlockLines(state) {
     const selLine = state.doc.lineAt(state.selection.main.head).number;
     let start = selLine;
@@ -475,7 +543,7 @@
     return { start, end };
   }
 
-  function buildCyberneticScoreDecorations(view, pulses, meters) {
+  function buildCyberneticScoreDecorations(view, pulses, meters, leafStates) {
     const now = Date.now();
     const builder = new RangeSetBuilder();
     const current = findCurrentBlockLines(view.state);
@@ -488,6 +556,7 @@
       const kind = lineHeadKind(head);
       const pulse = pulses.get(i);
       const meter = meters.get(i);
+      const leafState = leafStates && leafStates.get(i);
       const active = pulse && pulse.expires > now;
       const metered = meter && meter.expires > now;
       const isCurrent = i >= current.start && i <= current.end && trimmed;
@@ -503,16 +572,35 @@
       if (metered) classes.push('cs-metered-line');
 
       const attrs = { class: classes.join(' ') };
+      const styleParts = [];
       if (metered) {
         const v = clamp01(meter.value);
-        attrs.style = `--cs-meter:${Math.round(v * 100)}%; --cs-meter-alpha:${(0.18 + v * 0.42).toFixed(3)};`;
+        styleParts.push(`--cs-meter:${Math.round(v * 100)}%`);
+        styleParts.push(`--cs-meter-alpha:${(0.18 + v * 0.42).toFixed(3)}`);
       }
+      if (leafState && /^voice-/.test(kind)) {
+        const count = Math.max(1, Number(leafState.leafCount) | 0);
+        const range = leafState.range || null;
+        const left = range ? Math.max(0, Number(range.from) || 0) : 0;
+        const width = range ? Math.max(1, (Number(range.to) || left + 1) - left) : 1;
+        classes.push('cs-leaf-line-active', `cs-leaf-state-${leafStateClass(leafState.state)}`);
+        attrs.class = classes.join(' ');
+        styleParts.push(`--cs-leaf-left:${left}ch`);
+        styleParts.push(`--cs-leaf-width:${width}ch`);
+        styleParts.push(`--cs-leaf-count:${count}`);
+      }
+      if (styleParts.length) attrs.style = styleParts.join(';') + ';';
       builder.add(line.from, line.from, Decoration.line({ attributes: attrs }));
 
-      for (const r of tokenRanges(text)) {
+      const ranges = tokenRanges(text);
+      const activeLeafRange = leafState && /^voice-/.test(kind) && leafState.range ? leafState.range : null;
+      for (const r of ranges) {
         const cls = r.comment ? 'cs-token cs-comment' : tokenCssClass(r.text, r.isHead);
         const tokenPulse = active && r.isHead ? ' cs-token-active' : '';
-        builder.add(line.from + r.from, line.from + r.to, Decoration.mark({ class: cls + tokenPulse }));
+        const leafPulse = activeLeafRange && r.from === activeLeafRange.from && r.to === activeLeafRange.to
+          ? ` cs-leaf-token-active cs-leaf-token-${leafStateClass(leafState.state)}`
+          : '';
+        builder.add(line.from + r.from, line.from + r.to, Decoration.mark({ class: cls + tokenPulse + leafPulse }));
       }
     }
 
@@ -524,8 +612,9 @@
       this.view = view;
       this.pulses = new Map();
       this.meters = new Map();
+      this.leafStates = new Map();
       this.timer = null;
-      this.decorations = buildCyberneticScoreDecorations(view, this.pulses, this.meters);
+      this.decorations = buildCyberneticScoreDecorations(view, this.pulses, this.meters, this.leafStates);
       this.unsubscribe = ensurePulseBus().on((payload) => this.receive(payload));
     }
 
@@ -534,12 +623,29 @@
       if (!line || line > this.view.state.doc.lines) return;
       const now = Date.now();
       const intensity = clamp01(payload.intensity == null ? 1 : payload.intensity);
-      this.pulses.set(line, {
-        expires: now + CS_PULSE_MS,
-        kind: payload.kind || 'event',
-        voice: payload.voice || payload.color || '',
-        intensity,
-      });
+      if (payload && payload.kind === 'leaf') {
+        const count = Math.max(1, Number(payload.leafCount) | 0);
+        const index = Math.max(0, Math.min(count - 1, Number(payload.leafIndex) | 0));
+        const previous = this.leafStates.get(line) || {};
+        const lineText = this.view.state.doc.line(line).text;
+        const range = locateLeafTokenRange(lineText, payload);
+        this.leafStates.set(line, {
+          leafCount: count,
+          currentIndex: index,
+          state: payload.state || 'hit',
+          voice: payload.voice || previous.voice || '',
+          token: payload.token || '',
+          range: range ? { from: range.from, to: range.to, text: range.text } : null,
+          expires: now + Math.max(140, Math.min(420, Number(payload.duration) * 650 || CS_LEAF_RECENT_MS)),
+        });
+      } else {
+        this.pulses.set(line, {
+          expires: now + CS_PULSE_MS,
+          kind: payload.kind || 'event',
+          voice: payload.voice || payload.color || '',
+          intensity,
+        });
+      }
       if (payload.meter || payload.kind === 'mod' || payload.kind === 'input') {
         this.meters.set(line, { expires: now + CS_METER_MS, value: intensity });
       }
@@ -548,7 +654,7 @@
 
     requestRefresh() {
       if (!this.view || this.view.destroyed) return;
-      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters);
+      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
       try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
       this.armCleanup();
     }
@@ -564,15 +670,18 @@
         for (const [line, m] of Array.from(this.meters.entries())) {
           if (!m || m.expires <= now) this.meters.delete(line);
         }
-        this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters);
+        for (const [line, state] of Array.from(this.leafStates.entries())) {
+          if (!state || state.expires <= now) this.leafStates.delete(line);
+        }
+        this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
         try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
-        if (this.pulses.size || this.meters.size) this.armCleanup();
+        if (this.pulses.size || this.meters.size || this.leafStates.size) this.armCleanup();
       }, 120);
     }
 
     update(update) {
       if (update.docChanged || update.viewportChanged || update.selectionSet || update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)))) {
-        this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters);
+        this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters, this.leafStates);
       }
     }
 
@@ -828,6 +937,48 @@
       color: '#ffffff',
       outlineColor: '#070707',
     },
+    '.cm-line.cs-leaf-line-active': {
+      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(255,212,0,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(255,212,0,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
+      backgroundBlendMode: 'normal',
+      boxShadow: 'inset 0 -3px 0 #ffd400',
+    },
+    '.cm-line.cs-leaf-line-active.cs-line-sample, .cm-line.cs-leaf-line-active.cs-pulse-sample': {
+      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(227,52,47,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(227,52,47,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
+      boxShadow: 'inset 0 -3px 0 #e3342f',
+    },
+    '.cm-line.cs-leaf-line-active.cs-line-input, .cm-line.cs-leaf-line-active.cs-pulse-input': {
+      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(0,87,255,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(0,87,255,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
+      boxShadow: 'inset 0 -3px 0 #0057ff',
+    },
+    '.cm-line.cs-leaf-state-rest': {
+      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(255,255,255,0.76) calc(var(--cs-leaf-left) - 0.18ch), rgba(255,255,255,0.76) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
+      boxShadow: 'inset 0 -3px 0 #070707',
+    },
+    '.cm-line .cs-leaf-token-active': {
+      backgroundColor: '#ffd400',
+      color: '#070707',
+      outline: '2px solid #070707',
+      boxShadow: '3px 3px 0 #070707',
+      animation: 'cs-token-stamp 520ms steps(2, end) both',
+    },
+    '.cm-line.cs-line-sample .cs-leaf-token-active, .cm-line.cs-pulse-sample .cs-leaf-token-active': {
+      backgroundColor: '#e3342f',
+      color: '#ffffff',
+    },
+    '.cm-line.cs-line-input .cs-leaf-token-active, .cm-line.cs-pulse-input .cs-leaf-token-active': {
+      backgroundColor: '#0057ff',
+      color: '#ffffff',
+    },
+    '.cm-line .cs-leaf-token-rest': {
+      backgroundColor: '#ffffff',
+      color: '#070707',
+      outlineStyle: 'dashed',
+      boxShadow: '3px 3px 0 #070707',
+    },
+    '.cm-line .cs-leaf-token-mutated': {
+      backgroundImage: 'repeating-linear-gradient(135deg, rgba(124,60,255,0.88) 0, rgba(124,60,255,0.88) 2px, transparent 2px, transparent 5px)',
+    },
+
     '.cm-tooltip': {
       backgroundColor: '#ffffff',
       border: '2px solid #070707',
@@ -1395,7 +1546,7 @@
         'data-enable-grammarly': 'false',
         'aria-label': 'REPL score editor',
       }),
-      placeholder('// start typing — Cmd-Enter to play'),
+      placeholder('// start typing — Cmd-Enter to evaluate'),
       // keymap built last so it can reference the eventual view via closure.
       makeKeymap(opts.onCommand || {}),
       // baseline editing keymap, lower precedence

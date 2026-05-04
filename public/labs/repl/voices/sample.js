@@ -215,24 +215,26 @@
   function playSample(opts) {
     const audioCtx = opts.audioCtx;
     const masterBus = opts.masterBus;
-    if (!audioCtx || !masterBus) return;
+    if (!audioCtx || !masterBus) return false;
     const name = String(opts.name || '');
     const entry = manifestEntry(name);
     if (!entry) {
       if (typeof opts.onMissing === 'function') opts.onMissing(name);
-      return;
+      return false;
     }
 
     const time = Number.isFinite(opts.time) ? Math.max(opts.time, audioCtx.currentTime) : audioCtx.currentTime;
 
     if (!_buffers.has(name)) {
-      // Kick off load; silently miss this event.
+      // Kick off load; silently miss this event. The scheduler uses this
+      // boolean return value to avoid drawing a sample leaf highlight for a
+      // one-shot that did not actually schedule audio yet.
       loadBuffer(audioCtx, name);
-      return;
+      return false;
     }
 
     const buffer = _buffers.get(name);
-    if (!buffer) return;
+    if (!buffer) return false;
 
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
@@ -303,10 +305,12 @@
         if (gateDuration != null) {
           src.stop(time + gateDuration + 0.005);
         }
+        return true;
       } catch (err) {
         _activeSources.delete(src);
         // eslint-disable-next-line no-console
         console.warn('[repl] sample start failed:', name, err);
+        return false;
       }
   }
     

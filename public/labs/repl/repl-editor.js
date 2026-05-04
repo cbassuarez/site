@@ -22,7 +22,7 @@
   const CM = root.CMRepl;
   const {
     EditorState, Compartment, Prec, StateEffect,
-    EditorView, keymap, drawSelection, highlightActiveLine, placeholder, Decoration, ViewPlugin, RangeSetBuilder,
+    EditorView, keymap, drawSelection, highlightActiveLine, placeholder, Decoration, ViewPlugin, RangeSetBuilder, WidgetType,
     defaultKeymap, history, historyKeymap, indentLess,
     HighlightStyle, syntaxHighlighting, StreamLanguage, bracketMatching,
     autocompletion, completionKeymap, acceptCompletion, completionStatus, startCompletion,
@@ -339,6 +339,8 @@
   const csPulseNudge = StateEffect.define();
   const CS_PULSE_MS = 780;
   const CS_METER_MS = 460;
+  const CS_LEAF_RECENT_MS = 720;
+  const CS_LEAF_MAX_CELLS = 32;
 
   function clamp01(v) {
     const n = Number(v);
@@ -440,6 +442,237 @@
     return ranges;
   }
 
+
+  function sanitizeLeafClass(value) {
+    return String(value || '')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .toLowerCase() || 'event';
+  }
+
+  function leafStateClass(value) {
+    const state = sanitizeLeafClass(value || 'hit');
+    if (state === 'rest' || state === 'skipped' || state === 'mutated' || state === 'held') return state;
+    return 'hit';
+  }
+
+
+  function normalizeLeafToken(value) {
+    return String(value || '')
+      .trim()
+      .replace(/π/g, 'pi')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
+  function isRestLikeLeafToken(value) {
+    const token = normalizeLeafToken(value);
+    return token === '~' || token === '.' || token === '-' || token === 'rest' || token === 'sustain';
+  }
+
+  function isLeafStructuralToken(value) {
+    return /^(?:\(|\)|\||;)$/.test(String(value || '').trim());
+  }
+
+  function isLeafTokenRange(range) {
+    if (!range || range.comment || range.isHead) return false;
+    const raw = String(range.text || '').trim();
+    if (!raw || isLeafStructuralToken(raw)) return false;
+    return true;
+  }
+
+  function leafTokenRangesForLine(lineText) {
+    return tokenRanges(lineText).filter(isLeafTokenRange);
+  }
+
+  function leafTokenMatchesEvent(rangeText, eventToken) {
+    const token = normalizeLeafToken(eventToken);
+    if (!token) return false;
+    const raw = normalizeLeafToken(rangeText);
+    if (raw === token) return true;
+    if (token === 'note' && /^[a-g][b#]?-?\d+$/.test(raw)) return true;
+    if (token === 'sample' && /^[a-z0-9_:-]+-(?:\*&\d+!?|\*!?|[a-z0-9_-]+)$/.test(raw)) return true;
+    if (token === '*' && /^\*/.test(raw)) return true;
+    return false;
+  }
+
+  function locateLeafTokenRange(lineText, payload) {
+    const ranges = leafTokenRangesForLine(lineText);
+    if (!ranges.length) return null;
+
+    const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
+    const token = payload && payload.token;
+    const matches = token ? ranges.filter((range) => leafTokenMatchesEvent(range.text, token)) : [];
+    if (matches.length) {
+      return matches[leafIndex % matches.length];
+    }
+
+    // Nested rhythms can produce more runtime leaves than visible source tokens.
+    // When spans are unavailable, use the nearest visible leaf token rather than
+    // painting across the full editor width by percentage. This keeps the stamp
+    // attached to code-space instead of screen-space.
+    return ranges[Math.min(ranges.length - 1, leafIndex % ranges.length)];
+  }
+
+  function sanitizeLeafClass(value) {
+    return String(value || '')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .toLowerCase() || 'event';
+  }
+
+  function leafStateClass(value) {
+    const state = sanitizeLeafClass(value || 'hit');
+    if (state === 'rest' || state === 'skipped' || state === 'mutated' || state === 'held') return state;
+    return 'hit';
+  }
+
+  function isLeafStructuralToken(value) {
+    return /^(?:\(|\)|\||;)$/.test(String(value || '').trim());
+  }
+
+  function buildLeafSourceTree(lineText) {
+    const ranges = tokenRanges(lineText)
+      .filter((range) => !range.comment && !range.isHead)
+      .map((range) => ({
+        from: range.from,
+        to: range.to,
+        text: range.text,
+        structural: isLeafStructuralToken(range.text),
+      }));
+
+    let pos = 0;
+
+    function parseList(stopAtClose) {
+      const children = [];
+      while (pos < ranges.length) {
+        const range = ranges[pos];
+        const text = String(range.text || '').trim();
+
+        if (text === ')') {
+          if (stopAtClose) pos++;
+          return children;
+        }
+
+        if (text === '|') {
+          pos++;
+          continue;
+        }
+
+        if (text === '(') {
+          pos++;
+          children.push({ kind: 'group', children: parseList(true), range });
+          continue;
+        }
+
+        if (!range.structural) {
+          children.push({ kind: 'leaf', range });
+        }
+        pos++;
+      }
+      return children;
+    }
+
+    return parseList(false);
+  }
+
+  function flattenLeafSourceTree(nodes, out) {
+    const target = out || [];
+    for (const node of nodes || []) {
+      if (!node) continue;
+      if (node.kind === 'leaf' && node.range) target.push(node.range);
+      if (node.kind === 'group') flattenLeafSourceTree(node.children, target);
+    }
+    return target;
+  }
+
+  function leafRangeAtPath(nodes, path, depth) {
+    const index = Number(path && path[depth]);
+    if (!Number.isFinite(index) || index < 0) return null;
+    const node = nodes && nodes[index];
+    if (!node) return null;
+    if (node.kind === 'leaf') return node.range || null;
+    if (node.kind === 'group') return leafRangeAtPath(node.children, path, depth + 1);
+    return null;
+  }
+
+
+  function voiceHeadForLeafLine(lineText) {
+    const head = String(lineText || '').trim().split(/\s+/, 1)[0].toLowerCase();
+    if (head === 'string' || head === 'sample' || head === 'input') return head;
+    return '';
+  }
+
+  function payloadVoiceMatchesLine(lineText, payload) {
+    const lineVoice = voiceHeadForLeafLine(lineText);
+    const eventVoice = String((payload && payload.voice) || '').toLowerCase();
+    if (!lineVoice || !eventVoice) return true;
+    return lineVoice === eventVoice;
+  }
+
+  function locateLeafTokenRange(lineText, payload) {
+    const tree = buildLeafSourceTree(lineText);
+    const flat = flattenLeafSourceTree(tree);
+    if (!flat.length) return null;
+
+    const wantsRest = leafStateClass(payload && payload.state) === 'rest' || isRestLikeLeafToken(payload && payload.token);
+    const isRestRange = (range) => isRestLikeLeafToken(range && range.text);
+    const selectIndexedLeaf = (leaves, index) => {
+      if (!Array.isArray(leaves) || !leaves.length) return null;
+      const safeIndex = Math.max(0, Math.floor(Number(index) || 0));
+      const selected = leaves[Math.min(leaves.length - 1, safeIndex)];
+      if (!wantsRest) return selected || null;
+      if (selected && isRestRange(selected)) return selected;
+      // Rest/sustain events must stay attached to an actual visible rest cell.
+      // Do not silently fall through to a neighboring note; that is what made
+      // stale/nonexistent plates appear when patches changed.
+      const restLeaves = leaves.filter(isRestRange);
+      if (!restLeaves.length) return null;
+      return restLeaves[Math.min(restLeaves.length - 1, safeIndex)];
+    };
+
+    // The scheduler sends sourceLeafIndex: the leaf ordinal inside the
+    // top-level source slot that actually dispatched. Prefer that over global
+    // eventIndex or token text; repeated notes and repeated random leaves are
+    // otherwise indistinguishable by text. Rest-like `~` events are allowed
+    // through this path as long as the resolved source leaf is also rest-like.
+    const slotIndex = Number(payload && payload.slotIndex);
+    const sourceLeafIndex = Number(payload && payload.sourceLeafIndex);
+    if (Number.isFinite(slotIndex) && slotIndex >= 0 && Number.isFinite(sourceLeafIndex) && sourceLeafIndex >= 0) {
+      const slot = tree[slotIndex];
+      const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
+      const selected = selectIndexedLeaf(slotLeaves, sourceLeafIndex);
+      if (selected) return selected;
+      if (wantsRest) return null;
+    }
+
+    // Path fallback: preserves nested position when sourceLeafIndex is absent.
+    const path = payload && Array.isArray(payload.leafPath) ? payload.leafPath : null;
+    const byPath = path && path.length ? leafRangeAtPath(tree, path, 0) : null;
+    if (byPath && (!wantsRest || isRestRange(byPath))) return byPath;
+    if (wantsRest && byPath && !isRestRange(byPath)) return null;
+
+    // Slot fallback: choose the visible top-level slot or its first leaf.
+    if (Number.isFinite(slotIndex) && slotIndex >= 0) {
+      const slot = tree[slotIndex];
+      if (slot && slot.kind === 'leaf' && slot.range) return wantsRest && !isRestRange(slot.range) ? null : slot.range;
+      const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
+      const selected = selectIndexedLeaf(slotLeaves, 0);
+      if (selected) return selected;
+      if (wantsRest) return null;
+    }
+
+    // Last-resort fallback only: global flattened index. This intentionally no
+    // longer uses token-text matching, because repeated leaves made the wrong
+    // identical-looking token light up. Rest-like events still resolve to an
+    // actual rest-like source cell instead of being dropped.
+    const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
+    if (wantsRest) {
+      const restLeaves = flat.filter(isRestRange);
+      return restLeaves.length ? restLeaves[leafIndex % restLeaves.length] : null;
+    }
+    const selected = flat[leafIndex % flat.length];
+    return selected && isRestRange(selected) ? null : selected;
+  }
+
   function findCurrentBlockLines(state) {
     const selLine = state.doc.lineAt(state.selection.main.head).number;
     let start = selLine;
@@ -475,7 +708,7 @@
     return { start, end };
   }
 
-  function buildCyberneticScoreDecorations(view, pulses, meters) {
+  function buildCyberneticScoreDecorations(view, pulses, meters, leafStates) {
     const now = Date.now();
     const builder = new RangeSetBuilder();
     const current = findCurrentBlockLines(view.state);
@@ -488,6 +721,7 @@
       const kind = lineHeadKind(head);
       const pulse = pulses.get(i);
       const meter = meters.get(i);
+      const leafState = leafStates && leafStates.get(i);
       const active = pulse && pulse.expires > now;
       const metered = meter && meter.expires > now;
       const isCurrent = i >= current.start && i <= current.end && trimmed;
@@ -503,15 +737,34 @@
       if (metered) classes.push('cs-metered-line');
 
       const attrs = { class: classes.join(' ') };
+      const styleParts = [];
       if (metered) {
         const v = clamp01(meter.value);
-        attrs.style = `--cs-meter:${Math.round(v * 100)}%; --cs-meter-alpha:${(0.18 + v * 0.42).toFixed(3)};`;
+        styleParts.push(`--cs-meter:${Math.round(v * 100)}%`);
+        styleParts.push(`--cs-meter-alpha:${(0.18 + v * 0.42).toFixed(3)}`);
       }
+      if (leafState && /^voice-/.test(kind)) {
+        const count = Math.max(1, Number(leafState.leafCount) | 0);
+        const range = leafState.range || null;
+        const left = range ? Math.max(0, Number(range.from) || 0) : 0;
+        const width = range ? Math.max(1, (Number(range.to) || left + 1) - left) : 1;
+        classes.push('cs-leaf-line-active', `cs-leaf-state-${leafStateClass(leafState.state)}`);
+        attrs.class = classes.join(' ');
+        styleParts.push(`--cs-leaf-left:${left}ch`);
+        styleParts.push(`--cs-leaf-width:${width}ch`);
+        styleParts.push(`--cs-leaf-count:${count}`);
+      }
+      if (styleParts.length) attrs.style = styleParts.join(';') + ';';
       builder.add(line.from, line.from, Decoration.line({ attributes: attrs }));
 
-      for (const r of tokenRanges(text)) {
+      const ranges = tokenRanges(text);
+      for (const r of ranges) {
         const cls = r.comment ? 'cs-token cs-comment' : tokenCssClass(r.text, r.isHead);
         const tokenPulse = active && r.isHead ? ' cs-token-active' : '';
+        // Leaf playback is drawn by an absolute overlay plate owned by the
+        // ViewPlugin. Do not add layout-affecting classes to source tokens here:
+        // the code text must stay perfectly registered while the runtime stamp
+        // moves independently above/below the score grid.
         builder.add(line.from + r.from, line.from + r.to, Decoration.mark({ class: cls + tokenPulse }));
       }
     }
@@ -524,22 +777,92 @@
       this.view = view;
       this.pulses = new Map();
       this.meters = new Map();
+      this.leafStates = new Map();
+      this.leafPlates = new Map();
+      this.pendingLeafFrame = null;
       this.timer = null;
-      this.decorations = buildCyberneticScoreDecorations(view, this.pulses, this.meters);
+      this.overlay = document.createElement('div');
+      this.overlay.className = 'cs-leaf-highlight-layer';
+      this.overlay.setAttribute('aria-hidden', 'true');
+      // Put the plate plane inside CodeMirror's scroll DOM so coordinates are
+      // measured in the same viewport as coordsAtPos(). The plane never receives
+      // input and never changes the text DOM.
+      const host = view.scrollDOM || view.dom;
+      host.appendChild(this.overlay);
+      this.decorations = buildCyberneticScoreDecorations(view, this.pulses, this.meters, this.leafStates);
       this.unsubscribe = ensurePulseBus().on((payload) => this.receive(payload));
     }
 
+    clearLeafRuntime() {
+      this.leafStates.clear();
+      this.leafPlates.clear();
+      if (this.pendingLeafFrame != null) {
+        cancelAnimationFrame(this.pendingLeafFrame);
+        this.pendingLeafFrame = null;
+      }
+      if (this.overlay) this.overlay.replaceChildren();
+      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
+      try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
+    }
+
     receive(payload) {
+      if (payload && payload.kind === 'reset') {
+        this.pulses.clear();
+        this.meters.clear();
+        this.clearLeafRuntime();
+        return;
+      }
       const line = Math.max(1, Number(payload && payload.line) | 0);
       if (!line || line > this.view.state.doc.lines) return;
       const now = Date.now();
       const intensity = clamp01(payload.intensity == null ? 1 : payload.intensity);
-      this.pulses.set(line, {
-        expires: now + CS_PULSE_MS,
-        kind: payload.kind || 'event',
-        voice: payload.voice || payload.color || '',
-        intensity,
-      });
+      if (payload && payload.kind === 'leaf') {
+        const count = Math.max(1, Number(payload.leafCount) | 0);
+        const index = Math.max(0, Math.min(count - 1, Number(payload.leafIndex) | 0));
+        const previous = this.leafStates.get(line) || {};
+        const lineText = this.view.state.doc.line(line).text;
+        if (!payloadVoiceMatchesLine(lineText, payload)) return;
+        const range = locateLeafTokenRange(lineText, payload);
+        if (!range || !range.text) return;
+        const payloadToken = normalizeLeafToken(payload && payload.token);
+        const rangeToken = normalizeLeafToken(range.text);
+        const isRestEvent = leafStateClass(payload && payload.state) === 'rest' || isRestLikeLeafToken(payload && payload.token);
+        const isRestRange = isRestLikeLeafToken(range.text);
+        const canAcceptGeneric = payloadToken === 'note' || payloadToken === '*' || payloadToken === 'sample';
+        if (isRestEvent && !isRestRange) return;
+        if (!isRestEvent && isRestRange) return;
+        if (payloadToken && !isRestEvent && !canAcceptGeneric && payloadToken !== rangeToken) return;
+        // Rest/sustain leaves are true rhythmic events, but their visual
+        // registration must be a short punch, not a full-slot occupancy. A
+        // whole-beat rest in one voice can otherwise remain visible while a
+        // faster nested group in another voice fires, which reads as if the
+        // faster leaf leaked into every block. Keep sounding leaves slightly
+        // longer, but make rest plates deliberately quiet and brief.
+        const visualMs = isRestEvent
+          ? 135
+          : Math.max(160, Math.min(320, Number(payload.duration) * 420 || CS_LEAF_RECENT_MS));
+        const leafState = {
+          leafCount: count,
+          currentIndex: index,
+          state: isRestEvent ? 'rest' : (payload.state || 'hit'),
+          voice: payload.voice || previous.voice || '',
+          token: payload.token || '',
+          slotIndex: Number.isFinite(Number(payload.slotIndex)) ? Number(payload.slotIndex) : null,
+          sourceLeafIndex: Number.isFinite(Number(payload.sourceLeafIndex)) ? Number(payload.sourceLeafIndex) : null,
+          range: range ? { from: range.from, to: range.to, text: range.text } : null,
+          visualMs,
+          expires: now + visualMs,
+        };
+        this.leafStates.set(line, leafState);
+        if (leafState.range) this.queueLeafPlate(line, leafState);
+      } else {
+        this.pulses.set(line, {
+          expires: now + CS_PULSE_MS,
+          kind: payload.kind || 'event',
+          voice: payload.voice || payload.color || '',
+          intensity,
+        });
+      }
       if (payload.meter || payload.kind === 'mod' || payload.kind === 'input') {
         this.meters.set(line, { expires: now + CS_METER_MS, value: intensity });
       }
@@ -548,10 +871,83 @@
 
     requestRefresh() {
       if (!this.view || this.view.destroyed) return;
-      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters);
+      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
       try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
       this.armCleanup();
     }
+
+    queueLeafPlate(line, state) {
+      if (!state || !state.range || !this.view || this.view.destroyed) return;
+      const key = String(line);
+      this.leafPlates.set(key, { line, state });
+      if (this.pendingLeafFrame != null) return;
+      this.pendingLeafFrame = requestAnimationFrame(() => {
+        this.pendingLeafFrame = null;
+        this.flushLeafPlates();
+      });
+    }
+
+    ensureLeafPlate(key) {
+      if (!this.overlay) return null;
+      let plate = this.overlay.querySelector(`[data-leaf-plate="${key}"]`);
+      if (plate) return plate;
+      plate = document.createElement('div');
+      plate.className = 'cs-leaf-highlight-plate';
+      plate.dataset.leafPlate = key;
+      // Keep the code DOM immutable, but draw the active token on the overlay
+      // itself. The plate sits above CodeMirror text/background layers, so an
+      // opaque neo-brutal button can be readable without pushing glyph layout.
+      this.overlay.appendChild(plate);
+      return plate;
+    }
+
+    flushLeafPlates() {
+      if (!this.view || this.view.destroyed || !this.overlay) return;
+      for (const [key, item] of Array.from(this.leafPlates.entries())) {
+        const line = item.line;
+        const state = item.state || {};
+        if (!state.range || line < 1 || line > this.view.state.doc.lines) continue;
+        const docLine = this.view.state.doc.line(line);
+        const from = docLine.from + Math.max(0, Number(state.range.from) || 0);
+        const to = docLine.from + Math.max(Number(state.range.to) || (Number(state.range.from) || 0) + 1, (Number(state.range.from) || 0) + 1);
+        const start = this.view.coordsAtPos(from, 1);
+        const end = this.view.coordsAtPos(to, -1) || start;
+        const hostRect = (this.view.scrollDOM || this.view.dom).getBoundingClientRect();
+        if (!start || !end || !hostRect) continue;
+
+        const rawLeft = Math.min(start.left, end.left);
+        const rawRight = Math.max(start.right || start.left, end.right || end.left, start.left + 8);
+        const rawTop = Math.min(start.top, end.top);
+        const rawBottom = Math.max(start.bottom, end.bottom, start.top + 16);
+        const padX = 3;
+        const padY = 2;
+        const left = Math.round(rawLeft - hostRect.left - padX);
+        const top = Math.round(rawTop - hostRect.top - padY);
+        const width = Math.max(12, Math.round(rawRight - rawLeft + padX * 2));
+        const height = Math.max(16, Math.round(rawBottom - rawTop + padY * 2));
+        const plate = this.ensureLeafPlate(key);
+        if (!plate) continue;
+        const stateClass = leafStateClass(state.state);
+        const voiceClass = sanitizeLeafClass(state.voice || 'string');
+        plate.className = `cs-leaf-highlight-plate cs-leaf-highlight-${stateClass} cs-leaf-highlight-${voiceClass}`;
+        plate.textContent = String((state.range && state.range.text) || state.token || '').slice(0, 32);
+        plate.style.width = `${width}px`;
+        plate.style.height = `${height}px`;
+        plate.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        plate.style.setProperty('--cs-leaf-plate-w', `${width}px`);
+        plate.style.setProperty('--cs-leaf-plate-ms', `${Math.max(90, Math.min(360, Number(state.visualMs) || 220))}ms`);
+        // Restart the relay-punch animation without touching the token element.
+        plate.classList.remove('is-firing');
+        void plate.offsetWidth;
+        plate.classList.add('is-firing');
+        window.clearTimeout(plate._csRemoveTimer);
+        const removeMs = Math.max(90, Math.min(360, Number(state.visualMs) || 220));
+        plate._csRemoveTimer = window.setTimeout(() => {
+          if (plate && plate.parentNode) plate.parentNode.removeChild(plate);
+        }, removeMs);
+      }
+    }
+
 
     armCleanup() {
       if (this.timer) return;
@@ -564,21 +960,41 @@
         for (const [line, m] of Array.from(this.meters.entries())) {
           if (!m || m.expires <= now) this.meters.delete(line);
         }
-        this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters);
+        for (const [line, state] of Array.from(this.leafStates.entries())) {
+          if (!state || state.expires <= now) this.leafStates.delete(line);
+        }
+        this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
         try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
-        if (this.pulses.size || this.meters.size) this.armCleanup();
+        if (this.pulses.size || this.meters.size || this.leafStates.size) this.armCleanup();
       }, 120);
     }
 
     update(update) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet || update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)))) {
-        this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters);
+      const pulseNudged = update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)));
+      if (update.docChanged || update.viewportChanged || update.selectionSet || pulseNudged) {
+        this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters, this.leafStates);
+      }
+      if (update.docChanged) {
+        this.clearLeafRuntime();
+        return;
+      }
+      if (update.geometryChanged || update.viewportChanged) {
+        // Geometry changes invalidate already-measured overlay plates. Do not
+        // retain them; the next valid leaf event will measure the current doc.
+        this.leafPlates.clear();
+        if (this.pendingLeafFrame != null) {
+          cancelAnimationFrame(this.pendingLeafFrame);
+          this.pendingLeafFrame = null;
+        }
+        if (this.overlay) this.overlay.replaceChildren();
       }
     }
 
     destroy() {
       if (this.unsubscribe) this.unsubscribe();
       if (this.timer) clearTimeout(this.timer);
+      if (this.pendingLeafFrame != null) cancelAnimationFrame(this.pendingLeafFrame);
+      if (this.overlay && this.overlay.parentNode) this.overlay.parentNode.removeChild(this.overlay);
     }
   }, {
     decorations: (plugin) => plugin.decorations,
@@ -828,6 +1244,80 @@
       color: '#ffffff',
       outlineColor: '#070707',
     },
+    '.cm-scroller': {
+      position: 'relative',
+    },
+    '.cm-content': {
+      position: 'relative',
+      zIndex: '2',
+    },
+    '.cs-leaf-highlight-layer': {
+      position: 'absolute',
+      inset: '0',
+      zIndex: '40',
+      pointerEvents: 'none',
+      overflow: 'hidden',
+      contain: 'layout style paint',
+    },
+    '.cm-line.cs-leaf-line-active': {
+      backgroundImage: 'none',
+      boxShadow: 'none',
+    },
+    '.cm-line.cs-leaf-state-rest': {
+      backgroundImage: 'none',
+      boxShadow: 'none',
+    },
+    '.cs-leaf-highlight-plate': {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '2px solid #070707',
+      backgroundColor: '#ffd400',
+      color: '#070707',
+      boxShadow: '4px 4px 0 #070707',
+      boxSizing: 'border-box',
+      opacity: '0',
+      overflow: 'hidden',
+      whiteSpace: 'pre',
+      font: 'inherit',
+      fontWeight: '900',
+      letterSpacing: '0',
+      lineHeight: '1',
+      textAlign: 'center',
+      textDecoration: 'none',
+      textShadow: 'none',
+      willChange: 'transform, opacity',
+      transformOrigin: 'left top',
+    },
+    '.cs-leaf-highlight-plate.is-firing': {
+      animation: 'cs-leaf-overlay-punch var(--cs-leaf-plate-ms, 220ms) steps(2, end) both',
+    },
+    '.cs-leaf-highlight-sample': {
+      backgroundColor: '#e3342f',
+      color: '#ffffff',
+      borderRadius: '999px',
+      boxShadow: '4px 4px 0 #070707',
+    },
+    '.cs-leaf-highlight-input': {
+      backgroundColor: '#0057ff',
+      color: '#ffffff',
+      borderRadius: '0 10px 10px 0',
+      boxShadow: '4px 4px 0 #070707',
+    },
+    '.cs-leaf-highlight-rest': {
+      backgroundColor: '#ffffff',
+      color: '#070707',
+      backgroundImage: 'repeating-linear-gradient(135deg, transparent 0, transparent 5px, rgba(7,7,7,0.26) 5px, rgba(7,7,7,0.26) 7px)',
+      borderStyle: 'solid',
+      boxShadow: '4px 4px 0 #070707',
+    },
+    '.cs-leaf-highlight-mutated': {
+      backgroundImage: 'repeating-linear-gradient(135deg, #7c3cff 0, #7c3cff 4px, #ffffff 4px, #ffffff 8px)',
+    },
+
     '.cm-tooltip': {
       backgroundColor: '#ffffff',
       border: '2px solid #070707',
@@ -900,6 +1390,12 @@
     '@keyframes cs-token-stamp': {
       '0%': { outline: '2px solid #070707', boxShadow: '2px 2px 0 #070707' },
       '100%': { outline: '0 solid transparent', boxShadow: 'none' },
+    },
+    '@keyframes cs-leaf-overlay-punch': {
+      '0%': { opacity: '0', filter: 'none' },
+      '8%': { opacity: '1', filter: 'none' },
+      '48%': { opacity: '1', filter: 'none' },
+      '100%': { opacity: '0', filter: 'none' },
     },
   }, { dark: false });
 

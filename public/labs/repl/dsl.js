@@ -406,8 +406,8 @@
 
         const body = gate.body;
 
-        if (isRestToken(body)) return { kind: 'rest', value: null };
-        if (isSustainToken(body)) return { kind: 'sustain', value: null };
+        if (isRestToken(body)) return { kind: 'rest', value: null, raw: body };
+        if (isSustainToken(body)) return { kind: 'sustain', value: null, raw: body };
 
         if (voice === 'string') {
           if (isNoteToken(body)) {
@@ -1624,9 +1624,9 @@
         }
         if (tok.kind === 'sustain') {
           if (lastNoteValue) {
-            node.token = { kind: 'note', value: { ...lastNoteValue, sustained: true } };
+            node.token = { kind: 'note', value: { ...lastNoteValue, sustained: true }, raw: tok.raw || '~' };
           } else {
-            node.token = { kind: 'rest', value: null };
+            node.token = { kind: 'rest', value: null, raw: tok.raw || '~' };
           }
           return;
         }

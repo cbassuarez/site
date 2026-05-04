@@ -68,7 +68,13 @@
         ]},
         { type: 'h', text: 'fixed and live values' },
         { type: 'code', code: 'gain 0.5\ngain mic.intensity 0.1 0.75\nspace mic.silence 0.15 0.85\ngrain mic.noisiness 0.05 0.55' },
-        { type: 'p', text: 'A single number sets a fixed value. A live source maps an attractor feature into a range.' }
+        { type: 'p', text: 'A single number sets a fixed value. A live source maps an attractor feature into a range.' },
+        { type: 'h', text: 'effect surfaces' },
+        { type: 'p', text: 'Effect rows are not plugin inserts; they are regulatory surfaces on the block. compress stabilizes, space remembers, resonance and comb form a body, chorus thickens motion, excite adds edge, blur softens contour, and grain/scar add residue and memory pressure.' },
+        { type: 'p', text: 'These rows accept the same control-stream operators as params: *, ~, _, *!, *&N, *~, and parentheses.' },
+        { type: 'code', code: 'string A3 C4 E4 G4\ndecay    4\nbody     metal\nspace    0.28\ncompress 0.25\nchorus   0.14' },
+        { type: 'code', code: 'string *!4 (*4 A*) ~ C*!\nattractor weather.dew\nbody     0.5\nspace    *&24\nblur     0.28\ncomb     *~\ncompress 0.3\npan      *~' },
+        { type: 'code', code: 'sample snm-*&32; ~ tub-*&48; ~\nattractor archive\ngrain    0.35\nscar     0.25\nspace    memory\nbody     0.4\ncomb     *~\nrate     *~\npan      *~' }
       ]
     },
     {
@@ -96,6 +102,7 @@
       summary: 'Attractors, weather, archives, and live fields.',
       blocks: [
         { type: 'p', text: 'An attractor lets a block lean toward another source of behavior. It can push choices, surfaces, timing, density, pressure, and memory without replacing the block’s own syntax.' },
+        { type: 'p', text: 'Attractors also color literal material. A block with attractor weather.dew is routed through a light coupling bus — filter, saturation, and delay/wet coloration — and its resolved event parameters are gently modulated after parsing. Literal values remain anchors: decay 4 is still a four-second decision, but the attractor may lengthen, soften, haze, or spatially drift it according to the current normalized signal state.' },
         { type: 'table', headers: ['source', 'use'], rows: [
           ['weather', 'external environmental coupling'],
           ['archive', 'memory/sample bias'],
@@ -318,6 +325,9 @@
     };
 
     toggle.addEventListener('click', () => setOpen(panel.hidden));
+    document.querySelectorAll('[data-docs-open]').forEach((button) => {
+      button.addEventListener('click', () => setOpen(true));
+    });
     if (close) close.addEventListener('click', () => setOpen(false));
 
     nav.addEventListener('click', (event) => {

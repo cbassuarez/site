@@ -19,6 +19,7 @@
   const errorList = document.getElementById('errors');
   const beatDotsEl = document.getElementById('beat-dots');
   const blockRowsEl = document.getElementById('block-rows');
+  const transportVizEl = document.getElementById('transport-viz');
   const samplesToggleBtn = document.getElementById('samples-toggle');
   const inputToggleBtn = document.getElementById('input-toggle');
   const inputPanel = document.getElementById('input-panel');
@@ -503,14 +504,441 @@
     let beatDotEls = [];
     let couplingSummaryEls = null;
 
-    const SIGNALS = [
-      ['I', 'intensity', 'intensity'],
-      ['V', 'volatility', 'volatility'],
-      ['P', 'pressure', 'pressure'],
-      ['D', 'density', 'density'],
-      ['T', 'periodicity', 'periodicity'],
-      ['R', 'rupture', 'rupture'],
-    ];
+    const SIGNAL_META = {
+      I: {
+        key: 'intensity',
+        name: 'intensity',
+        summary: 'overall signal strength / amplitude pressure',
+        detail: 'How strong the current source is. Usually tracks amplitude, confidence, or signal presence.',
+        use: 'higher I = louder, more present, more forceful',
+        modulates: ['gain', 'compress', 'trigger', 'space'],
+      },
+      V: {
+        key: 'volatility',
+        name: 'volatility',
+        summary: 'instability, flux, and rate of change',
+        detail: 'How unstable or fast-changing the source is. Often derived from flux, motion, or sudden parameter change.',
+        use: 'higher V = more drift, jitter, mutation, spatial instability',
+        modulates: ['pan', 'blur', 'grain', 'rate', 'leaf'],
+      },
+      P: {
+        key: 'pressure',
+        name: 'pressure',
+        summary: 'force applied by the source to the patch',
+        detail: 'How much force the source applies to the patch. Useful for density, compression, and body behavior.',
+        use: 'higher P = heavier behavior, more compression, stronger body/color',
+        modulates: ['force', 'body', 'compress', 'filter', 'crush'],
+      },
+      D: {
+        key: 'density',
+        name: 'density',
+        summary: 'activity concentration and event crowding',
+        detail: 'How active or crowded the source is over time. Usually related to onset rate, activity, or event concentration.',
+        use: 'higher D = more events, tighter spacing, denser sample behavior',
+        modulates: ['beat', 'time', 'grain', 'trigger', 'sample'],
+      },
+      T: {
+        key: 'periodicity',
+        name: 'tension',
+        summary: 'distance from rest; harmonic or behavioral strain',
+        detail: 'How far the source is from rest. A composite signal for instability, brightness, pressure, or unresolved motion.',
+        use: 'higher T = more edge, stretch, harmonic strain, or unresolved energy',
+        modulates: ['pitch', 'tone', 'filter', 'resonance', 'decay'],
+      },
+      R: {
+        key: 'rupture',
+        name: 'rupture',
+        summary: 'attacks, transients, breaks, and discontinuities',
+        detail: 'How sharply the source breaks continuity. Usually tracks transients, attacks, spikes, or discontinuities.',
+        use: 'higher R = attacks, cuts, scars, re-articulations',
+        modulates: ['trigger', 'scar', 'leaf', 'start', 'reset'],
+      },
+    };
+
+
+
+    const SURFACE_META = {
+      speed: {
+        name: 'speed',
+        summary: 'pattern-time multiplier / temporal pressure',
+        detail: 'Changes how quickly a block consumes its score material. When coupled, speed becomes the surface where signal motion can bend musical time.',
+        use: 'higher drive = faster bodies, warped pacing, or drifted clock behavior',
+        drivenBy: ['volatility', 'density', 'rupture'],
+      },
+      pan: {
+        name: 'pan',
+        summary: 'left-right position / spatial lateral motion',
+        detail: 'Moves material across the stereo field. It is the simplest surface for drift, jitter, and attractor steering.',
+        use: 'higher drive = more lateral motion, instability, or spatial displacement',
+        drivenBy: ['volatility', 'intensity', 'pressure'],
+      },
+      gain: {
+        name: 'gain',
+        summary: 'level / amplitude opening',
+        detail: 'Controls how present a block is in the mix. It is usually the first surface touched by intensity and confidence.',
+        use: 'higher drive = louder, closer, more exposed material',
+        drivenBy: ['intensity', 'pressure'],
+      },
+      force: {
+        name: 'force',
+        summary: 'gesture weight / physical push',
+        detail: 'Applies body-like pressure to synthesis and coupled behavior. Useful when a source should push the patch instead of merely modulating it.',
+        use: 'higher drive = heavier articulation, stronger impact, more push',
+        drivenBy: ['pressure', 'intensity', 'rupture'],
+      },
+      compress: {
+        name: 'compress',
+        summary: 'dynamic regulation / signal clamp',
+        detail: 'Turns incoming pressure into compression behavior. It can make the system feel held down, squeezed, or mechanically governed.',
+        use: 'higher drive = more grip, flattening, density, or pressure-control',
+        drivenBy: ['pressure', 'density', 'intensity'],
+      },
+      space: {
+        name: 'space',
+        summary: 'room send / spatial bloom',
+        detail: 'Opens reverberant space around the block. Coupling this surface lets the environment expand, contract, or smear around the source.',
+        use: 'higher drive = wider room, longer tail, more atmospheric spread',
+        drivenBy: ['intensity', 'tension', 'volatility'],
+      },
+      body: {
+        name: 'body',
+        summary: 'resonant mass / embodied color',
+        detail: 'Adds mass, chamber, or object-like coloration. It makes a signal feel housed inside something physical.',
+        use: 'higher drive = thicker resonance, stronger object-color, heavier body',
+        drivenBy: ['pressure', 'intensity', 'tension'],
+      },
+      pitch: {
+        name: 'pitch',
+        summary: 'frequency target / harmonic address',
+        detail: 'Controls tonal height or pitch selection. In coupled patches, pitch is where tension can become harmonic strain.',
+        use: 'higher drive = brighter register, wider pitch pull, sharper harmonic motion',
+        drivenBy: ['tension', 'volatility'],
+      },
+      filter: {
+        name: 'filter',
+        summary: 'spectral gate / brightness contour',
+        detail: 'Shapes the brightness and spectral aperture of a block. It is the main surface for weather, pressure, and tone-color steering.',
+        use: 'higher drive = more open spectrum, sharper contour, stronger color shift',
+        drivenBy: ['tension', 'pressure', 'intensity'],
+      },
+      color: {
+        name: 'color',
+        summary: 'timbre stain / spectral identity',
+        detail: 'Marks the block with source-derived tone color. It is a broad surface for making control feel visible in the sound.',
+        use: 'higher drive = stronger coloration, more source identity, less neutrality',
+        drivenBy: ['pressure', 'tension', 'intensity'],
+      },
+      decay: {
+        name: 'decay',
+        summary: 'release length / tail behavior',
+        detail: 'Changes how long a gesture remains after articulation. Useful for turning density and tension into lingering or clipped behavior.',
+        use: 'higher drive = longer tails, stretched release, or more unstable endings',
+        drivenBy: ['tension', 'density', 'intensity'],
+      },
+      tone: {
+        name: 'tone',
+        summary: 'brightness / harmonic emphasis',
+        detail: 'Tilts the block toward darker or brighter harmonic behavior. It is a compact surface for timbral pressure.',
+        use: 'higher drive = brighter edge, stronger tone focus, more harmonic bite',
+        drivenBy: ['tension', 'pressure'],
+      },
+      crush: {
+        name: 'crush',
+        summary: 'bit damage / digital abrasion',
+        detail: 'Introduces reduction, grit, or broken digital texture. It is the surface where pressure can become audible damage.',
+        use: 'higher drive = more grit, fracture, hard edges, and degraded signal',
+        drivenBy: ['pressure', 'rupture', 'tension'],
+      },
+      rate: {
+        name: 'rate',
+        summary: 'sample speed / playback motion',
+        detail: 'Changes sample playback speed and direction-like behavior. It lets unstable sources bend sample motion directly.',
+        use: 'higher drive = faster playback, pitch-linked motion, or sample instability',
+        drivenBy: ['volatility', 'density', 'tension'],
+      },
+      start: {
+        name: 'start',
+        summary: 'sample entry point / cut location',
+        detail: 'Moves where sample playback begins. This surface turns rupture into cuts, skips, and re-articulations inside recorded material.',
+        use: 'higher drive = more displacement, sharper cuts, less stable sample origin',
+        drivenBy: ['rupture', 'volatility'],
+      },
+      sample: {
+        name: 'sample',
+        summary: 'archive choice / material selection',
+        detail: 'Selects or biases which sample material appears. It is the surface for turning a signal into curatorial pressure.',
+        use: 'higher drive = more active selection, tighter bias, or denser archive behavior',
+        drivenBy: ['density', 'rupture', 'intensity'],
+      },
+      fade: {
+        name: 'fade',
+        summary: 'entry-exit envelope / presence gate',
+        detail: 'Controls whether a block enters, leaves, or holds in place. It makes presence itself a performable surface.',
+        use: 'higher drive = clearer entrances, exits, holds, or threshold behavior',
+        drivenBy: ['intensity', 'rupture'],
+      },
+      harm: {
+        name: 'harm',
+        summary: 'harmonic selection / partial emphasis',
+        detail: 'Bends harmonic emphasis inside pitched material. It turns control streams into changes in intervallic color.',
+        use: 'higher drive = stronger harmonic pull, brighter partials, altered interval color',
+        drivenBy: ['tension', 'pressure'],
+      },
+      octave: {
+        name: 'octave',
+        summary: 'register displacement / octave pressure',
+        detail: 'Moves material between octave bands. This surface keeps pitch identity while changing scale and register.',
+        use: 'higher drive = broader register jumps, more vertical displacement',
+        drivenBy: ['tension', 'volatility'],
+      },
+      resonance: {
+        name: 'resonance',
+        summary: 'filter peak / ringing emphasis',
+        detail: 'Adds focused ringing around spectral contours. It can make tension feel like a point of acoustic stress.',
+        use: 'higher drive = sharper peaks, more whistle, more unstable focus',
+        drivenBy: ['tension', 'pressure'],
+      },
+      comb: {
+        name: 'comb',
+        summary: 'delay teeth / resonant interference',
+        detail: 'Creates tight delay-based coloration and notched resonance. It is a surface for making space feel mechanical or striated.',
+        use: 'higher drive = stronger interference, metallic teeth, tighter coloration',
+        drivenBy: ['volatility', 'tension'],
+      },
+      grain: {
+        name: 'grain',
+        summary: 'granular texture / particle behavior',
+        detail: 'Breaks material into smaller pieces and controls particle activity. It turns density into audible particulate motion.',
+        use: 'higher drive = more particles, finer texture, denser fragmentation',
+        drivenBy: ['density', 'volatility', 'rupture'],
+      },
+      chorus: {
+        name: 'chorus',
+        summary: 'detuned doubling / unstable plurality',
+        detail: 'Adds moving duplicate voices around the source. It is a surface for widening and destabilizing identity.',
+        use: 'higher drive = wider doubling, more shimmer, less single-body certainty',
+        drivenBy: ['volatility', 'tension'],
+      },
+      excite: {
+        name: 'excite',
+        summary: 'added brightness / activation energy',
+        detail: 'Injects extra high-frequency activation into the block. It makes the source feel sparked or chemically awake.',
+        use: 'higher drive = brighter attack, more activation, more edge',
+        drivenBy: ['intensity', 'rupture', 'tension'],
+      },
+      blur: {
+        name: 'blur',
+        summary: 'edge smear / temporal softening',
+        detail: 'Softens articulation and smears boundaries. It is the opposite of rupture: a surface for loss of contour.',
+        use: 'higher drive = more smear, softer attacks, less precise edges',
+        drivenBy: ['volatility', 'density'],
+      },
+      scar: {
+        name: 'scar',
+        summary: 'cut memory / accumulated damage',
+        detail: 'Leaves marks from discontinuities and attacks. It lets rupture become a remembered texture instead of a one-time event.',
+        use: 'higher drive = more cuts, marks, hard edits, and historical damage',
+        drivenBy: ['rupture', 'pressure'],
+      },
+      literal: {
+        name: 'literal',
+        summary: 'fixed value / uncoupled surface',
+        detail: 'This block has no exposed surface chips yet. Its values are being read as written rather than bent by an attractor or control stream.',
+        use: 'literal = stable score behavior with no active surface legend',
+        drivenBy: ['score'],
+      },
+    };
+
+    const SURFACE_STATE_META = {
+      speed: {
+        label: 'SPEED',
+        role: 'playback rate / beat division',
+        bends: ['beat', 'rate', 'time'],
+        units: ['number', 'ratio', 'pattern'],
+        cues: [
+          { test: (item) => item.kind === 'pattern', text: 'patterned playback clock' },
+          { test: (item) => numericAverage(item.values) > 1.25, text: 'fast playback pressure' },
+          { test: (item) => numericAverage(item.values) > 0 && numericAverage(item.values) < 0.85, text: 'slowed time / stretched pacing' },
+        ],
+      },
+      pan: {
+        label: 'PAN',
+        role: 'stereo or spatial placement',
+        bends: ['space', 'motion', 'field'],
+        units: ['left', 'right', 'center', 'modulation'],
+        cues: [
+          { test: (item) => item.kind === 'field' || item.kind === 'modulation', text: 'stereo motion field' },
+          { test: (item) => item.rawLower.includes('right') && item.rawLower.includes('left'), text: 'right/left pan alternation' },
+        ],
+      },
+      gain: {
+        label: 'GAIN',
+        role: 'amplitude scalar',
+        bends: ['loudness', 'presence'],
+        units: ['0–1', 'number', 'signal'],
+        cues: [
+          { test: (item) => numericAverage(item.values) >= 0.75, text: 'strong presence / forward level' },
+          { test: (item) => numericAverage(item.values) > 0 && numericAverage(item.values) < 0.4, text: 'quiet level / recessed presence' },
+          { test: (item) => numericAverage(item.values) > 0, text: 'moderate amplitude scalar' },
+        ],
+      },
+      compress: {
+        label: 'COMPRESS',
+        role: 'dynamic pressure / transient containment',
+        bends: ['body', 'density', 'force'],
+        units: ['number', 'symbol', 'signal'],
+        cues: [{ test: () => true, text: 'dynamic clamp / pressure control' }],
+      },
+      force: {
+        label: 'FORCE',
+        role: 'physical pressure applied to the patch',
+        bends: ['body', 'compress', 'trigger'],
+        units: ['pp', 'p', 'mp', 'mf', 'f', 'ff'],
+        cues: [
+          { test: (item) => item.displayText.includes('MF'), text: 'medium-force body pressure' },
+          { test: (item) => numericAverage(item.values) >= 0.7, text: 'heavy physical push' },
+          { test: (item) => numericAverage(item.values) > 0, text: 'body pressure / trigger force' },
+        ],
+      },
+      decay: {
+        label: 'DECAY',
+        role: 'tail length / release memory',
+        bends: ['space', 'resonance', 'memory'],
+        units: ['seconds', 'ratio', 'number'],
+        cues: [
+          { test: (item) => numericAverage(item.values) >= 2, text: 'long tail / release memory' },
+          { test: (item) => numericAverage(item.values) > 0, text: 'shortened release contour' },
+        ],
+      },
+      pitch: {
+        label: 'PITCH',
+        role: 'frequency displacement / harmonic position',
+        bends: ['tone', 'tension', 'resonance'],
+        units: ['number', 'ratio', 'symbol'],
+        cues: [{ test: () => true, text: 'harmonic displacement / pitch pull' }],
+      },
+      filter: {
+        label: 'FILTER',
+        role: 'spectral gate / color aperture',
+        bends: ['tone', 'brightness', 'pressure'],
+        units: ['hz', 'word', 'number'],
+        cues: [{ test: () => true, text: 'spectral aperture / brightness contour' }],
+      },
+      color: {
+        label: 'COLOR',
+        role: 'timbre tint / spectral identity',
+        bends: ['tone', 'surface', 'source'],
+        units: ['word', 'symbol', 'signal'],
+        cues: [{ test: () => true, text: 'timbre stain / source color' }],
+      },
+      crush: {
+        label: 'CRUSH',
+        role: 'bit-depth damage / digital pressure',
+        bends: ['rupture', 'scar', 'body'],
+        units: ['number', 'symbol', 'signal'],
+        cues: [{ test: () => true, text: 'digital abrasion / hard edge' }],
+      },
+      rate: {
+        label: 'RATE',
+        role: 'sample playback speed',
+        bends: ['sample', 'pitch', 'motion'],
+        units: ['number', 'ratio', 'pattern'],
+        cues: [{ test: () => true, text: 'sample motion / playback rate' }],
+      },
+      start: {
+        label: 'START',
+        role: 'sample entry point / cut location',
+        bends: ['rupture', 'sample', 'scar'],
+        units: ['seconds', 'number', 'signal'],
+        cues: [{ test: () => true, text: 'sample cut-point displacement' }],
+      },
+      sample: {
+        label: 'SAMPLE',
+        role: 'archive choice / material selection',
+        bends: ['archive', 'density', 'rupture'],
+        units: ['selector', 'word', 'signal'],
+        cues: [{ test: () => true, text: 'archive selection pressure' }],
+      },
+      fade: {
+        label: 'FADE',
+        role: 'entry-exit envelope / presence gate',
+        bends: ['presence', 'threshold', 'time'],
+        units: ['mode', 'seconds'],
+        cues: [{ test: () => true, text: 'presence envelope / entrance gate' }],
+      },
+      harm: {
+        label: 'HARM',
+        role: 'harmonic selection / partial emphasis',
+        bends: ['pitch', 'tone', 'color'],
+        units: ['number', 'symbol'],
+        cues: [{ test: () => true, text: 'harmonic color selection' }],
+      },
+      octave: {
+        label: 'OCTAVE',
+        role: 'register displacement',
+        bends: ['pitch', 'scale', 'register'],
+        units: ['integer', 'pattern'],
+        cues: [{ test: () => true, text: 'register shift / scale displacement' }],
+      },
+      resonance: {
+        label: 'RESONANCE',
+        role: 'resonant emphasis / ringing body',
+        bends: ['body', 'tone', 'decay'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'ringing body emphasis' }],
+      },
+      comb: {
+        label: 'COMB',
+        role: 'delay-line coloration',
+        bends: ['space', 'filter', 'body'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'mechanical comb coloration' }],
+      },
+      grain: {
+        label: 'GRAIN',
+        role: 'granular spray / microscopic density',
+        bends: ['density', 'sample', 'time'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'grain cloud / microscopic density' }],
+      },
+      chorus: {
+        label: 'CHORUS',
+        role: 'duplicate voice spread',
+        bends: ['space', 'blur', 'motion'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'widened duplicate-voice field' }],
+      },
+      excite: {
+        label: 'EXCITE',
+        role: 'activation energy / brightness injection',
+        bends: ['attack', 'tone', 'rupture'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'sparked attack / added brightness' }],
+      },
+      blur: {
+        label: 'BLUR',
+        role: 'edge smear / temporal softening',
+        bends: ['time', 'density', 'contour'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'smeared contour / softened articulation' }],
+      },
+      scar: {
+        label: 'SCAR',
+        role: 'cut memory / accumulated damage',
+        bends: ['rupture', 'sample', 'history'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'remembered cuts / historical damage' }],
+      },
+      body: {
+        label: 'BODY',
+        role: 'resonant mass / embodied color',
+        bends: ['pressure', 'tone', 'space'],
+        units: ['number', 'mode'],
+        cues: [{ test: () => true, text: 'resonant mass / object color' }],
+      },
+    };
+
+    const SIGNALS = Object.entries(SIGNAL_META).map(([abbr, meta]) => [abbr, meta.key, meta.name]);
 
     function classifySlotForViz(node) {
       if (!node) return 'rest';
@@ -535,22 +963,519 @@
       return v && typeof v === 'object' && v.kind === 'param-op';
     }
 
-    function walkSlots(nodes, fn) {
-      if (!Array.isArray(nodes)) return;
-      for (const node of nodes) walkSlotNode(node, fn);
+    function surfaceStateMetaFor(name) {
+      const key = String(name || '').toLowerCase();
+      const fallback = surfaceMetaFor(key);
+      return SURFACE_STATE_META[key] || {
+        label: key.toUpperCase(),
+        role: fallback.summary || 'exposed behavior surface',
+        bends: fallback.drivenBy || ['score'],
+        units: ['value'],
+        cues: [{ test: () => true, text: fallback.use || `${key} behavior surface` }],
+      };
     }
 
-    function walkSlotNode(node, fn) {
-      if (!node) return;
-      fn(node);
-      if (node.kind === 'group' && Array.isArray(node.children)) {
-        for (const child of node.children) walkSlotNode(child, fn);
+    function numericAverage(values) {
+      if (!Array.isArray(values)) return 0;
+      const nums = values.map((v) => Number(v)).filter(Number.isFinite);
+      if (!nums.length) return 0;
+      return nums.reduce((sum, v) => sum + v, 0) / nums.length;
+    }
+
+    function paramStreamValues(stream) {
+      if (!stream) return [];
+      const raw = stream.kind === 'vector' ? stream.values : [stream.value];
+      return raw.map((value) => {
+        if (isParamOp(value)) return value.raw || value.op || '*';
+        if (typeof value === 'number') return value;
+        if (value && typeof value === 'object') return value.raw || value.name || value.kind || 'object';
+        return value;
+      });
+    }
+
+    function rawParamLineForBlock(block, name) {
+      if (!block || !block.paramLines || !editorAPI) return '';
+      const lineNumber = block.paramLines[name];
+      if (!lineNumber) return '';
+      const lines = String(editorAPI.getValue() || '').split(/\r?\n/);
+      const line = lines[lineNumber - 1] || '';
+      const trimmed = line.trim();
+      const pattern = new RegExp('^' + String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b\\s*', 'i');
+      return trimmed.replace(pattern, '').trim();
+    }
+
+    function escapeTooltipText(value) {
+      const div = document.createElement('div');
+      div.textContent = value == null ? '' : String(value);
+      return div.innerHTML;
+    }
+
+    function displayTokensFromRaw(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return [];
+      const normalized = text
+        .replace(/\bpi\b/gi, 'π')
+        .replace(/\b([0-9]+)\s*\*\s*π\b/g, '$1π')
+        .replace(/[()]/g, ' ')
+        .replace(/[|]/g, ' | ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return normalized ? normalized.split(' ').filter(Boolean) : [];
+    }
+
+    function classifySurfaceState(name, raw, stream) {
+      const text = String(raw || '').trim();
+      const lower = text.toLowerCase();
+      const values = paramStreamValues(stream);
+      const tokenCount = displayTokensFromRaw(text).filter((token) => token !== '|').length || values.length;
+
+      if (/\*|~|_/.test(text)) {
+        if (/\bleft\b|\bright\b|\bcenter\b/.test(lower)) return 'field';
+        return 'modulation';
+      }
+      if (/[()|]/.test(text) || tokenCount > 1 || (stream && stream.kind === 'vector')) return 'pattern';
+      if (/^(ppp|pp|p|mp|mf|f|ff|fff|quiet|half|full|loud|dark|bright|left|right|center|off|on)$/i.test(text)) return 'symbol';
+      if (values.length && values.every((v) => Number.isFinite(Number(v)))) return 'number';
+      if (/^-?(?:\d+(?:\.\d+)?|π|pi)(?:[*/]-?(?:\d+(?:\.\d+)?|π|pi))*$/i.test(text)) return 'number';
+      if (/^[a-z][a-z0-9_.:-]*$/i.test(text)) return 'word';
+      return 'unknown';
+    }
+
+    function surfaceStateDisplayText(raw, values) {
+      const tokens = displayTokensFromRaw(raw);
+      if (tokens.length) return tokens.join(' · ');
+      if (Array.isArray(values) && values.length) {
+        return values.map((v) => {
+          if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3))).replace(/^0\./, '.');
+          return String(v);
+        }).join(' · ');
+      }
+      return 'default';
+    }
+
+
+    function formatSurfaceNumber(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value == null ? '' : value);
+      if (Math.abs(n) >= 10) return String(Math.round(n * 10) / 10);
+      if (Number.isInteger(n)) return String(n);
+      return String(Math.round(n * 100) / 100).replace(/^0\./, '.').replace(/^-0\./, '-.');
+    }
+
+    function liveSurfaceValueFor(name, liveState) {
+      if (!liveState) return undefined;
+      const key = String(name || '').toLowerCase();
+      if (key === 'speed') return liveState.speed;
+      if (key === 'fade') return undefined;
+      if (liveState.params && Object.prototype.hasOwnProperty.call(liveState.params, key)) return liveState.params[key];
+      if (liveState.effects) {
+        const rawKey = '_raw' + key.charAt(0).toUpperCase() + key.slice(1);
+        if (Object.prototype.hasOwnProperty.call(liveState.effects, rawKey)) return liveState.effects[rawKey];
+        if (Object.prototype.hasOwnProperty.call(liveState.effects, key)) return liveState.effects[key];
+      }
+      return undefined;
+    }
+
+    function displayTextForLiveSurface(name, liveValue, fallback) {
+      if (liveValue === undefined || liveValue === null || liveValue === '') return fallback;
+      const key = String(name || '').toLowerCase();
+      if (typeof liveValue === 'number') {
+        if (key === 'pan') {
+          if (liveValue > 0.08) return `R ${formatSurfaceNumber(liveValue)}`;
+          if (liveValue < -0.08) return `L ${formatSurfaceNumber(Math.abs(liveValue))}`;
+          return 'CENTER';
+        }
+        return formatSurfaceNumber(liveValue);
+      }
+      if (typeof liveValue === 'string') return liveValue.toUpperCase();
+      if (liveValue && typeof liveValue === 'object') return String(liveValue.raw || liveValue.name || liveValue.kind || fallback || 'ON').toUpperCase();
+      return String(liveValue).toUpperCase();
+    }
+
+    function streamForSurface(block, name) {
+      if (!block) return null;
+      if (name === 'speed') return block.speed || null;
+      if (name === 'fade') return block.fade || null;
+      if (block.params && block.params[name]) return block.params[name];
+      if (block.effects && block.effects[name]) return block.effects[name];
+      return null;
+    }
+
+    function activeSurfaceStateItems(block, liveState) {
+      if (!block || !block.paramLines) return [];
+      const items = [];
+      const seen = new Set();
+      const keys = Object.keys(block.paramLines)
+        .filter((name) => SURFACE_STATE_META[name] || SURFACE_META[name] || name === 'fade')
+        .sort((a, b) => (block.paramLines[a] || 0) - (block.paramLines[b] || 0));
+
+      for (const name of keys) {
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const stream = streamForSurface(block, name);
+        if (!stream && name !== 'fade') continue;
+        const raw = rawParamLineForBlock(block, name);
+        const values = paramStreamValues(stream);
+        const kind = classifySurfaceState(name, raw, stream);
+        const meta = surfaceStateMetaFor(name);
+        const fallbackText = surfaceStateDisplayText(raw, values);
+        const liveValue = liveSurfaceValueFor(name, liveState);
+        const displayText = displayTextForLiveSurface(name, liveValue, fallbackText);
+        const item = {
+          name,
+          meta,
+          kind,
+          raw,
+          rawLower: String(raw || '').toLowerCase(),
+          values: liveValue !== undefined && liveValue !== null && Number.isFinite(Number(liveValue)) ? [Number(liveValue)] : values,
+          liveValue,
+          displayText,
+          behavior: meta.role,
+        };
+        const cue = (meta.cues || []).find((candidate) => {
+          try { return candidate.test(item); } catch (_) { return false; }
+        });
+        if (cue && cue.text) item.behavior = cue.text;
+        items.push(item);
+      }
+      return items;
+    }
+
+    function surfaceStateTokens(item) {
+      const tokens = String(item && item.displayText ? item.displayText : '')
+        .split(' · ')
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .filter((token) => token !== '|');
+      if (tokens.length) return tokens;
+      if (item && Array.isArray(item.values) && item.values.length) {
+        return item.values.map((value) => String(value)).filter(Boolean);
+      }
+      return ['default'];
+    }
+
+    function compactSurfaceStateValue(item) {
+      const tokens = surfaceStateTokens(item);
+      const upper = tokens.map((token) => token.toUpperCase());
+      if (item.kind === 'field') {
+        const hasLeft = upper.some((token) => token.includes('LEFT'));
+        const hasRight = upper.some((token) => token.includes('RIGHT'));
+        const hasCenter = upper.some((token) => token.includes('CENTER'));
+        if (hasLeft && hasRight) return 'R ↔ L';
+        if (hasLeft) return 'LEFT';
+        if (hasRight) return 'RIGHT';
+        if (hasCenter) return 'CENTER';
+      }
+      if (item.kind === 'pattern' || item.kind === 'modulation') {
+        const visible = tokens.filter((token) => !/^[*~_\-]+$/.test(token)).slice(0, 4);
+        return visible.join(' ').replace(/\bpi\b/gi, 'π') || item.kind.toUpperCase();
+      }
+      const joined = tokens.slice(0, 3).join(' ');
+      if (joined.length > 18) return `${joined.slice(0, 15)}…`;
+      return joined || 'default';
+    }
+
+    function surfaceHudKind(item) {
+      const name = String(item && item.name ? item.name : '').toLowerCase();
+      if (name === 'speed' || name === 'rate') return 'clock';
+      if (name === 'pan') return 'pan';
+      if (name === 'gain') return 'level';
+      if (name === 'compress' || name === 'crush') return 'clamp';
+      if (name === 'force') return 'pressure';
+      if (name === 'decay' || name === 'fade') return 'tail';
+      if (name === 'space' || name === 'blur' || name === 'chorus') return 'field';
+      if (name === 'pitch' || name === 'octave' || name === 'harm') return 'pitch';
+      if (name === 'grain' || name === 'density') return 'particle';
+      if (name === 'sample' || name === 'start') return 'tape';
+      if (name === 'scar' || name === 'rupture') return 'cut';
+      if (name === 'tone' || name === 'filter' || name === 'color' || name === 'body') return 'stamp';
+      if (item.kind === 'number') return 'level';
+      if (item.kind === 'pattern' || item.kind === 'modulation') return 'clock';
+      return 'stamp';
+    }
+
+    function normalizedSurfaceNumber(item) {
+      const nums = (item && Array.isArray(item.values) ? item.values : [])
+        .map((value) => Number(value))
+        .filter(Number.isFinite);
+      if (nums.length) return Math.max(0, Math.min(1, nums.reduce((sum, value) => sum + value, 0) / nums.length));
+      const text = String(item && item.raw ? item.raw : '').trim();
+      const n = Number(text);
+      if (!Number.isFinite(n)) return 0.5;
+      if (n > 1) return Math.max(0, Math.min(1, n / 8));
+      return Math.max(0, Math.min(1, n));
+    }
+
+    function meterCellsHTML(count, active, className = 'surface-hud-cell') {
+      const total = Math.max(1, count | 0);
+      const filled = Math.max(0, Math.min(total, active | 0));
+      let html = '';
+      for (let i = 0; i < total; i += 1) {
+        html += `<span class="${className}${i < filled ? ' is-on' : ''}"></span>`;
+      }
+      return html;
+    }
+
+    function clockHudHTML(item) {
+      const tokens = surfaceStateTokens(item).filter((token) => token !== '|').slice(0, 4);
+      const filled = Math.max(1, Math.min(4, tokens.length || 1));
+      return `<span class="surface-hud-clock" aria-hidden="true">${meterCellsHTML(4, filled)}</span>`;
+    }
+
+    function pressureHudHTML(item) {
+      const symbols = { ppp: 1, pp: 1, p: 2, mp: 3, mf: 4, f: 5, ff: 6, fff: 6 };
+      const key = String(compactSurfaceStateValue(item)).toLowerCase().trim();
+      const filled = symbols[key] || Math.max(1, Math.round(normalizedSurfaceNumber(item) * 6));
+      return `<span class="surface-hud-ladder" aria-hidden="true">${meterCellsHTML(6, filled, 'surface-hud-step')}</span>`;
+    }
+
+    function tailHudHTML(item) {
+      const filled = Math.max(1, Math.round(normalizedSurfaceNumber(item) * 6));
+      return `<span class="surface-hud-tail" aria-hidden="true">${meterCellsHTML(6, filled)}</span>`;
+    }
+
+    function panHudHTML(item) {
+      const text = String(item.raw || item.displayText || '').toLowerCase();
+      const hasLeft = /left/.test(text);
+      const hasRight = /right/.test(text);
+      const hasCenter = /center/.test(text) || (!hasLeft && !hasRight);
+      return `
+        <span class="surface-hud-pan" aria-hidden="true">
+          <span>L</span>
+          <span class="surface-hud-pan-cell${hasLeft ? ' is-on' : ''}"></span>
+          <span class="surface-hud-pan-cell${hasCenter ? ' is-on' : ''}"></span>
+          <span class="surface-hud-pan-cell${hasRight ? ' is-on' : ''}"></span>
+          <span>R</span>
+        </span>`;
+    }
+
+    function levelHudHTML(item, cells = 6) {
+      const filled = Math.max(0, Math.min(cells, Math.round(normalizedSurfaceNumber(item) * cells)));
+      return `<span class="surface-hud-level" aria-hidden="true">${meterCellsHTML(cells, filled)}</span>`;
+    }
+
+    function fieldHudHTML(item) {
+      const filled = Math.max(1, Math.round(normalizedSurfaceNumber(item) * 5));
+      return `<span class="surface-hud-field" aria-hidden="true">${meterCellsHTML(5, filled)}</span>`;
+    }
+
+    function pitchHudHTML(item) {
+      const n = normalizedSurfaceNumber(item);
+      const active = Math.max(1, Math.min(5, Math.round(n * 5)));
+      return `<span class="surface-hud-pitch" aria-hidden="true">${meterCellsHTML(5, active)}</span>`;
+    }
+
+    function particleHudHTML(item) {
+      const active = Math.max(1, Math.min(7, Math.round(normalizedSurfaceNumber(item) * 7)));
+      return `<span class="surface-hud-particles" aria-hidden="true">${meterCellsHTML(7, active, 'surface-hud-dot')}</span>`;
+    }
+
+    function tapeHudHTML(item) {
+      return `<span class="surface-hud-tape" aria-hidden="true"><span></span><span></span><span></span></span>`;
+    }
+
+    function cutHudHTML(item) {
+      const active = Math.max(1, Math.min(5, Math.round(normalizedSurfaceNumber(item) * 5)));
+      return `<span class="surface-hud-cut" aria-hidden="true">${meterCellsHTML(5, active)}</span>`;
+    }
+
+    function stampHudHTML(item) {
+      const value = escapeTooltipText(compactSurfaceStateValue(item).toUpperCase());
+      return `<span class="surface-hud-stamp" aria-hidden="true">${value || 'ON'}</span>`;
+    }
+
+    function surfaceHudVizHTML(item) {
+      switch (surfaceHudKind(item)) {
+        case 'clock': return clockHudHTML(item);
+        case 'pressure': return pressureHudHTML(item);
+        case 'tail': return tailHudHTML(item);
+        case 'pan': return panHudHTML(item);
+        case 'level': return levelHudHTML(item);
+        case 'clamp': return levelHudHTML(item, 5);
+        case 'field': return fieldHudHTML(item);
+        case 'pitch': return pitchHudHTML(item);
+        case 'particle': return particleHudHTML(item);
+        case 'tape': return tapeHudHTML(item);
+        case 'cut': return cutHudHTML(item);
+        case 'stamp':
+        default: return stampHudHTML(item);
+      }
+    }
+
+    function surfaceStateHudHTML(item) {
+      const label = escapeTooltipText(item.meta.label || item.name.toUpperCase());
+      const value = escapeTooltipText(compactSurfaceStateValue(item).toUpperCase());
+      const kind = escapeTooltipText(surfaceHudKind(item).toUpperCase());
+      const aria = `${label}: ${compactSurfaceStateValue(item)}. ${item.behavior || item.meta.role || 'active surface parameter'}.`;
+      return `
+        <button class="surface-hud" type="button" data-surface="${escapeTooltipText(item.name)}" data-kind="${escapeTooltipText(item.kind)}" data-hud-kind="${kind}" aria-label="${escapeTooltipText(aria)}">
+          <span class="surface-hud-top"><span class="surface-hud-label">${label}</span><span class="surface-hud-kind">${kind}</span></span>
+          <span class="surface-hud-value">${value || 'ON'}</span>
+          ${surfaceHudVizHTML(item)}
+        </button>`;
+    }
+
+    function renderSurfaceStatePanel(el, block, liveState) {
+      if (!el) return [];
+      const items = activeSurfaceStateItems(block, liveState);
+      if (!items.length) {
+        if (el.classList && el.classList.contains('block-surface-state')) {
+          el.innerHTML = '';
+          el.hidden = true;
+        } else {
+          el.innerHTML = '<div class="surface-state-empty">no active surface instruments</div>';
+          el.hidden = false;
+        }
+        return [];
+      }
+      el.hidden = false;
+      el.innerHTML = items.map(surfaceStateHudHTML).join('');
+      return items.map((item) => item.name);
+    }
+
+    function surfaceMetaFor(name) {
+      const key = String(name || 'literal').toLowerCase();
+      return SURFACE_META[key] || {
+        name: key,
+        summary: 'exposed parameter surface',
+        detail: 'This chip marks a block surface that can be written literally, automated by control streams, or bent by an attractor.',
+        use: `${key} = active behavior surface`,
+        drivenBy: ['signal', 'score'],
+      };
+    }
+
+    function surfaceAriaLabel(name) {
+      const meta = surfaceMetaFor(name);
+      return `${meta.name}: ${meta.summary}. Driven by ${meta.drivenBy.join(', ')}.`;
+    }
+
+    function ensureSurfaceTooltip() {
+      let tooltip = document.getElementById('surface-tooltip');
+      if (tooltip) return tooltip;
+
+      tooltip = document.createElement('aside');
+      tooltip.id = 'surface-tooltip';
+      tooltip.className = 'surface-tooltip';
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(tooltip);
+      return tooltip;
+    }
+
+    function surfaceTooltipHTML(name) {
+      const meta = surfaceMetaFor(name);
+      const label = escapeTooltipText(String(name || 'literal').toUpperCase());
+      const chips = meta.drivenBy.map((item) => `<span>${escapeTooltipText(item)}</span>`).join('');
+
+      return `
+        <div class="surface-tooltip-stamp"><span class="surface-tooltip-mark" aria-hidden="true"></span> SURFACE / ${label}</div>
+        <div class="surface-tooltip-title">${escapeTooltipText(meta.name)}</div>
+        <div class="surface-tooltip-summary">${escapeTooltipText(meta.summary)}</div>
+        <div class="surface-tooltip-detail">${escapeTooltipText(meta.detail)}</div>
+        <div class="surface-tooltip-use">${escapeTooltipText(meta.use)}</div>
+        <div class="surface-tooltip-modulates"><strong>driven by</strong><div>${chips}</div></div>
+      `;
+    }
+
+    function positionSurfaceTooltip(tooltip, target, clientX, clientY) {
+      positionSignalTooltip(tooltip, target, clientX, clientY);
+    }
+
+    function showSurfaceTooltip(target, clientX, clientY) {
+      const name = target && target.dataset ? target.dataset.surface : '';
+      if (!name) return;
+
+      const tooltip = ensureSurfaceTooltip();
+      tooltip.dataset.surface = name;
+      tooltip.innerHTML = surfaceTooltipHTML(name);
+      tooltip.setAttribute('aria-hidden', 'false');
+      tooltip.classList.add('visible');
+      target.setAttribute('aria-describedby', 'surface-tooltip');
+      positionSurfaceTooltip(tooltip, target, clientX, clientY);
+    }
+
+    function hideSurfaceTooltip(target) {
+      const tooltip = document.getElementById('surface-tooltip');
+      if (!tooltip) return;
+
+      tooltip.classList.remove('visible');
+      tooltip.setAttribute('aria-hidden', 'true');
+      if (target && target.removeAttribute) target.removeAttribute('aria-describedby');
+    }
+
+    function bindSurfaceTooltipEvents() {
+      if (!transportVizEl) return;
+
+      transportVizEl.addEventListener('mousemove', (event) => {
+        const target = event.target.closest('.surface-chip[data-surface], .surface-hud[data-surface]');
+        if (!target || !transportVizEl.contains(target)) return;
+        showSurfaceTooltip(target, event.clientX, event.clientY);
+      });
+
+      transportVizEl.addEventListener('mouseleave', (event) => {
+        hideSurfaceTooltip(event.target);
+      });
+
+      transportVizEl.addEventListener('focusin', (event) => {
+        const target = event.target.closest('.surface-chip[data-surface], .surface-hud[data-surface]');
+        if (!target || !transportVizEl.contains(target)) return;
+        const rect = target.getBoundingClientRect();
+        showSurfaceTooltip(target, rect.left + rect.width / 2, rect.top);
+      });
+
+      transportVizEl.addEventListener('focusout', (event) => {
+        const target = event.target.closest('.surface-chip[data-surface], .surface-hud[data-surface]');
+        if (target) hideSurfaceTooltip(target);
+      });
+
+      window.addEventListener('scroll', () => hideSurfaceTooltip(document.activeElement), true);
+      window.addEventListener('resize', () => hideSurfaceTooltip(document.activeElement));
+    }
+
+    bindSurfaceTooltipEvents();
+
+    function renderSurfaceChips(el, surfaces, active, activeSurfaceNames) {
+      if (!el) return;
+      el.innerHTML = '';
+
+      if (!surfaces || surfaces.length === 0) {
+        const empty = document.createElement('span');
+        empty.className = 'surface-chip';
+        empty.textContent = 'literal';
+        empty.dataset.surface = 'literal';
+        empty.tabIndex = 0;
+        empty.setAttribute('role', 'button');
+        empty.setAttribute('aria-label', surfaceAriaLabel('literal'));
+        el.appendChild(empty);
+        return;
+      }
+
+      const activeSet = activeSurfaceNames instanceof Set ? activeSurfaceNames : new Set(activeSurfaceNames || []);
+      for (const surface of surfaces) {
+        const isActiveSurface = active || activeSet.has(surface);
+        const chip = document.createElement('span');
+        chip.className = 'surface-chip' + (isActiveSurface ? ' active' : '');
+        chip.textContent = surface;
+        chip.dataset.surface = surface;
+        chip.tabIndex = 0;
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('aria-label', surfaceAriaLabel(surface));
+        el.appendChild(chip);
+      }
+    }
+
+    function walkSlots(slots, fn) {
+      if (!Array.isArray(slots)) return;
+      for (const node of slots) {
+        if (!node) continue;
+        fn(node);
+        if (node.kind === 'group') walkSlots(node.children, fn);
       }
     }
 
     function blockHasTokenKind(block, predicate) {
       let found = false;
-      walkSlots(block.slots, (node) => {
+      walkSlots(block && block.slots, (node) => {
         if (found || node.kind !== 'leaf') return;
         if (predicate(node.token)) found = true;
       });
@@ -559,25 +1484,24 @@
 
     function surfacesForBlock(block) {
       const surfaces = [];
-
       if (!block) return surfaces;
 
-        const params = block.params || {};
-        const effects = block.effects || {};
-        const push = (name) => {
-          if (!surfaces.includes(name)) surfaces.push(name);
-        };
+      const params = block.params || {};
+      const effects = block.effects || {};
+      const push = (name) => {
+        if (name && !surfaces.includes(name)) surfaces.push(name);
+      };
 
-        if (block.fade && block.fade.mode && block.fade.mode !== 'clear') push('fade');
-
+      if (block.fade && block.fade.mode && block.fade.mode !== 'clear') push('fade');
       if (block.speed && (hasParamControlStream(block.speed) || block.speed.kind === 'vector')) push('speed');
 
       for (const name of ['pan', 'gain', 'rate', 'start', 'crush', 'force', 'decay', 'tone', 'harm', 'octave']) {
         if (hasParamControlStream(params[name])) push(name);
       }
-        for (const name of ['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body']) {
-          if (effects[name]) push(name);
-        }
+
+      for (const name of ['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body']) {
+        if (effects[name]) push(name);
+      }
 
       if (block.voice === 'string') {
         const hasRandomPitch = blockHasTokenKind(block, (tok) => tok && tok.kind === 'note-random');
@@ -591,40 +1515,41 @@
         if (hasSelector) push('sample');
       }
 
-        // Attractors now color the medium even when all patch values are literal.
-        // These surfaces are always under attractor pressure when coupled.
-        if (block.attractor) {
-            push('filter');
-            push('space');
-            push('body');
-            push('color');
-          push('gain');
-          push('pan');
+      // Attractors color the medium even when patch values are literal.
+      if (block.attractor) {
+        push('filter');
+        push('space');
+        push('body');
+        push('color');
+        push('gain');
+        push('pan');
 
-          if (block.voice === 'string') {
-            push('decay');
-            push('tone');
-            push('crush');
-            push('pitch');
-          } else if (block.voice === 'sample') {
-            push('rate');
-            push('start');
-            push('sample');
-          }
-
-          if (block.speed) push('speed');
+        if (block.voice === 'string') {
+          push('decay');
+          push('tone');
+          push('crush');
+          push('pitch');
+        } else if (block.voice === 'sample') {
+          push('rate');
+          push('start');
+          push('sample');
         }
+
+        if (block.speed) push('speed');
+      }
 
       return surfaces;
     }
 
     function attractorStateForBlock(block) {
       if (!block || !block.attractor) return null;
-
-      if (window.ReplAttractors && window.ReplAttractors.peek) {
-        return window.ReplAttractors.peek(block.attractor);
+      if (window.ReplAttractors && typeof window.ReplAttractors.peek === 'function') {
+        try {
+          return window.ReplAttractors.peek(block.attractor);
+        } catch (_) {
+          return null;
+        }
       }
-
       return null;
     }
 
@@ -655,7 +1580,6 @@
 
     function sourceLabelForBlock(block) {
       if (!block || !block.attractor) return '';
-
       const source = block.source || block.attractor.source || {};
       const parts = [];
 
@@ -671,14 +1595,12 @@
 
     function couplingLabel(block, state) {
       if (!block || !block.attractor) return 'none';
-
       const name = block.attractor.raw || 'attractor';
       const sourceLabel = sourceLabelForBlock(block);
       const status = block.voice === 'input' ? formatInputBlockStatus(block) : formatSourceStatus(state);
-
       return [name, sourceLabel, status].filter(Boolean).join(' · ');
     }
-    
+
     function formatFadeLevel(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return '.00';
@@ -687,7 +1609,6 @@
 
     function fadeLabel(block, fadeState) {
       if (!block || !block.fade || !block.fade.mode || block.fade.mode === 'clear') return '';
-
       const mode = block.fade.mode;
 
       if (!fadeState) {
@@ -695,13 +1616,11 @@
         return `fade ${mode}`;
       }
 
-      if (fadeState.held) {
-        return `fade hold · ${formatFadeLevel(fadeState.level)}`;
-      }
+      if (fadeState.held) return `fade hold · ${formatFadeLevel(fadeState.level)}`;
 
       if (fadeState.completed && fadeState.latched) {
-        if (mode === 'in') return `fade in · complete`;
-        if (mode === 'out') return `fade out · latched`;
+        if (mode === 'in') return 'fade in · complete';
+        if (mode === 'out') return 'fade out · latched';
       }
 
       return `fade ${mode} · ${formatFadeLevel(fadeState.level)}`;
@@ -709,43 +1628,26 @@
 
     function blockStatusLabel(block, attractorState, fadeState) {
       const parts = [];
-
-      if (block && block.attractor) {
-        parts.push(couplingLabel(block, attractorState));
-      }
-
+      if (block && block.attractor) parts.push(couplingLabel(block, attractorState));
       const fade = fadeLabel(block, fadeState);
       if (fade) parts.push(fade);
-
       return parts.join(' · ');
+    }
+
+    function signalAriaLabel(abbr, value) {
+      const meta = SIGNAL_META[abbr];
+      if (!meta) return `Signal ${abbr}: ${formatDecimal(value)}`;
+      return `${meta.name}: ${meta.summary}. Modulates ${meta.modulates.join(', ')}.`;
     }
 
     function signalHTML(state) {
       if (!state) return '';
-
-      return SIGNALS.map(([abbr, key, title]) => {
-        return `<span class="signal-token" title="${title}"><abbr>${abbr}</abbr>${formatDecimal(state[key])}</span>`;
+      return SIGNALS.map(([abbr, key]) => {
+        const value = Math.max(0, Math.min(1, Number(state[key]) || 0));
+        const level = String(value.toFixed(3));
+        const ariaLabel = signalAriaLabel(abbr, value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<span class="signal-token" style="--signal:${level}" data-signal="${abbr}" data-signal-value="${level}" tabindex="0" role="button" aria-label="${ariaLabel}"><abbr>${abbr}</abbr>${formatDecimal(value)}</span>`;
       }).join('');
-    }
-
-    function renderSurfaceChips(el, surfaces, active) {
-      if (!el) return;
-      el.innerHTML = '';
-
-      if (!surfaces || surfaces.length === 0) {
-        const empty = document.createElement('span');
-        empty.className = 'surface-chip';
-        empty.textContent = 'literal';
-        el.appendChild(empty);
-        return;
-      }
-
-      for (const surface of surfaces) {
-        const chip = document.createElement('span');
-        chip.className = 'surface-chip' + (active ? ' active' : '');
-        chip.textContent = surface;
-        el.appendChild(chip);
-      }
     }
 
     function primaryCoupledBlockState(t) {
@@ -787,7 +1689,7 @@
       couplingSummaryEls.couplingValue.textContent = couplingLabel(block, attractorState);
       couplingSummaryEls.couplingValue.className = 'coupling-value ' + sourceClass(attractorState);
       couplingSummaryEls.signalsValue.innerHTML = signalHTML(attractorState);
-      renderSurfaceChips(couplingSummaryEls.surfacesValue, surfaces, true);
+      renderSurfaceChips(couplingSummaryEls.surfacesValue, surfaces, false);
     }
 
     function renderTransportShell(program) {
@@ -800,6 +1702,8 @@
       for (let i = 0; i < beats; i++) {
         const d = document.createElement('span');
         d.className = 'dot beat';
+        d.title = `beat ${i + 1} of ${beats}`;
+        d.setAttribute('aria-label', `beat ${i + 1}`);
         beatDotsEl.appendChild(d);
         beatDotEls.push(d);
       }
@@ -927,6 +1831,10 @@
           }
         }
 
+        const surfaceStateEl = document.createElement('div');
+        surfaceStateEl.className = 'surface-state-stack block-surface-state';
+        renderSurfaceStatePanel(surfaceStateEl, block, null);
+
         const couplingEl = document.createElement('div');
         couplingEl.className = 'block-coupling';
           const initialState = attractorStateForBlock(block);
@@ -944,12 +1852,13 @@
 
         row.appendChild(label);
         row.appendChild(slotsWrap);
+        row.appendChild(surfaceStateEl);
         row.appendChild(couplingEl);
         row.appendChild(surfacesEl);
         if (block.every) row.appendChild(everyEl);
 
         blockRowsEl.appendChild(row);
-        blockRowEls.push({ row, slotEls, everyEl, couplingEl, surfacesEl, block });
+        blockRowEls.push({ row, slotEls, everyEl, couplingEl, surfacesEl, surfaceStateEl, block });
       });
 
       // Show any parsed/warmed attractor state even before play starts.
@@ -963,8 +1872,13 @@
     }
 
     function clearActiveClasses() {
-      for (const d of beatDotEls) d.classList.remove('active');
+      if (transportVizEl) transportVizEl.dataset.running = 'false';
+      for (const d of beatDotEls) {
+        d.classList.remove('active');
+        d.style.removeProperty('--beat-progress');
+      }
       for (const blk of blockRowEls) {
+        if (blk.row) blk.row.classList.remove('active', 'silent', 'live', 'fallback');
         for (const d of blk.slotEls) d.classList.remove('active', 'live', 'fallback');
       }
     }
@@ -985,11 +1899,21 @@
       }
 
       const t = scheduler.now();
+      if (transportVizEl) {
+        transportVizEl.dataset.running = 'true';
+        transportVizEl.style.setProperty('--beat-progress', String(Math.max(0, Math.min(1, Number(t.beatProgress) || 0))));
+      }
 
-      // Beat dot: highlight whichever beat we're in.
-      const beatInBar = Math.floor(t.beat) % lastGoodProgram.meter.num;
+      // Beat dot: highlight whichever beat we're in, and expose beat progress for the light fill.
+      const beatInBar = Number.isFinite(t.beatIndex) ? t.beatIndex : (Math.floor(t.beat) % lastGoodProgram.meter.num);
       for (let i = 0; i < beatDotEls.length; i++) {
-        beatDotEls[i].classList.toggle('active', i === beatInBar);
+        const active = i === beatInBar;
+        beatDotEls[i].classList.toggle('active', active);
+        if (active) {
+          beatDotEls[i].style.setProperty('--beat-progress', String(Math.max(0, Math.min(1, Number(t.beatProgress) || 0))));
+        } else {
+          beatDotEls[i].style.removeProperty('--beat-progress');
+        }
       }
 
       updateCouplingSummary(t);
@@ -1001,12 +1925,23 @@
         const block = lastGoodProgram.blocks[i];
 
         for (const d of blk.slotEls) d.classList.remove('active', 'live', 'fallback');
+        if (blk.row) blk.row.classList.remove('active', 'silent', 'live', 'fallback');
         if (!state || !block) continue;
 
         const attractorState = state.attractorState || attractorStateForBlock(block);
+        if (blk.row) {
+          blk.row.classList.toggle('silent', Boolean(state.silent));
+          blk.row.classList.toggle('active', !state.silent && state.inBlockIdx >= 0);
+          blk.row.classList.toggle('live', Boolean(attractorState && attractorState.source === 'live'));
+          blk.row.classList.toggle('fallback', Boolean(attractorState && attractorState.source && attractorState.source !== 'live'));
+        }
         if (blk.couplingEl) {
             blk.couplingEl.textContent = blockStatusLabel(block, attractorState, state.fadeState);
             blk.couplingEl.className = 'block-coupling ' + sourceClass(attractorState);
+        }
+
+        if (blk.surfaceStateEl) {
+          renderSurfaceStatePanel(blk.surfaceStateEl, block, state.surfaceState || null);
         }
 
         if (blk.surfacesEl) {
@@ -1014,6 +1949,7 @@
               blk.surfacesEl,
               surfacesForBlock(block),
               Boolean(
+                (!state.silent && state.inBlockIdx >= 0) ||
                 block.attractor ||
                 (block.effects && Object.keys(block.effects).length) ||
                 (block.fade && block.fade.mode && block.fade.mode !== 'clear')
@@ -1043,8 +1979,18 @@
     }
 
     function vizFrame() {
-      updateVisualizer();
-      requestAnimationFrame(vizFrame);
+      try {
+        updateVisualizer();
+      } catch (err) {
+        // Keep the transport sidebar alive even if an unexpected program state slips through.
+        if (!vizFrame._lastWarn || performance.now() - vizFrame._lastWarn > 1500) {
+          vizFrame._lastWarn = performance.now();
+          // eslint-disable-next-line no-console
+          console.warn('[repl transport viz] update failed:', err);
+        }
+      } finally {
+        requestAnimationFrame(vizFrame);
+      }
     }
     requestAnimationFrame(vizFrame);
 
