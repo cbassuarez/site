@@ -45,6 +45,7 @@ const RANDOM_LABS_ROUTES = [
   '/labs/guestbook',
   '/labs/chunk-surfer',
   '/labs/string',
+  '/labs/repl',
   '/room',
   '/labs/tell-me-about-your-day'
 ];
@@ -805,6 +806,9 @@ function RecentWorksPage() {
         <li>
           step into [ <a href="/labs/string">string</a> ] for the live multi-visitor instrument layer.
         </li>
+        <li>
+          live-code through the cbassuarez voices at [ <a href="/labs/repl">repl</a> ] — score-grid notation, sample wildcards, and attractor coupling.
+        </li>
       </ul>
     </>
   );
@@ -1030,7 +1034,7 @@ function StringLabPage() {
           <i>string</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs">labs</a> ] [ <a href="/labs/repl">repl</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
@@ -1064,7 +1068,7 @@ function ReplLabPage() {
           <i>repl</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs">labs</a> ] [ <a href="/labs/string">string</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs">labs</a> ] [ <a href="/labs/string">string</a> ] [ <a href="/labs/chunk-surfer">chunk surfer</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
@@ -1098,7 +1102,7 @@ function ChunkSurferLabPage() {
           <i>labs / chunk surfer</i>
         </p>
         <p>
-          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
+          [ <a href="/">home</a> ] [ <a href="/works">works</a> ] [ <a href="/labs">labs</a> ] [ <a href="/labs/string">string</a> ] [ <a href="/labs/repl">repl</a> ] [ <a href="/about">about</a> ] [ <a href="/contact">contact</a> ]
         </p>
       </center>
 
@@ -1161,6 +1165,9 @@ function SiteLeftPane() {
           </li>
           <li>
             <a href="/labs/string">string</a>
+          </li>
+          <li>
+            <a href="/labs/repl">repl</a>
           </li>
           <li>
             <a href="/room">anteroom</a> <small>(usually closed)</small>
