@@ -6,6 +6,17 @@
   <title>seb’s repl</title>
   <style>
     html, body { margin: 0; padding: 0; background: #fafafa; font-family: "Times New Roman", Times, serif; }
+    ::selection {
+      background: rgba(255, 212, 0, 0.72);
+      color: #070707;
+    }
+    .reference-rail ::selection,
+    .transport-viz ::selection,
+    .signal-tooltip ::selection,
+    .surface-tooltip ::selection {
+      background: #ffd400;
+      color: #070707;
+    }
     .shell { max-width: 64em; margin: 0 auto; padding: 1.2em 1em 2em; }
     .shell.repl-shell { max-width: min(96rem, calc(100vw - 2rem)); }
 
@@ -684,24 +695,71 @@
     }
 
     .editor-wrap {
+    --editor-label-rail: 1.8rem;
       background: var(--cs-white) !important;
       border: 2px solid var(--cs-line) !important;
       border-radius: 0 !important;
       box-shadow: 6px 6px 0 var(--cs-line), 10px 10px 0 rgba(0, 87, 255, 0.25) !important;
     }
+      
+      .editor-wrap > .repl-editor {
+            height: calc(100% - var(--editor-label-rail)) !important;
+            margin-top: var(--editor-label-rail);
+          }
+      
+          .editor-wrap > .repl-editor .cm-editor {
+            height: 100% !important;
+          }
 
     .editor-wrap::before {
-      content: "CYBERNETIC SCORE" !important;
-      top: 0 !important;
-      right: 0 !important;
-      color: var(--cs-white) !important;
-      background: var(--cs-line) !important;
-      border: 0 !important;
-      border-left: 2px solid var(--cs-line) !important;
-      border-bottom: 2px solid var(--cs-line) !important;
-      padding: 0.28rem 0.5rem !important;
-      letter-spacing: 0.14em !important;
+      content: none !important;
+    }
+
+    .editor-label-chip {
+      position: absolute;
+      top: 0;
+      z-index: 5;
+      display: inline-flex;
+      align-items: center;
+      max-width: min(34rem, calc(50% - 0.75rem));
+      min-height: 1.42rem;
+      box-sizing: border-box;
+      color: var(--cs-white);
+      background: var(--cs-line);
+      border: 0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.66rem;
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0.28rem 0.5rem;
+      user-select: none;
+    }
+
+    .patch-title-chip {
+      left: 0;
+      border-right: 2px solid var(--cs-line);
+      border-bottom: 2px solid var(--cs-line);
+      box-shadow: 4px 4px 0 var(--cs-blue);
+      cursor: text;
+      pointer-events: auto;
+    }
+
+    .patch-title-chip:focus-visible {
+      outline: 2px solid var(--cs-yellow);
+      outline-offset: 2px;
+    }
+
+    .cybernetic-score-chip {
+      right: 0;
+      border-left: 2px solid var(--cs-line);
+      border-bottom: 2px solid var(--cs-line);
       box-shadow: -4px 4px 0 var(--cs-blue);
+      pointer-events: none;
     }
 
     .editor-wrap::after {
@@ -722,6 +780,8 @@
       background: var(--cs-white);
       color: var(--cs-ink);
       border-radius: 0;
+      min-height: calc(22em - var(--editor-label-rail, 0px));
+margin-top: var(--editor-label-rail, 0px);
     }
 
     .controls {
@@ -4024,8 +4084,9 @@
       padding-left: 1rem;
     }
 
-    .manual-chip,
-    .manual-open {
+      .manual-chip,
+      .manual-open,
+      .report-bug-trigger {
       font-family: "Courier New", Courier, monospace;
       font-size: 0.7rem;
       line-height: 1;
@@ -4041,11 +4102,25 @@
       box-sizing: border-box;
     }
 
-    .manual-open {
-      cursor: pointer;
-      border-left-width: 8px;
-      border-left-color: var(--cs-blue);
-    }
+      .manual-open {
+        cursor: pointer;
+        border-left-width: 8px;
+        border-left-color: var(--cs-blue);
+      }
+
+      .report-bug-trigger {
+        cursor: pointer;
+        border-left-width: 8px;
+        border-left-color: var(--cs-red);
+        box-shadow: 3px 3px 0 var(--cs-line), -5px 0 0 var(--cs-blue);
+      }
+
+      .report-bug-trigger:hover,
+      .report-bug-trigger:focus {
+        background: var(--cs-red);
+        color: var(--cs-white);
+        outline: 2px solid var(--cs-line);
+      }
 
     .manual-open:hover,
     .manual-open:focus {
@@ -4054,10 +4129,288 @@
       outline: 2px solid var(--cs-line);
     }
 
-    .manual-open:active {
-      transform: translate(2px, 2px);
-      box-shadow: 1px 1px 0 var(--cs-line);
-    }
+      .manual-open:active,
+      .report-bug-trigger:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0 var(--cs-line);
+      }
+      
+      .field-report-dialog {
+        width: min(46rem, calc(100vw - 2rem));
+        max-height: calc(100vh - 2rem);
+        padding: 0;
+        border: 3px solid var(--cs-line);
+        border-radius: 0;
+        background: var(--cs-white);
+        color: var(--cs-ink);
+        box-shadow: 8px 8px 0 var(--cs-line), 13px 13px 0 rgba(0, 87, 255, 0.28);
+      }
+
+      .field-report-dialog::backdrop {
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.76)),
+          repeating-linear-gradient(
+            135deg,
+            rgba(0, 0, 0, 0.16) 0,
+            rgba(0, 0, 0, 0.16) 2px,
+            transparent 2px,
+            transparent 8px
+          );
+      }
+
+      .field-report-form {
+        display: grid;
+        gap: 0.8rem;
+        max-height: calc(100vh - 2.5rem);
+        overflow: auto;
+        padding: 1rem;
+        box-sizing: border-box;
+      }
+
+      .field-report-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: start;
+        padding-bottom: 0.85rem;
+        border-bottom: 2px solid var(--cs-line);
+      }
+
+      .field-report-kicker {
+        margin: 0 0 0.35rem;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.66rem;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--cs-blue);
+      }
+
+      .field-report-head h2 {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", Times, serif;
+        font-size: clamp(1.8rem, 4vw, 3.4rem);
+        line-height: 0.95;
+        letter-spacing: -0.055em;
+        font-weight: 400;
+        text-transform: lowercase;
+      }
+
+      .field-report-head p {
+        margin: 0.6rem 0 0;
+        max-width: 34rem;
+        font-size: 0.95rem;
+        line-height: 1.45;
+      }
+
+      .field-report-close {
+        appearance: none;
+        width: 2rem;
+        height: 2rem;
+        border: 2px solid var(--cs-line);
+        border-radius: 0;
+        background: var(--cs-white);
+        color: var(--cs-ink);
+        box-shadow: 3px 3px 0 var(--cs-line);
+        font-family: "Courier New", Courier, monospace;
+        font-size: 1.4rem;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .field-report-close:hover,
+      .field-report-close:focus {
+        background: var(--cs-line);
+        color: var(--cs-white);
+        outline: 2px solid var(--cs-blue);
+      }
+
+      .field-report-warning {
+        border: 2px solid var(--cs-line);
+        border-left-width: 8px;
+        border-left-color: var(--cs-yellow);
+        padding: 0.55rem 0.65rem;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.72rem;
+        font-weight: 900;
+        line-height: 1.35;
+        text-transform: uppercase;
+        background: rgba(255, 212, 0, 0.18);
+      }
+
+      .field-report-field,
+      .field-report-fieldset {
+        display: grid;
+        gap: 0.35rem;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .field-report-field > span,
+      .field-report-fieldset > legend {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .field-report-field > span b {
+        color: var(--cs-red);
+        font-weight: 900;
+      }
+
+      .field-report-field textarea,
+      .field-report-field input[type="text"] {
+        width: 100%;
+        box-sizing: border-box;
+        border: 2px solid var(--cs-line);
+        border-radius: 0;
+        background: var(--cs-white);
+        color: var(--cs-ink);
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
+        padding: 0.6rem 0.7rem;
+        font: 700 0.86rem/1.45 "Courier New", Courier, monospace;
+      }
+
+      .field-report-field textarea:focus,
+      .field-report-field input[type="text"]:focus {
+        outline: 3px solid var(--cs-blue);
+        outline-offset: 1px;
+      }
+
+      .field-report-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+
+      .field-report-options label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.32rem;
+        cursor: pointer;
+      }
+
+      .field-report-options input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .field-report-options span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.8rem;
+        border: 2px solid var(--cs-line);
+        border-radius: 0;
+        background: var(--cs-white);
+        box-shadow: 3px 3px 0 var(--cs-line);
+        padding: 0.38rem 0.48rem 0.3rem;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.68rem;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .field-report-options input:checked + span {
+        background: var(--cs-blue);
+        color: var(--cs-white);
+      }
+
+      .field-report-options input:focus-visible + span {
+        outline: 3px solid var(--cs-yellow);
+        outline-offset: 1px;
+      }
+
+      .field-report-fieldset.compact .field-report-options span {
+        min-height: 1.7rem;
+      }
+
+      .field-report-checks {
+        display: grid;
+        gap: 0.55rem;
+        border-top: 2px solid var(--cs-line);
+        border-bottom: 2px solid var(--cs-line);
+        padding: 0.75rem 0;
+      }
+
+      .field-report-checks label {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.55rem;
+        align-items: start;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.76rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .field-report-checks input {
+        margin-top: 0.12rem;
+        accent-color: var(--cs-blue);
+      }
+
+      .field-report-checks small {
+        display: block;
+        margin-top: 0.18rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        line-height: 1.3;
+        text-transform: none;
+      }
+
+      .report-preview-wrap textarea {
+        min-height: 10rem;
+        background:
+          linear-gradient(rgba(0, 87, 255, 0.045), rgba(0, 87, 255, 0.045)),
+          var(--cs-white);
+        font-size: 0.74rem;
+      }
+
+      .field-report-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.65rem;
+        padding-top: 0.25rem;
+      }
+
+      .field-report-actions button {
+        appearance: none;
+        border: 2px solid var(--cs-line);
+        border-radius: 0;
+        background: var(--cs-white);
+        color: var(--cs-ink);
+        box-shadow: 4px 4px 0 var(--cs-line);
+        padding: 0.62rem 0.7rem 0.5rem;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.74rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .field-report-actions button:hover,
+      .field-report-actions button:focus {
+        outline: 3px solid var(--cs-blue);
+        outline-offset: 1px;
+      }
+
+      .field-report-github {
+        background: var(--cs-line) !important;
+        color: var(--cs-white) !important;
+      }
+
+      .field-report-copy.copied {
+        background: var(--cs-yellow);
+        color: var(--cs-ink);
+      }
 
     .work-label {
       margin: 0.4rem auto 0;
@@ -4952,43 +5305,63 @@
       font-size: 0.42rem;
     }
 
-    @media (min-width: 74.01rem) {
-      .transport-viz {
-        height: clamp(40rem, 74vh, 64rem) !important;
-        min-height: clamp(40rem, 74vh, 64rem) !important;
-        max-height: clamp(40rem, 74vh, 64rem) !important;
-        overflow: hidden !important;
-      }
+      @media (min-width: 74.01rem) {
+        .transport-viz {
+          height: clamp(40rem, 74vh, 64rem) !important;
+          min-height: clamp(40rem, 74vh, 64rem) !important;
+          max-height: clamp(40rem, 74vh, 64rem) !important;
+          overflow: hidden !important;
+        }
 
-      .transport-viz .block-rows {
-        flex: 1 1 auto !important;
-        min-height: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        overscroll-behavior: contain;
-        scrollbar-width: thin;
-      }
+        .transport-viz .block-rows {
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          scrollbar-width: thin;
+        }
 
-      .transport-viz::after {
-        display: none !important;
-      }
+        .transport-viz::after {
+          display: none !important;
+        }
 
-      .transport-viz .block-row {
-        grid-template-areas:
-          "label primary"
-          "label hud"
-          "label secondary"
-          "label surfaces" !important;
-      }
+        .transport-viz .block-row {
+          grid-template-areas:
+            "label primary"
+            "label hud"
+            "label secondary"
+            "label surfaces" !important;
+        }
 
-      .transport-viz .beat-row,
-      .transport-viz .coupling-row {
-        grid-template-areas:
-          "label primary"
-          "label secondary"
-          "label surfaces" !important;
+        .transport-viz .coupling-row {
+          grid-template-areas:
+            "label primary"
+            "label secondary"
+            "label surfaces" !important;
+        }
+
+        .transport-viz .beat-row {
+          position: relative;
+          grid-template-areas: "label primary" !important;
+          grid-template-rows: auto !important;
+          align-items: start !important;
+          padding-top: 0.3rem !important;
+          padding-bottom: 0.4rem !important;
+        }
+
+        .transport-viz .beat-row .beat-label {
+          align-self: stretch !important;
+          padding-top: 0.42rem !important;
+        }
+
+        .transport-viz .beat-row .beat-dots {
+          align-self: start !important;
+          justify-self: start !important;
+          margin-top: 0 !important;
+          transform: translateY(-0.28rem);
+        }
       }
-    }
 
     @media (max-width: 74rem) {
       .transport-viz .block-row {
@@ -4999,6 +5372,7 @@
           "label surfaces" !important;
       }
     }
+      
 
   </style>
 </head>
@@ -5026,6 +5400,8 @@
         </div>
 
         <div class="editor-wrap">
+          <button id="patch-title-chip" class="editor-label-chip patch-title-chip" type="button" title="Option-click to insert a title metadata line">PATCH / UNTITLED</button>
+          <div class="editor-label-chip cybernetic-score-chip" aria-hidden="true">CYBERNETIC SCORE</div>
           <div id="editor" class="repl-editor" aria-label="REPL score editor"></div>
         </div>
 
@@ -5226,8 +5602,121 @@
         <span class="manual-chip">coupling</span>
         <span class="manual-chip">live input</span>
         <span class="manual-chip">reference</span>
+        <button class="manual-open report-bug-trigger" type="button" data-field-report-open>
+          report bug
+        </button>
       </div>
     </section>
+    
+    <dialog id="field-report-dialog" class="field-report-dialog" aria-labelledby="field-report-title">
+      <form id="field-report-form" class="field-report-form" method="dialog">
+        <div class="field-report-head">
+          <div>
+            <div class="field-report-kicker">field report / bug</div>
+            <h2 id="field-report-title">Report broken behavior</h2>
+            <p>
+              Something in the REPL is not working, sounding, rendering, saving,
+              or responding correctly. Tell us what broke; the technical snapshot
+              can be included automatically.
+            </p>
+          </div>
+          <button class="field-report-close" type="button" data-field-report-close aria-label="Close field report">
+            ×
+          </button>
+        </div>
+
+        <div class="field-report-warning">
+          Please do not paste private access tokens, API keys, passwords, or credentials.
+        </div>
+
+        <label class="field-report-field">
+          <span>What happened? <b>required</b></span>
+          <textarea
+            name="what"
+            rows="5"
+            required
+            placeholder="Example: I clicked Replay after loading Coupled Weather String and the transport lit up, but no sound came out."
+          ></textarea>
+        </label>
+
+        <label class="field-report-field">
+          <span>What were you trying to do?</span>
+          <textarea
+            name="intent"
+            rows="3"
+            placeholder="Example: I was trying to test the sample + string example with weather coupling."
+          ></textarea>
+        </label>
+
+        <fieldset class="field-report-fieldset">
+          <legend>What kind of bug is it?</legend>
+          <div class="field-report-options">
+            <label><input type="radio" name="kind" value="Audio / no sound" required> <span>Audio / no sound</span></label>
+            <label><input type="radio" name="kind" value="Playback / transport"> <span>Playback</span></label>
+            <label><input type="radio" name="kind" value="Editor / parsing"> <span>Editor / parsing</span></label>
+            <label><input type="radio" name="kind" value="Visual / layout"> <span>Visual / layout</span></label>
+            <label><input type="radio" name="kind" value="Weather / external data"> <span>Weather</span></label>
+            <label><input type="radio" name="kind" value="Samples / loading"> <span>Samples</span></label>
+            <label><input type="radio" name="kind" value="Input / microphone or tab audio"> <span>Input</span></label>
+            <label><input type="radio" name="kind" value="Sharing / links"> <span>Sharing</span></label>
+            <label><input type="radio" name="kind" value="Performance / lag or crash"> <span>Performance</span></label>
+            <label><input type="radio" name="kind" value="Other"> <span>Other</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="field-report-fieldset compact">
+          <legend>How bad is it?</legend>
+          <div class="field-report-options">
+            <label><input type="radio" name="impact" value="Annoying" required> <span>Annoying</span></label>
+            <label><input type="radio" name="impact" value="Blocks this patch"> <span>Blocks this patch</span></label>
+            <label><input type="radio" name="impact" value="Breaks the REPL"> <span>Breaks the REPL</span></label>
+            <label><input type="radio" name="impact" value="Crash / unusable"> <span>Crash / unusable</span></label>
+          </div>
+        </fieldset>
+
+        <div class="field-report-checks">
+          <label>
+            <input type="checkbox" name="includePatch" checked>
+            <span>
+              Include current patch text
+              <small>This helps reproduce parser, transport, and audio bugs.</small>
+            </span>
+          </label>
+
+          <label>
+            <input type="checkbox" name="includeDiagnostics" checked>
+            <span>
+              Include browser + REPL diagnostic snapshot
+              <small>Includes route, viewport, browser, transport, build, parse status, and timestamp.</small>
+            </span>
+          </label>
+        </div>
+
+        <label class="field-report-field">
+          <span>Contact optional</span>
+          <input
+            name="contact"
+            type="text"
+            autocomplete="off"
+            placeholder="only if you want a follow-up"
+          >
+        </label>
+
+        <label class="field-report-field report-preview-wrap">
+          <span>Generated report preview</span>
+          <textarea id="field-report-preview" rows="9" readonly></textarea>
+        </label>
+
+        <div class="field-report-actions">
+          <button class="field-report-copy" type="button" data-field-report-copy>
+            copy report
+          </button>
+          <button class="field-report-github" type="submit">
+            open github issue
+          </button>
+        </div>
+      </form>
+    </dialog>
 
     <div id="docs-panel" class="docs-panel" hidden aria-label="seb’s repl documentation">
       <div class="docs-frame">

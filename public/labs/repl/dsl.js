@@ -1230,6 +1230,9 @@
 
     for (let i = 0; i < rawLines.length; i++) {
       const lineNumber = i + 1;
+      if (/^\s*#/.test(rawLines[i])) {
+        continue;
+      }
       const stripped = stripComment(rawLines[i]).trimEnd();
       const trimmedForCheck = stripped.trim();
 

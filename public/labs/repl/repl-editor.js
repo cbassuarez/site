@@ -122,8 +122,9 @@
   // Patterns for body tokens — order matters: longer/specific first.
   // Returns a tag string (matched in our HighlightStyle below).
   function tokenBody(stream, state) {
-    // Comments (also accepted mid-line)
+    // Comments and metadata lines (also accepted mid-line for //).
     if (stream.match(/^\/\/.*$/)) return 'comment';
+    if (stream.sol() && stream.match(/^#.*$/)) return 'comment';
 
     // Operators in priority order. Invalid forms emit 'invalid' so they
     // can wear a dotted underline without blocking input.
@@ -373,6 +374,7 @@
 
   function lineHeadKind(head) {
     const h = String(head || '').toLowerCase();
+    if (h === '//' || h === '///' || h === '#') return 'metadata';
     if (h === 'string' || h === 'sample' || h === 'input') return `voice-${h}`;
     if (HEAD_DIRECTIVE.has(h)) return 'directive';
     if (HEAD_PARAM.has(h)) return 'param';
@@ -407,7 +409,7 @@
         : 'cs-token cs-invalid';
     }
     if (LIVE_SOURCE_SET.has(lower)) return 'cs-token cs-live-source';
-    if (/^\/\//.test(raw)) return 'cs-token cs-comment';
+    if (/^\/\//.test(raw) || /^#/.test(raw)) return 'cs-token cs-comment';
     if (/^[()]/.test(raw)) return 'cs-token cs-bracket';
     if (/^(?:\*|\*!|\*~|\*&\d+!?|\*!\d+|\*\d+|~|_|\||;|\.|-)$/.test(raw)) return 'cs-token cs-operator';
     if (/^-?\d+\/\d+$/.test(raw) || /^-?\d*\.\d+$/.test(raw) || /^-?\d+$/.test(raw) || /^\d+(?:ms|s)$/.test(raw) || /^pi(?:\/\d+)?$/.test(raw)) return 'cs-token cs-number';
@@ -421,6 +423,8 @@
   function tokenRanges(lineText) {
     const ranges = [];
     const commentAt = (() => {
+      const hashIdx = lineText.search(/^\s*#/);
+      if (hashIdx >= 0) return lineText.indexOf('#', hashIdx);
       const idx = lineText.search(/(^|\s)\/\//);
       return idx < 0 ? -1 : (lineText[idx] === '/' ? idx : idx + 1);
     })();
@@ -687,6 +691,147 @@
     return null;
   }
 
+
+  function hasNonEmptySelection(state) {
+    try {
+      return state.selection && state.selection.ranges.some((range) => range && !range.empty);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function syncSelectionClass(view) {
+    if (!view || !view.dom) return;
+    view.dom.classList.toggle('cs-has-selection', hasNonEmptySelection(view.state));
+  }
+
+  function isDslTokenChar(ch) {
+    return /[A-Za-z0-9*?!&;_.\-\/:#π]/.test(String(ch || ''));
+  }
+
+  function dslTokenRangeAt(state, pos) {
+    const doc = state && state.doc;
+    if (!doc || !doc.length) return null;
+    const safePos = Math.max(0, Math.min(doc.length, Number(pos) || 0));
+    const line = doc.lineAt(safePos);
+    const text = line.text || '';
+    if (!text) return null;
+    let offset = Math.max(0, Math.min(text.length, safePos - line.from));
+    let probe = offset;
+
+    // If the click lands at a token's right edge, prefer the token to the left.
+    if (probe >= text.length || !isDslTokenChar(text[probe])) {
+      if (probe > 0 && isDslTokenChar(text[probe - 1])) probe -= 1;
+    }
+    if (probe < 0 || probe >= text.length || !isDslTokenChar(text[probe])) return null;
+
+    let from = probe;
+    let to = probe + 1;
+    while (from > 0 && isDslTokenChar(text[from - 1])) from -= 1;
+    while (to < text.length && isDslTokenChar(text[to])) to += 1;
+    if (from === to) return null;
+    return { from: line.from + from, to: line.from + to, line };
+  }
+
+  function selectDslTokenAtMouse(view, event) {
+    if (!view || !event) return false;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+    if (pos == null) return false;
+    const range = dslTokenRangeAt(view.state, pos);
+    if (!range) return false;
+    view.dispatch({
+      selection: { anchor: range.from, head: range.to },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  function selectDslRowAtMouse(view, event) {
+    if (!view || !event) return false;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+    if (pos == null) return false;
+    const line = view.state.doc.lineAt(pos);
+    view.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
+  const dslSelectionMousePlugin = Prec.highest(EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (!event || event.button !== 0) return false;
+      if (event.detail === 3) {
+        if (selectDslRowAtMouse(view, event)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+      }
+      if (event.detail === 2) {
+        if (selectDslTokenAtMouse(view, event)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+      }
+      return false;
+    },
+  }));
+
+  const selectionStateClassPlugin = ViewPlugin.fromClass(class {
+    constructor(view) {
+      this.view = view;
+      syncSelectionClass(view);
+    }
+    update(update) {
+      if (update.selectionSet || update.docChanged || update.focusChanged) syncSelectionClass(update.view);
+    }
+    destroy() {
+      if (this.view && this.view.dom) this.view.dom.classList.remove('cs-has-selection');
+    }
+  });
+
+
+  function buildUserSelectionMaskDecorations(state) {
+    const selection = state && state.selection;
+    if (!selection || !selection.ranges || !selection.ranges.length) return Decoration.none;
+    const builder = new RangeSetBuilder();
+    const mark = Decoration.mark({ class: 'cs-user-selection-mask' });
+
+    for (const range of selection.ranges) {
+      if (!range || range.empty) continue;
+      const from = Math.max(0, Math.min(state.doc.length, range.from));
+      const to = Math.max(0, Math.min(state.doc.length, range.to));
+      if (to <= from) continue;
+
+      // Split by logical line so the mask paints as rectangular edit bands and
+      // never asks CodeMirror to style the hidden newline character itself.
+      const startLine = state.doc.lineAt(from);
+      const endLine = state.doc.lineAt(to);
+      for (let lineNo = startLine.number; lineNo <= endLine.number; lineNo += 1) {
+        const line = state.doc.line(lineNo);
+        const lineFrom = Math.max(from, line.from);
+        const lineTo = Math.min(to, line.to);
+        if (lineTo > lineFrom) builder.add(lineFrom, lineTo, mark);
+      }
+    }
+    return builder.finish();
+  }
+
+  const selectionMaskPlugin = ViewPlugin.fromClass(class {
+    constructor(view) {
+      this.decorations = buildUserSelectionMaskDecorations(view.state);
+    }
+    update(update) {
+      if (update.selectionSet || update.docChanged) {
+        this.decorations = buildUserSelectionMaskDecorations(update.state);
+      }
+    }
+  }, {
+    decorations: (plugin) => plugin.decorations,
+  });
+
   function findCurrentBlockLines(state) {
     const selLine = state.doc.lineAt(state.selection.main.head).number;
     let start = selLine;
@@ -732,7 +877,7 @@
       const text = line.text;
       const trimmed = text.trim();
       const head = trimmed ? trimmed.split(/\s+/, 1)[0].toLowerCase() : '';
-      const kind = lineHeadKind(head);
+      const kind = /^\s*(?:\/\/\/|\/\/\s*title\s*:|#\s*title\s*:)/i.test(text) ? 'metadata' : lineHeadKind(head);
       const pulse = pulses.get(i);
       const meter = meters.get(i);
       const leafState = leafStates && leafStates.get(i);
@@ -789,6 +934,7 @@
   const cyberneticScorePlugin = ViewPlugin.fromClass(class {
     constructor(view) {
       this.view = view;
+      syncSelectionClass(view);
       this.pulses = new Map();
       this.meters = new Map();
       this.leafStates = new Map();
@@ -1048,6 +1194,7 @@
     }
 
     update(update) {
+      if (update.selectionSet || update.docChanged || update.focusChanged) syncSelectionClass(update.view);
       const pulseNudged = update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)));
       if (update.docChanged || update.viewportChanged || update.selectionSet || pulseNudged) {
         this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters, this.leafStates);
@@ -1172,6 +1319,23 @@
       backgroundColor: '#ffffff',
       borderLeftColor: '#008f5a',
     },
+    '.cm-line.cs-line-metadata': {
+      backgroundColor: '#fbfbfb',
+      borderLeftColor: '#070707',
+      boxShadow: 'inset 0 -1px 0 rgba(7,7,7,0.08)',
+    },
+    '.cm-line.cs-line-metadata::after': {
+      content: '""',
+      position: 'absolute',
+      left: '2.72rem',
+      top: '0.56em',
+      width: '0.46rem',
+      height: '0.46rem',
+      background: '#e3342f',
+      border: '1.5px solid #070707',
+      boxShadow: '2px 2px 0 #ffd400',
+      pointerEvents: 'none',
+    },
     '.cm-line.cs-active-line': {
       animation: 'cs-line-stamp 780ms ease-out both',
       boxShadow: 'inset 0 -2px 0 #070707, 3px 3px 0 rgba(7,7,7,0.16)',
@@ -1207,9 +1371,41 @@
     '.cm-cursor, .cm-dropCursor': {
       borderLeftColor: '#070707',
       borderLeftWidth: '2px',
+      boxShadow: '2px 0 0 #ffd400',
     },
-    '&.cm-focused .cm-selectionBackground, ::selection, .cm-selectionBackground': {
-      backgroundColor: 'rgba(0, 87, 255, 0.22)',
+    '.cm-selectionLayer': {
+      zIndex: '70',
+    },
+    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+      backgroundColor: 'rgba(255, 212, 0, 0.58)',
+      boxShadow: 'inset 0 0 0 1px rgba(7,7,7,0.72)',
+    },
+    '.cm-content ::selection, .cm-line ::selection, ::selection': {
+      backgroundColor: 'rgba(255, 212, 0, 0.62)',
+      color: '#070707',
+    },
+    '.cs-user-selection-mask': {
+      backgroundColor: '#ffe45c !important',
+      color: '#070707 !important',
+      boxShadow: 'inset 0 -2px 0 #070707, inset 0 1px 0 rgba(7,7,7,0.22)',
+      outline: '1px solid rgba(7,7,7,0.48)',
+      outlineOffset: '-1px',
+      textShadow: 'none !important',
+      textDecorationColor: '#070707 !important',
+      borderRadius: '0',
+    },
+    '.cs-user-selection-mask *': {
+      color: '#070707 !important',
+      backgroundColor: 'transparent !important',
+      textShadow: 'none !important',
+      textDecorationColor: '#070707 !important',
+    },
+    '&.cs-has-selection .cs-leaf-highlight-layer': {
+      opacity: '0.16',
+      zIndex: '1',
+    },
+    '&.cs-has-selection .cm-content': {
+      zIndex: '3',
     },
     '.cm-selectionMatch': {
       backgroundColor: '#ffd400',
@@ -1298,6 +1494,13 @@
       fontStyle: 'italic',
       fontWeight: '650',
       boxShadow: 'inset 3px 0 0 #070707',
+    },
+    '.cm-line.cs-line-metadata .cs-comment': {
+      color: '#3f3832',
+      fontStyle: 'italic',
+      fontWeight: '800',
+      letterSpacing: '0.025em',
+      boxShadow: 'inset 3px 0 0 #e3342f, inset 0 -2px 0 rgba(0,87,255,0.2)',
     },
     '.cs-invalid': {
       color: '#d7263d',
@@ -1948,6 +2151,9 @@
       replLanguageWithTags,
       syntaxHighlighting(replHighlight),
       cyberneticScorePlugin,
+      selectionStateClassPlugin,
+      selectionMaskPlugin,
+      dslSelectionMousePlugin,
       autocompletion({
         override: [completionSource],
         activateOnTyping: true,
@@ -2025,6 +2231,13 @@
         const max = view.state.doc.length;
         const clamped = Math.max(0, Math.min(max, pos | 0));
         view.dispatch({ selection: { anchor: clamped } });
+      },
+
+      selectRange(from, to) {
+        const max = view.state.doc.length;
+        const f = Math.max(0, Math.min(max, from | 0));
+        const tt = Math.max(0, Math.min(max, to | 0));
+        view.dispatch({ selection: { anchor: f, head: tt }, scrollIntoView: true });
       },
 
       dispatchTextChange(from, to, text) {

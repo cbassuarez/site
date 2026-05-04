@@ -464,6 +464,11 @@
       .toLowerCase();
   }
 
+  function isRestLikeLeafToken(value) {
+    const token = normalizeLeafToken(value);
+    return token === '~' || token === '.' || token === '-' || token === 'rest' || token === 'sustain';
+  }
+
   function isLeafStructuralToken(value) {
     return /^(?:\(|\)|\||;)$/.test(String(value || '').trim());
   }
@@ -490,22 +495,196 @@
     return false;
   }
 
-  function locateLeafTokenRange(lineText, payload) {
+  // Note: this earlier definition is shadowed below by the tree-based variant
+  // (see `function locateLeafTokenRange(lineText, payload)` later). The later
+  // definition is the one the receiver uses; both strict-drop on out-of-range
+  // identity now.
+  function locateLeafTokenRangeFlat(lineText, payload) {
     const ranges = leafTokenRangesForLine(lineText);
     if (!ranges.length) return null;
-
     const leafIndex = Math.max(0, Number(payload && payload.leafIndex) | 0);
     const token = payload && payload.token;
     const matches = token ? ranges.filter((range) => leafTokenMatchesEvent(range.text, token)) : [];
-    if (matches.length) {
-      return matches[leafIndex % matches.length];
+    if (matches.length) return matches[Math.min(matches.length - 1, leafIndex)];
+    return null;
+  }
+
+  function sanitizeLeafClass(value) {
+    return String(value || '')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .toLowerCase() || 'event';
+  }
+
+  function leafStateClass(value) {
+    const state = sanitizeLeafClass(value || 'hit');
+    if (state === 'rest' || state === 'skipped' || state === 'mutated' || state === 'held') return state;
+    return 'hit';
+  }
+
+  function isLeafStructuralToken(value) {
+    return /^(?:\(|\)|\||;)$/.test(String(value || '').trim());
+  }
+
+  function buildLeafSourceTree(lineText) {
+    const ranges = tokenRanges(lineText)
+      .filter((range) => !range.comment && !range.isHead)
+      .map((range) => ({
+        from: range.from,
+        to: range.to,
+        text: range.text,
+        structural: isLeafStructuralToken(range.text),
+      }));
+
+    let pos = 0;
+
+    function parseList(stopAtClose) {
+      const children = [];
+      while (pos < ranges.length) {
+        const range = ranges[pos];
+        const text = String(range.text || '').trim();
+
+        if (text === ')') {
+          if (stopAtClose) pos++;
+          return children;
+        }
+
+        if (text === '|') {
+          pos++;
+          continue;
+        }
+
+        if (text === '(') {
+          pos++;
+          children.push({ kind: 'group', children: parseList(true), range });
+          continue;
+        }
+
+        if (!range.structural) {
+          children.push({ kind: 'leaf', range });
+        }
+        pos++;
+      }
+      return children;
     }
 
-    // Nested rhythms can produce more runtime leaves than visible source tokens.
-    // When spans are unavailable, use the nearest visible leaf token rather than
-    // painting across the full editor width by percentage. This keeps the stamp
-    // attached to code-space instead of screen-space.
-    return ranges[Math.min(ranges.length - 1, leafIndex % ranges.length)];
+    return parseList(false);
+  }
+
+  function flattenLeafSourceTree(nodes, out) {
+    const target = out || [];
+    for (const node of nodes || []) {
+      if (!node) continue;
+      if (node.kind === 'leaf' && node.range) target.push(node.range);
+      if (node.kind === 'group') flattenLeafSourceTree(node.children, target);
+    }
+    return target;
+  }
+
+  function leafRangeAtPath(nodes, path, depth) {
+    const index = Number(path && path[depth]);
+    if (!Number.isFinite(index) || index < 0) return null;
+    const node = nodes && nodes[index];
+    if (!node) return null;
+    if (node.kind === 'leaf') return node.range || null;
+    if (node.kind === 'group') return leafRangeAtPath(node.children, path, depth + 1);
+    return null;
+  }
+
+
+  function voiceHeadForLeafLine(lineText) {
+    const head = String(lineText || '').trim().split(/\s+/, 1)[0].toLowerCase();
+    if (head === 'string' || head === 'sample' || head === 'input') return head;
+    return '';
+  }
+
+  function payloadVoiceMatchesLine(lineText, payload) {
+    const lineVoice = voiceHeadForLeafLine(lineText);
+    const eventVoice = String((payload && payload.voice) || '').toLowerCase();
+    // Strict: a leaf/block-position pulse only paints lines that own a voice
+    // declaration matching the event's voice. The previous permissive
+    // "either side empty → accept" rule could let a sample-block event land
+    // on a non-voice row (or vice versa) when an event's voice tag was
+    // missing, which is a cross-block contamination vector. Voice events
+    // must arrive on a real voice line.
+    if (!eventVoice) return false;
+    if (!lineVoice) return false;
+    return lineVoice === eventVoice;
+  }
+
+  function locateLeafTokenRange(lineText, payload) {
+    const tree = buildLeafSourceTree(lineText);
+    const flat = flattenLeafSourceTree(tree);
+    if (!flat.length) return null;
+
+    const wantsRest = leafStateClass(payload && payload.state) === 'rest' || isRestLikeLeafToken(payload && payload.token);
+    const isRestRange = (range) => isRestLikeLeafToken(range && range.text);
+    const selectIndexedLeaf = (leaves, index) => {
+      if (!Array.isArray(leaves) || !leaves.length) return null;
+      const safeIndex = Math.max(0, Math.floor(Number(index) || 0));
+      // Strict: never wrap modulo. A sourceLeafIndex outside the slot's leaf
+      // count means the event is for a different shape of phrase than what
+      // this line currently shows — drop it instead of painting a neighbor.
+      if (safeIndex >= leaves.length) return null;
+      const selected = leaves[safeIndex];
+      if (!wantsRest) return selected || null;
+      if (selected && isRestRange(selected)) return selected;
+      // Rest/sustain events must stay attached to an actual visible rest cell.
+      // Do not silently fall through to a neighboring note; that is what made
+      // stale/nonexistent plates appear when patches changed.
+      return null;
+    };
+
+    const slotIndex = Number(payload && payload.slotIndex);
+    const sourceLeafIndex = Number(payload && payload.sourceLeafIndex);
+
+    // Reject events whose top-level slot index is out of range for the line.
+    // This is the primary defense against cross-voice subdivision inheritance:
+    // a string block with 4 top-level slots that emit slotIndex 0..3 may not
+    // paint a sample block whose visible line shows 16 nested cells, and
+    // vice versa. Both blocks own their own slot count; the editor refuses
+    // to translate one block's index into the other block's range space.
+    if (Number.isFinite(slotIndex) && slotIndex >= 0 && slotIndex >= tree.length) {
+      return null;
+    }
+
+    // The scheduler sends sourceLeafIndex: the leaf ordinal inside the
+    // top-level source slot that actually dispatched. Prefer that over global
+    // eventIndex or token text; repeated notes and repeated random leaves are
+    // otherwise indistinguishable by text.
+    if (Number.isFinite(slotIndex) && slotIndex >= 0 && Number.isFinite(sourceLeafIndex) && sourceLeafIndex >= 0) {
+      const slot = tree[slotIndex];
+      const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
+      const selected = selectIndexedLeaf(slotLeaves, sourceLeafIndex);
+      if (selected) return selected;
+      // Strict drop: if the source slot exists but the sub-leaf does not,
+      // do not fall through to a path/flat fallback — the event does not
+      // map onto a real cell of *this* line.
+      return null;
+    }
+
+    // Path fallback: preserves nested position when sourceLeafIndex is absent.
+    // Still gated on the slot being in range for this line's visible tree.
+    const path = payload && Array.isArray(payload.leafPath) ? payload.leafPath : null;
+    const byPath = path && path.length ? leafRangeAtPath(tree, path, 0) : null;
+    if (byPath && (!wantsRest || isRestRange(byPath))) return byPath;
+    if (wantsRest && byPath && !isRestRange(byPath)) return null;
+
+    // Slot fallback: choose the visible top-level slot or its first leaf.
+    if (Number.isFinite(slotIndex) && slotIndex >= 0) {
+      const slot = tree[slotIndex];
+      if (slot && slot.kind === 'leaf' && slot.range) return wantsRest && !isRestRange(slot.range) ? null : slot.range;
+      const slotLeaves = slot ? flattenLeafSourceTree([slot]) : [];
+      const selected = selectIndexedLeaf(slotLeaves, 0);
+      if (selected) return selected;
+      return null;
+    }
+
+    // No slot index, no path, no source leaf index — we have no committed
+    // identity to anchor on. The previous code wrapped a global leafIndex
+    // by `flat.length`, which guaranteed *some* token would light up even
+    // for events that didn't actually belong to this line's pattern shape.
+    // Drop instead.
+    return null;
   }
 
   function findCurrentBlockLines(state) {
@@ -593,14 +772,14 @@
       builder.add(line.from, line.from, Decoration.line({ attributes: attrs }));
 
       const ranges = tokenRanges(text);
-      const activeLeafRange = leafState && /^voice-/.test(kind) && leafState.range ? leafState.range : null;
       for (const r of ranges) {
         const cls = r.comment ? 'cs-token cs-comment' : tokenCssClass(r.text, r.isHead);
         const tokenPulse = active && r.isHead ? ' cs-token-active' : '';
-        const leafPulse = activeLeafRange && r.from === activeLeafRange.from && r.to === activeLeafRange.to
-          ? ` cs-leaf-token-active cs-leaf-token-${leafStateClass(leafState.state)}`
-          : '';
-        builder.add(line.from + r.from, line.from + r.to, Decoration.mark({ class: cls + tokenPulse + leafPulse }));
+        // Leaf playback is drawn by an absolute overlay plate owned by the
+        // ViewPlugin. Do not add layout-affecting classes to source tokens here:
+        // the code text must stay perfectly registered while the runtime stamp
+        // moves independently above/below the score grid.
+        builder.add(line.from + r.from, line.from + r.to, Decoration.mark({ class: cls + tokenPulse }));
       }
     }
 
@@ -613,31 +792,147 @@
       this.pulses = new Map();
       this.meters = new Map();
       this.leafStates = new Map();
+      this.leafPlates = new Map();
+      // line → blockId most-recently observed on a block-position pulse for
+      // that line. Used to reject leaf events whose owning block's identity
+      // doesn't match the current owner of the line — a defense in depth
+      // against a hot-swapped or re-shaped block painting through stale
+      // identity.
+      this.lineOwners = new Map();
+      this.pendingLeafFrame = null;
       this.timer = null;
+      this.currentEpoch = null;
+      this.seenLeafEvents = new Set();
+      this.overlay = document.createElement('div');
+      this.overlay.className = 'cs-leaf-highlight-layer';
+      this.overlay.setAttribute('aria-hidden', 'true');
+      // Put the plate plane inside CodeMirror's scroll DOM so coordinates are
+      // measured in the same viewport as coordsAtPos(). The plane never receives
+      // input and never changes the text DOM.
+      const host = view.scrollDOM || view.dom;
+      host.appendChild(this.overlay);
       this.decorations = buildCyberneticScoreDecorations(view, this.pulses, this.meters, this.leafStates);
       this.unsubscribe = ensurePulseBus().on((payload) => this.receive(payload));
     }
 
+    clearLeafRuntime() {
+      this.leafStates.clear();
+      this.leafPlates.clear();
+      this.seenLeafEvents.clear();
+      this.lineOwners.clear();
+      if (this.pendingLeafFrame != null) {
+        cancelAnimationFrame(this.pendingLeafFrame);
+        this.pendingLeafFrame = null;
+      }
+      if (this.overlay) this.overlay.replaceChildren();
+      this.decorations = buildCyberneticScoreDecorations(this.view, this.pulses, this.meters, this.leafStates);
+      try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
+    }
+
+    removeLeafPlate(line) {
+      const key = String(line);
+      this.leafPlates.delete(key);
+      if (!this.overlay) return;
+      const plate = this.overlay.querySelector(`[data-leaf-plate="${key}"]`);
+      if (plate && plate.parentNode) plate.parentNode.removeChild(plate);
+    }
+
     receive(payload) {
+      if (payload && payload.kind === 'reset') {
+        this.currentEpoch = Number.isFinite(Number(payload.epoch)) ? Number(payload.epoch) : null;
+        this.pulses.clear();
+        this.meters.clear();
+        this.clearLeafRuntime();
+        return;
+      }
+      if (payload && Number.isFinite(Number(payload.epoch))) {
+        const epoch = Number(payload.epoch);
+        if (this.currentEpoch != null && epoch !== this.currentEpoch) return;
+        this.currentEpoch = epoch;
+      }
       const line = Math.max(1, Number(payload && payload.line) | 0);
       if (!line || line > this.view.state.doc.lines) return;
       const now = Date.now();
       const intensity = clamp01(payload.intensity == null ? 1 : payload.intensity);
+      if (payload && payload.kind === 'block-position') {
+        // A block can advance through silent time, rests, or a longer-than-bar
+        // cycle without firing a new token. Clear the old plate on the owning
+        // line so the editor never displays "last event" as "current event".
+        const lineText = this.view.state.doc.line(line).text;
+        if (!payloadVoiceMatchesLine(lineText, payload)) return;
+        // Record this block as the current owner of this line. Subsequent
+        // leaf events whose blockId mismatches this owner are rejected as
+        // cross-block strays. Block-position is the canonical "I own this
+        // line" signal because it fires once per top-slot of the owning
+        // block, regardless of speed/every gating.
+        const ownerId = payload.blockId == null ? null : String(payload.blockId);
+        if (ownerId) this.lineOwners.set(line, ownerId);
+        this.leafStates.delete(line);
+        this.removeLeafPlate(line);
+        this.requestRefresh();
+        return;
+      }
       if (payload && payload.kind === 'leaf') {
+        const eventId = payload.eventId == null ? '' : `${payload.epoch || ''}:${payload.eventId}`;
+        if (eventId && this.seenLeafEvents.has(eventId)) return;
+        if (eventId) this.seenLeafEvents.add(eventId);
+        if (this.seenLeafEvents.size > 512) this.seenLeafEvents.clear();
         const count = Math.max(1, Number(payload.leafCount) | 0);
         const index = Math.max(0, Math.min(count - 1, Number(payload.leafIndex) | 0));
         const previous = this.leafStates.get(line) || {};
         const lineText = this.view.state.doc.line(line).text;
+        if (!payloadVoiceMatchesLine(lineText, payload)) return;
+        // BlockId guard: if a line has a recorded owner from block-position,
+        // reject leaf events claiming a different blockId. Without this
+        // guard, a stale event could land on a hot-swapped line and paint
+        // through the new block's tokens.
+        const eventBlockId = payload.blockId == null ? null : String(payload.blockId);
+        const ownerId = this.lineOwners.get(line) || null;
+        if (ownerId && eventBlockId && ownerId !== eventBlockId) return;
+        if (eventBlockId && !ownerId) this.lineOwners.set(line, eventBlockId);
+        // SlotIndex sanity: scheduler stamps slotsTotal = the owning block's
+        // top-level slot count. If slotIndex falls outside that range, the
+        // event cannot belong to this block — refuse it.
+        const totalSlots = Number(payload.slotsTotal);
+        const evtSlot = Number(payload.slotIndex);
+        if (Number.isFinite(totalSlots) && totalSlots > 0
+            && Number.isFinite(evtSlot) && (evtSlot < 0 || evtSlot >= totalSlots)) return;
         const range = locateLeafTokenRange(lineText, payload);
-        this.leafStates.set(line, {
+        if (!range || !range.text) return;
+        const payloadToken = normalizeLeafToken(payload && payload.token);
+        const rangeToken = normalizeLeafToken(range.text);
+        const isRestEvent = leafStateClass(payload && payload.state) === 'rest' || isRestLikeLeafToken(payload && payload.token);
+        const isRestRange = isRestLikeLeafToken(range.text);
+        const canAcceptGeneric = payloadToken === 'note' || payloadToken === '*' || payloadToken === 'sample';
+        if (isRestEvent && !isRestRange) return;
+        if (!isRestEvent && isRestRange) return;
+        if (payloadToken && !isRestEvent && !canAcceptGeneric && payloadToken !== rangeToken) return;
+        // Rest/sustain leaves are true rhythmic events, but their visual
+        // registration must be a short punch, not a full-slot occupancy. A
+        // whole-beat rest in one voice can otherwise remain visible while a
+        // faster nested group in another voice fires, which reads as if the
+        // faster leaf leaked into every block. Keep sounding leaves slightly
+        // longer, but make rest plates deliberately quiet and brief.
+        const visualFromPayload = Number(payload && payload.visualDurationMs);
+        const visualMs = Number.isFinite(visualFromPayload)
+          ? Math.max(70, Math.min(360, visualFromPayload))
+          : (isRestEvent
+              ? 110
+              : Math.max(150, Math.min(300, Number(payload.duration) * 360 || CS_LEAF_RECENT_MS)));
+        const leafState = {
           leafCount: count,
           currentIndex: index,
-          state: payload.state || 'hit',
+          state: isRestEvent ? 'rest' : (payload.state || 'hit'),
           voice: payload.voice || previous.voice || '',
           token: payload.token || '',
+          slotIndex: Number.isFinite(Number(payload.slotIndex)) ? Number(payload.slotIndex) : null,
+          sourceLeafIndex: Number.isFinite(Number(payload.sourceLeafIndex)) ? Number(payload.sourceLeafIndex) : null,
           range: range ? { from: range.from, to: range.to, text: range.text } : null,
-          expires: now + Math.max(140, Math.min(420, Number(payload.duration) * 650 || CS_LEAF_RECENT_MS)),
-        });
+          visualMs,
+          expires: now + visualMs,
+        };
+        this.leafStates.set(line, leafState);
+        if (leafState.range) this.queueLeafPlate(line, leafState);
       } else {
         this.pulses.set(line, {
           expires: now + CS_PULSE_MS,
@@ -658,6 +953,79 @@
       try { this.view.dispatch({ effects: csPulseNudge.of(Date.now()) }); } catch (_) {}
       this.armCleanup();
     }
+
+    queueLeafPlate(line, state) {
+      if (!state || !state.range || !this.view || this.view.destroyed) return;
+      const key = String(line);
+      this.leafPlates.set(key, { line, state });
+      if (this.pendingLeafFrame != null) return;
+      this.pendingLeafFrame = requestAnimationFrame(() => {
+        this.pendingLeafFrame = null;
+        this.flushLeafPlates();
+      });
+    }
+
+    ensureLeafPlate(key) {
+      if (!this.overlay) return null;
+      let plate = this.overlay.querySelector(`[data-leaf-plate="${key}"]`);
+      if (plate) return plate;
+      plate = document.createElement('div');
+      plate.className = 'cs-leaf-highlight-plate';
+      plate.dataset.leafPlate = key;
+      // Keep the code DOM immutable, but draw the active token on the overlay
+      // itself. The plate sits above CodeMirror text/background layers, so an
+      // opaque neo-brutal button can be readable without pushing glyph layout.
+      this.overlay.appendChild(plate);
+      return plate;
+    }
+
+    flushLeafPlates() {
+      if (!this.view || this.view.destroyed || !this.overlay) return;
+      for (const [key, item] of Array.from(this.leafPlates.entries())) {
+        const line = item.line;
+        const state = item.state || {};
+        if (!state.range || line < 1 || line > this.view.state.doc.lines) continue;
+        const docLine = this.view.state.doc.line(line);
+        const from = docLine.from + Math.max(0, Number(state.range.from) || 0);
+        const to = docLine.from + Math.max(Number(state.range.to) || (Number(state.range.from) || 0) + 1, (Number(state.range.from) || 0) + 1);
+        const start = this.view.coordsAtPos(from, 1);
+        const end = this.view.coordsAtPos(to, -1) || start;
+        const hostRect = (this.view.scrollDOM || this.view.dom).getBoundingClientRect();
+        if (!start || !end || !hostRect) continue;
+
+        const rawLeft = Math.min(start.left, end.left);
+        const rawRight = Math.max(start.right || start.left, end.right || end.left, start.left + 8);
+        const rawTop = Math.min(start.top, end.top);
+        const rawBottom = Math.max(start.bottom, end.bottom, start.top + 16);
+        const padX = 3;
+        const padY = 2;
+        const left = Math.round(rawLeft - hostRect.left - padX);
+        const top = Math.round(rawTop - hostRect.top - padY);
+        const width = Math.max(12, Math.round(rawRight - rawLeft + padX * 2));
+        const height = Math.max(16, Math.round(rawBottom - rawTop + padY * 2));
+        const plate = this.ensureLeafPlate(key);
+        if (!plate) continue;
+        const stateClass = leafStateClass(state.state);
+        const voiceClass = sanitizeLeafClass(state.voice || 'string');
+        plate.className = `cs-leaf-highlight-plate cs-leaf-highlight-${stateClass} cs-leaf-highlight-${voiceClass}`;
+        plate.textContent = String((state.range && state.range.text) || state.token || '').slice(0, 32);
+        plate.style.width = `${width}px`;
+        plate.style.height = `${height}px`;
+        plate.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        plate.style.setProperty('--cs-leaf-plate-w', `${width}px`);
+        plate.style.setProperty('--cs-leaf-plate-ms', `${Math.max(90, Math.min(360, Number(state.visualMs) || 220))}ms`);
+        // Restart the relay-punch animation without touching the token element.
+        plate.classList.remove('is-firing');
+        void plate.offsetWidth;
+        plate.classList.add('is-firing');
+        window.clearTimeout(plate._csRemoveTimer);
+        const removeMs = Math.max(90, Math.min(360, Number(state.visualMs) || 220));
+        plate._csRemoveTimer = window.setTimeout(() => {
+          if (plate && plate.parentNode) plate.parentNode.removeChild(plate);
+        }, removeMs);
+      }
+    }
+
 
     armCleanup() {
       if (this.timer) return;
@@ -680,14 +1048,31 @@
     }
 
     update(update) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet || update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)))) {
+      const pulseNudged = update.transactions.some((tr) => tr.effects.some((e) => e.is(csPulseNudge)));
+      if (update.docChanged || update.viewportChanged || update.selectionSet || pulseNudged) {
         this.decorations = buildCyberneticScoreDecorations(update.view, this.pulses, this.meters, this.leafStates);
+      }
+      if (update.docChanged) {
+        this.clearLeafRuntime();
+        return;
+      }
+      if (update.geometryChanged || update.viewportChanged) {
+        // Geometry changes invalidate already-measured overlay plates. Do not
+        // retain them; the next valid leaf event will measure the current doc.
+        this.leafPlates.clear();
+        if (this.pendingLeafFrame != null) {
+          cancelAnimationFrame(this.pendingLeafFrame);
+          this.pendingLeafFrame = null;
+        }
+        if (this.overlay) this.overlay.replaceChildren();
       }
     }
 
     destroy() {
       if (this.unsubscribe) this.unsubscribe();
       if (this.timer) clearTimeout(this.timer);
+      if (this.pendingLeafFrame != null) cancelAnimationFrame(this.pendingLeafFrame);
+      if (this.overlay && this.overlay.parentNode) this.overlay.parentNode.removeChild(this.overlay);
     }
   }, {
     decorations: (plugin) => plugin.decorations,
@@ -937,46 +1322,78 @@
       color: '#ffffff',
       outlineColor: '#070707',
     },
+    '.cm-scroller': {
+      position: 'relative',
+    },
+    '.cm-content': {
+      position: 'relative',
+      zIndex: '2',
+    },
+    '.cs-leaf-highlight-layer': {
+      position: 'absolute',
+      inset: '0',
+      zIndex: '40',
+      pointerEvents: 'none',
+      overflow: 'hidden',
+      contain: 'layout style paint',
+    },
     '.cm-line.cs-leaf-line-active': {
-      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(255,212,0,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(255,212,0,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
-      backgroundBlendMode: 'normal',
-      boxShadow: 'inset 0 -3px 0 #ffd400',
-    },
-    '.cm-line.cs-leaf-line-active.cs-line-sample, .cm-line.cs-leaf-line-active.cs-pulse-sample': {
-      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(227,52,47,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(227,52,47,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
-      boxShadow: 'inset 0 -3px 0 #e3342f',
-    },
-    '.cm-line.cs-leaf-line-active.cs-line-input, .cm-line.cs-leaf-line-active.cs-pulse-input': {
-      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(0,87,255,0.24) calc(var(--cs-leaf-left) - 0.18ch), rgba(0,87,255,0.24) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
-      boxShadow: 'inset 0 -3px 0 #0057ff',
+      backgroundImage: 'none',
+      boxShadow: 'none',
     },
     '.cm-line.cs-leaf-state-rest': {
-      backgroundImage: 'linear-gradient(90deg, transparent 0, transparent calc(var(--cs-leaf-left) - 0.18ch), rgba(255,255,255,0.76) calc(var(--cs-leaf-left) - 0.18ch), rgba(255,255,255,0.76) calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch), transparent calc(var(--cs-leaf-left) + var(--cs-leaf-width) + 0.18ch))',
-      boxShadow: 'inset 0 -3px 0 #070707',
+      backgroundImage: 'none',
+      boxShadow: 'none',
     },
-    '.cm-line .cs-leaf-token-active': {
+    '.cs-leaf-highlight-plate': {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '2px solid #070707',
       backgroundColor: '#ffd400',
       color: '#070707',
-      outline: '2px solid #070707',
-      boxShadow: '3px 3px 0 #070707',
-      animation: 'cs-token-stamp 520ms steps(2, end) both',
+      boxShadow: '4px 4px 0 #070707',
+      boxSizing: 'border-box',
+      opacity: '0',
+      overflow: 'hidden',
+      whiteSpace: 'pre',
+      font: 'inherit',
+      fontWeight: '900',
+      letterSpacing: '0',
+      lineHeight: '1',
+      textAlign: 'center',
+      textDecoration: 'none',
+      textShadow: 'none',
+      willChange: 'transform, opacity',
+      transformOrigin: 'left top',
     },
-    '.cm-line.cs-line-sample .cs-leaf-token-active, .cm-line.cs-pulse-sample .cs-leaf-token-active': {
+    '.cs-leaf-highlight-plate.is-firing': {
+      animation: 'cs-leaf-overlay-punch var(--cs-leaf-plate-ms, 220ms) steps(2, end) both',
+    },
+    '.cs-leaf-highlight-sample': {
       backgroundColor: '#e3342f',
       color: '#ffffff',
+      borderRadius: '999px',
+      boxShadow: '4px 4px 0 #070707',
     },
-    '.cm-line.cs-line-input .cs-leaf-token-active, .cm-line.cs-pulse-input .cs-leaf-token-active': {
+    '.cs-leaf-highlight-input': {
       backgroundColor: '#0057ff',
       color: '#ffffff',
+      borderRadius: '0 10px 10px 0',
+      boxShadow: '4px 4px 0 #070707',
     },
-    '.cm-line .cs-leaf-token-rest': {
+    '.cs-leaf-highlight-rest': {
       backgroundColor: '#ffffff',
       color: '#070707',
-      outlineStyle: 'dashed',
-      boxShadow: '3px 3px 0 #070707',
+      backgroundImage: 'repeating-linear-gradient(135deg, transparent 0, transparent 5px, rgba(7,7,7,0.26) 5px, rgba(7,7,7,0.26) 7px)',
+      borderStyle: 'solid',
+      boxShadow: '4px 4px 0 #070707',
     },
-    '.cm-line .cs-leaf-token-mutated': {
-      backgroundImage: 'repeating-linear-gradient(135deg, rgba(124,60,255,0.88) 0, rgba(124,60,255,0.88) 2px, transparent 2px, transparent 5px)',
+    '.cs-leaf-highlight-mutated': {
+      backgroundImage: 'repeating-linear-gradient(135deg, #7c3cff 0, #7c3cff 4px, #ffffff 4px, #ffffff 8px)',
     },
 
     '.cm-tooltip': {
@@ -1051,6 +1468,12 @@
     '@keyframes cs-token-stamp': {
       '0%': { outline: '2px solid #070707', boxShadow: '2px 2px 0 #070707' },
       '100%': { outline: '0 solid transparent', boxShadow: 'none' },
+    },
+    '@keyframes cs-leaf-overlay-punch': {
+      '0%': { opacity: '0', filter: 'none' },
+      '8%': { opacity: '1', filter: 'none' },
+      '48%': { opacity: '1', filter: 'none' },
+      '100%': { opacity: '0', filter: 'none' },
     },
   }, { dark: false });
 

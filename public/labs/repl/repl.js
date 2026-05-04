@@ -17,6 +17,7 @@
     const shareBtn = document.getElementById('share');
   const exampleSelect = document.getElementById('example-select');
   const errorList = document.getElementById('errors');
+  const patchTitleChip = document.getElementById('patch-title-chip');
   const beatDotsEl = document.getElementById('beat-dots');
   const blockRowsEl = document.getElementById('block-rows');
   const transportVizEl = document.getElementById('transport-viz');
@@ -36,6 +37,13 @@
     const referenceToggleBtn = document.getElementById('reference-toggle');
     const referencePanel = document.getElementById('reference-panel');
     const referenceCloseBtn = document.getElementById('reference-close');
+    const fieldReportDialog = document.getElementById('field-report-dialog');
+    const fieldReportForm = document.getElementById('field-report-form');
+    const fieldReportPreview = document.getElementById('field-report-preview');
+    const fieldReportOpenBtns = Array.from(document.querySelectorAll('[data-field-report-open]'));
+    const fieldReportCloseBtns = Array.from(document.querySelectorAll('[data-field-report-close]'));
+    const fieldReportCopyBtn = document.querySelector('[data-field-report-copy]');
+    const FIELD_REPORT_ISSUE_URL = 'https://github.com/OWNER/REPO/issues/new';
 
     const SAMPLES_MANIFEST_URL = './samples/manifest.json';
     const DEFAULT_EXAMPLE_URL = './examples/default.txt';
@@ -46,6 +54,146 @@
   let statusTimer = null;
     let editorAPI = null;
     let shouldAutofocusEditor = true;
+    let loadedExampleLabel = '';
+    let lastParseErrorText = '';
+    let lastRuntimeErrorText = '';
+
+  // ---------------- patch title plate ----------------
+
+  const TITLE_COMMENT_RE = /^\s*(?:\/\/\s*title\s*:\s*|#\s*title\s*:\s*|\/\/\/\s*(?:patch\s*:\s*)?)(.+?)\s*$/i;
+  const FIELD_COMMENT_RE = /^\s*\/\/\/\s*field\s*:\s*(.+?)\s*$/i;
+
+  function normalizePatchTitle(raw) {
+    return String(raw || '')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function formatPatchTitle(raw) {
+    const title = normalizePatchTitle(raw) || 'UNTITLED';
+    return `PATCH / ${title.toUpperCase()}`;
+  }
+
+  function findExplicitPatchTitle(text) {
+    const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    let offset = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const m = line.match(TITLE_COMMENT_RE);
+      if (m && normalizePatchTitle(m[1])) {
+        const value = m[1];
+        const valueStartInLine = line.indexOf(value);
+        const from = offset + Math.max(0, valueStartInLine);
+        const to = from + value.length;
+        return {
+          title: normalizePatchTitle(value),
+          line: i + 1,
+          from,
+          to,
+          lineFrom: offset,
+          lineTo: offset + line.length,
+        };
+      }
+      offset += line.length + 1;
+    }
+
+    return null;
+  }
+
+  function sourceLabelFromAttractor(block) {
+    if (!block) return '';
+    const source = block.source || (block.attractor && block.attractor.source) || {};
+    const station = source.station || source.feed || source.region || source.city || '';
+    const raw = block.attractor && block.attractor.raw ? block.attractor.raw : '';
+    if (raw) return raw;
+    if (station) return station;
+    return '';
+  }
+
+  function generatedPatchTitle(program, text) {
+    const blocks = program && Array.isArray(program.blocks) ? program.blocks : [];
+    const voices = [];
+    const sources = [];
+
+    for (const block of blocks) {
+      if (block && block.voice && !voices.includes(block.voice)) voices.push(block.voice);
+      const sourceLabel = sourceLabelFromAttractor(block);
+      if (sourceLabel && !sources.includes(sourceLabel)) sources.push(sourceLabel);
+    }
+
+    if (voices.length || sources.length) {
+      const voicePart = voices.length ? voices.slice(0, 3).join(' + ') : 'patch';
+      const sourcePart = sources.length ? ` · ${sources.slice(0, 2).join(' · ')}` : '';
+      return `${voicePart}${sourcePart}`;
+    }
+
+    const field = String(text || '').split('\n').map((line) => line.match(FIELD_COMMENT_RE)).find(Boolean);
+    if (field && field[1]) return field[1];
+    return 'UNTITLED';
+  }
+
+  function computePatchTitle(text, program) {
+    const explicit = findExplicitPatchTitle(text);
+    if (explicit) return { label: formatPatchTitle(explicit.title), explicit };
+    if (loadedExampleLabel) return { label: formatPatchTitle(loadedExampleLabel), explicit: null };
+    return { label: formatPatchTitle(generatedPatchTitle(program, text)), explicit: null };
+  }
+
+  function setPatchTitleChip(label) {
+    if (!patchTitleChip) return;
+    patchTitleChip.textContent = label || 'PATCH / UNTITLED';
+    patchTitleChip.setAttribute('aria-label', `Patch title: ${patchTitleChip.textContent}`);
+  }
+
+  function refreshPatchTitle() {
+    if (!patchTitleChip || !editorAPI) return;
+    const text = editorAPI.getValue();
+    let program = lastGoodProgram;
+    if (window.ReplDSL && window.ReplDSL.parse) {
+      const parsed = window.ReplDSL.parse(text);
+      if (parsed && parsed.ok) program = parsed.program;
+    }
+    setPatchTitleChip(computePatchTitle(text, program).label);
+  }
+
+  function insertPatchTitleMetadata() {
+    if (!editorAPI) return;
+    const text = editorAPI.getValue();
+    const titleInfo = findExplicitPatchTitle(text);
+    if (titleInfo) {
+      editorAPI.selectRange(titleInfo.from, titleInfo.to);
+      editorAPI.focus();
+      return;
+    }
+
+    const inferred = computePatchTitle(text, lastGoodProgram).label.replace(/^PATCH\s*\/\s*/i, '');
+    const title = normalizePatchTitle(inferred) || 'Untitled Patch';
+    const prefix = `// title: ${title}\n`;
+    editorAPI.dispatchTextChange(0, 0, prefix);
+    editorAPI.selectRange(prefix.indexOf(title), prefix.indexOf(title) + title.length);
+    editorAPI.focus();
+    refreshPatchTitle();
+  }
+
+  function focusPatchTitleMetadata(selectText) {
+    if (!editorAPI) return;
+    const titleInfo = findExplicitPatchTitle(editorAPI.getValue());
+    if (!titleInfo) {
+      editorAPI.focus();
+      editorAPI.setCursor(0);
+      return;
+    }
+    if (selectText && typeof editorAPI.selectRange === 'function') {
+      editorAPI.selectRange(titleInfo.from, titleInfo.to);
+    } else {
+      editorAPI.setCursor(titleInfo.from);
+    }
+    editorAPI.focus();
+  }
 
   // ---------------- status / errors ----------------
 
@@ -74,14 +222,18 @@
     errorList.innerHTML = '';
   }
 
-  function showErrors(errors) {
-    clearErrors();
-    for (const e of errors) {
-      const li = document.createElement('li');
-      li.textContent = `line ${e.line}: ${e.message}`;
-      errorList.appendChild(li);
+    function showErrors(errors) {
+      clearErrors();
+      lastParseErrorText = Array.isArray(errors) && errors.length
+        ? errors.map((e) => `line ${e.line}: ${e.message}`).join('\n')
+        : '';
+
+      for (const e of errors) {
+        const li = document.createElement('li');
+        li.textContent = `line ${e.line}: ${e.message}`;
+        errorList.appendChild(li);
+      }
     }
-  }
 
   function showWarning(text) {
     const li = document.createElement('li');
@@ -89,6 +241,260 @@
     li.style.color = '#a04';
     errorList.appendChild(li);
   }
+    
+    // ---------------- field report / bug form ----------------
+
+    function getCurrentPatchText() {
+      return editorAPI ? editorAPI.getValue() : '';
+    }
+
+    function getCurrentPatchTitle() {
+      if (patchTitleChip && patchTitleChip.textContent.trim()) {
+        return patchTitleChip.textContent.trim();
+      }
+      return 'PATCH / UNTITLED';
+    }
+
+    function getCheckedValue(form, name, fallback) {
+      const checked = form ? form.querySelector(`input[name="${name}"]:checked`) : null;
+      return checked ? checked.value : fallback;
+    }
+
+    function readFieldReportForm() {
+      if (!fieldReportForm) {
+        return {
+          what: '',
+          intent: '',
+          kind: 'Other',
+          impact: 'Annoying',
+          contact: '',
+          includePatch: true,
+          includeDiagnostics: true,
+        };
+      }
+
+      const data = new FormData(fieldReportForm);
+      return {
+        what: String(data.get('what') || '').trim(),
+        intent: String(data.get('intent') || '').trim(),
+        kind: getCheckedValue(fieldReportForm, 'kind', 'Other'),
+        impact: getCheckedValue(fieldReportForm, 'impact', 'Annoying'),
+        contact: String(data.get('contact') || '').trim(),
+        includePatch: Boolean(data.get('includePatch')),
+        includeDiagnostics: Boolean(data.get('includeDiagnostics')),
+      };
+    }
+
+    function collectFieldReportDiagnostics() {
+      const audioState = scheduler && scheduler.ctx ? scheduler.ctx.state : 'not booted';
+      const transportState = scheduler
+        ? (scheduler.isRunning() ? 'playing' : 'stopped')
+        : 'not booted';
+
+      const viewport = `${window.innerWidth} × ${window.innerHeight}`;
+      const route = `${window.location.pathname}${window.location.search}${window.location.hash ? '#…' : ''}`;
+      const exampleLabel = loadedExampleLabel || 'none';
+      const buildNode = document.querySelector('[data-build], .build, #build');
+      const build = buildNode ? buildNode.textContent.trim() : 'dev';
+
+      let sampleBank = 'unknown';
+      if (window.SampleVoice && typeof window.SampleVoice.list === 'function') {
+        try {
+          sampleBank = `${window.SampleVoice.list().length} samples available`;
+        } catch (_) {
+          sampleBank = 'sample list unavailable';
+        }
+      }
+
+      return [
+        ['Build', build],
+        ['Route', route],
+        ['Browser', navigator.userAgent],
+        ['Viewport', viewport],
+        ['Patch title', getCurrentPatchTitle()],
+        ['Example', exampleLabel],
+        ['Transport', transportState],
+        ['Audio context', audioState],
+        ['Sample bank', sampleBank],
+        ['Last parse error', lastParseErrorText || 'none'],
+        ['Last runtime error', lastRuntimeErrorText || 'none'],
+        ['Timestamp', new Date().toISOString()],
+      ];
+    }
+
+    function buildFieldReportBody() {
+      const report = readFieldReportForm();
+      const patchText = getCurrentPatchText();
+      const diagnostics = collectFieldReportDiagnostics();
+
+      const parts = [
+        '## What happened',
+        '',
+        report.what || '[not provided]',
+        '',
+        '## What I was trying to do',
+        '',
+        report.intent || '[not provided]',
+        '',
+        '## Bug type',
+        '',
+        report.kind,
+        '',
+        '## Impact',
+        '',
+        report.impact,
+        '',
+        '## Current patch title',
+        '',
+        getCurrentPatchTitle(),
+        '',
+      ];
+
+      if (report.contact) {
+        parts.push('## Contact', '', report.contact, '');
+      }
+
+      if (report.includePatch) {
+        parts.push(
+          '## Current patch text',
+          '',
+          '```repl',
+          patchText || '[empty patch]',
+          '```',
+          ''
+        );
+      } else {
+        parts.push('## Current patch text', '', '[not included]', '');
+      }
+
+      if (report.includeDiagnostics) {
+        parts.push(
+          '## Diagnostics',
+          '',
+          ...diagnostics.map(([key, value]) => `- ${key}: ${value || 'unknown'}`),
+          ''
+        );
+      } else {
+        parts.push('## Diagnostics', '', '[not included]', '');
+      }
+
+      return parts.join('\n');
+    }
+
+    function buildFieldReportTitle() {
+      const report = readFieldReportForm();
+      const kind = report.kind || 'Bug';
+      const title = getCurrentPatchTitle().replace(/^PATCH\s*\/\s*/i, '').trim() || 'Untitled patch';
+      return `[REPL] ${kind} — ${title}`;
+    }
+
+    function refreshFieldReportPreview() {
+      if (!fieldReportPreview) return;
+      fieldReportPreview.value = buildFieldReportBody();
+    }
+
+    function openFieldReportDialog() {
+      if (!fieldReportDialog || !fieldReportForm) return;
+
+      refreshFieldReportPreview();
+
+      if (typeof fieldReportDialog.showModal === 'function') {
+        fieldReportDialog.showModal();
+      } else {
+        fieldReportDialog.setAttribute('open', '');
+      }
+
+      const first = fieldReportForm.querySelector('textarea[name="what"]');
+      if (first) first.focus();
+    }
+
+    function closeFieldReportDialog() {
+      if (!fieldReportDialog) return;
+
+      if (typeof fieldReportDialog.close === 'function') {
+        fieldReportDialog.close();
+      } else {
+        fieldReportDialog.removeAttribute('open');
+      }
+
+      if (editorAPI) editorAPI.focus();
+    }
+
+    async function copyFieldReport() {
+      const body = buildFieldReportBody();
+
+      try {
+        await navigator.clipboard.writeText(body);
+        if (fieldReportCopyBtn) {
+          fieldReportCopyBtn.classList.add('copied');
+          fieldReportCopyBtn.textContent = 'copied';
+          window.setTimeout(() => {
+            fieldReportCopyBtn.classList.remove('copied');
+            fieldReportCopyBtn.textContent = 'copy report';
+          }, 1400);
+        }
+      } catch (_) {
+        if (fieldReportPreview) {
+          fieldReportPreview.focus();
+          fieldReportPreview.select();
+        }
+        showWarning('clipboard unavailable — report selected for manual copy');
+      }
+    }
+
+    function openFieldReportIssue() {
+      const title = buildFieldReportTitle();
+      const body = buildFieldReportBody();
+      const report = readFieldReportForm();
+
+      const url = new URL(FIELD_REPORT_ISSUE_URL);
+      url.searchParams.set('title', title);
+      url.searchParams.set('body', body);
+      url.searchParams.set('labels', `bug,repl,${report.kind.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    }
+
+    function bindFieldReport() {
+      if (!fieldReportDialog || !fieldReportForm) return;
+
+      fieldReportOpenBtns.forEach((btn) => {
+        btn.addEventListener('click', openFieldReportDialog);
+      });
+
+      fieldReportCloseBtns.forEach((btn) => {
+        btn.addEventListener('click', closeFieldReportDialog);
+      });
+
+      fieldReportForm.addEventListener('input', refreshFieldReportPreview);
+      fieldReportForm.addEventListener('change', refreshFieldReportPreview);
+
+      if (fieldReportCopyBtn) {
+        fieldReportCopyBtn.addEventListener('click', copyFieldReport);
+      }
+
+      fieldReportForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        if (!fieldReportForm.reportValidity()) {
+          refreshFieldReportPreview();
+          return;
+        }
+
+        refreshFieldReportPreview();
+        openFieldReportIssue();
+      });
+
+      fieldReportDialog.addEventListener('click', (event) => {
+        if (event.target === fieldReportDialog) closeFieldReportDialog();
+      });
+
+      fieldReportDialog.addEventListener('cancel', () => {
+        window.setTimeout(() => {
+          if (editorAPI) editorAPI.focus();
+        }, 0);
+      });
+    }
 
   // ---------------- evaluation ----------------
 
@@ -103,33 +509,41 @@
       }
 
       clearErrors();
+      lastParseErrorText = '';
       lastGoodProgram = result.program;
+      refreshPatchTitle();
 
-      if (window.ReplAttractors && window.ReplAttractors.warm) {
-        window.ReplAttractors.warm(result.program);
+      try {
+        if (window.ReplAttractors && window.ReplAttractors.warm) {
+          window.ReplAttractors.warm(result.program);
+        }
+
+        renderTransportShell(result.program);
+
+        if (!scheduler) bootScheduler();
+        if (!scheduler) return;
+
+        const armed = await armInputsForProgram(result.program);
+        if (!armed) return;
+
+        // Hard evaluate/play:
+        // - stop current audio first
+        // - install the newly parsed AST
+        // - start from transport zero
+        //
+        // This intentionally differs from safePlay(), because Cmd-Enter / [play]
+        // should rebuild runtime state and allow frozen random choices to reroll.
+        if (scheduler.isRunning()) {
+          scheduler.stop();
+        }
+
+        scheduler.update(result.program);
+        scheduler.start();
+        lastRuntimeErrorText = '';
+      } catch (err) {
+        lastRuntimeErrorText = err && err.stack ? err.stack : String(err || 'unknown runtime error');
+        showWarning(`runtime error — ${err && err.message ? err.message : 'see field report diagnostics'}`);
       }
-
-      renderTransportShell(result.program);
-
-      if (!scheduler) bootScheduler();
-      if (!scheduler) return;
-
-      const armed = await armInputsForProgram(result.program);
-      if (!armed) return;
-
-      // Hard evaluate/play:
-      // - stop current audio first
-      // - install the newly parsed AST
-      // - start from transport zero
-      //
-      // This intentionally differs from safePlay(), because Cmd-Enter / [play]
-      // should rebuild runtime state and allow frozen random choices to reroll.
-      if (scheduler.isRunning()) {
-        scheduler.stop();
-      }
-
-      scheduler.update(result.program);
-      scheduler.start();
     }
 
     async function safePlay() {
@@ -260,7 +674,9 @@
     if (!location.hash || location.hash === '#') return false;
     const text = await decodeHash(location.hash);
     if (text) {
+      loadedExampleLabel = '';
       if (editorAPI) editorAPI.setValue(text);
+      refreshPatchTitle();
       return true;
     }
     showWarning('couldn\'t load shared patch — falling back to default example');
@@ -272,12 +688,16 @@
       const r = await fetch(DEFAULT_EXAMPLE_URL);
       if (r.ok) {
         const t = await r.text();
+        loadedExampleLabel = 'default';
         if (editorAPI) editorAPI.setValue(t);
+        refreshPatchTitle();
         return;
       }
     } catch (_) {}
     if (editorAPI) {
+      loadedExampleLabel = '';
       editorAPI.setValue('// failed to load default example. start typing.\n\ntempo 110\n\nstring   A3   C4   E4   G4\nforce    f    mf   p    f\n');
+      refreshPatchTitle();
     }
   }
 
@@ -352,6 +772,21 @@
         if (editorAPI) editorAPI.focus();
       });
     }
+
+  if (patchTitleChip) {
+    patchTitleChip.addEventListener('click', (e) => {
+      if (e.altKey || e.metaKey) {
+        e.preventDefault();
+        insertPatchTitleMetadata();
+        return;
+      }
+      focusPatchTitleMetadata(false);
+    });
+    patchTitleChip.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      focusPatchTitleMetadata(true);
+    });
+  }
 
   // Document-level Esc safety net: if the user presses Esc anywhere inside
   // the REPL shell, stop audio and refocus the editor. Scoped to the REPL
@@ -488,7 +923,10 @@
         const r = await fetch(`./examples/${v}`);
         if (r.ok) {
           const text = await r.text();
+          const selectedOption = exampleSelect.options[exampleSelect.selectedIndex];
+          loadedExampleLabel = selectedOption ? selectedOption.textContent : v.replace(/\.txt$/i, '');
           if (editorAPI) editorAPI.setValue(text);
+          refreshPatchTitle();
         }
       } catch (_) {}
       exampleSelect.value = '';
@@ -1377,8 +1815,83 @@
       `;
     }
 
+    function positionFloatingTooltip(tooltip, target, clientX, clientY) {
+      if (!tooltip) return;
+
+      const viewportPad = 12;
+      const cursorGap = 16;
+      const targetGap = 10;
+      const shadowPad = 10;
+
+      const targetRect = target && target.getBoundingClientRect
+        ? target.getBoundingClientRect()
+        : null;
+
+      let anchorX = Number.isFinite(clientX) ? clientX : null;
+      let anchorY = Number.isFinite(clientY) ? clientY : null;
+
+      if ((anchorX === null || anchorY === null) && targetRect) {
+        anchorX = targetRect.left + targetRect.width / 2;
+        anchorY = targetRect.top + targetRect.height / 2;
+      }
+
+      if (anchorX === null) anchorX = window.innerWidth / 2;
+      if (anchorY === null) anchorY = window.innerHeight / 2;
+
+      tooltip.style.left = '0px';
+      tooltip.style.top = '0px';
+
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const tooltipWidth = tooltipRect.width || tooltip.offsetWidth || 304;
+      const tooltipHeight = tooltipRect.height || tooltip.offsetHeight || 220;
+
+      let left = anchorX + cursorGap;
+      let top = anchorY + cursorGap;
+
+      if (targetRect) {
+        const preferRight = targetRect.right + targetGap + tooltipWidth + shadowPad <= window.innerWidth - viewportPad;
+        const preferLeft = targetRect.left - targetGap - tooltipWidth - shadowPad >= viewportPad;
+
+        if (preferRight) {
+          left = targetRect.right + targetGap;
+        } else if (preferLeft) {
+          left = targetRect.left - targetGap - tooltipWidth;
+        } else {
+          left = anchorX - tooltipWidth / 2;
+        }
+
+        const below = targetRect.bottom + targetGap;
+        const above = targetRect.top - targetGap - tooltipHeight;
+
+        if (below + tooltipHeight + shadowPad <= window.innerHeight - viewportPad) {
+          top = below;
+        } else if (above >= viewportPad) {
+          top = above;
+        } else {
+          top = anchorY + cursorGap;
+        }
+      }
+
+      left = Math.max(
+        viewportPad,
+        Math.min(left, window.innerWidth - tooltipWidth - shadowPad - viewportPad)
+      );
+
+      top = Math.max(
+        viewportPad,
+        Math.min(top, window.innerHeight - tooltipHeight - shadowPad - viewportPad)
+      );
+
+      tooltip.style.left = `${Math.round(left)}px`;
+      tooltip.style.top = `${Math.round(top)}px`;
+    }
+
+    function positionSignalTooltip(tooltip, target, clientX, clientY) {
+      positionFloatingTooltip(tooltip, target, clientX, clientY);
+    }
+
     function positionSurfaceTooltip(tooltip, target, clientX, clientY) {
-      positionSignalTooltip(tooltip, target, clientX, clientY);
+      positionFloatingTooltip(tooltip, target, clientX, clientY);
     }
 
     function showSurfaceTooltip(target, clientX, clientY) {
@@ -1433,6 +1946,7 @@
     }
 
     bindSurfaceTooltipEvents();
+    bindSignalTooltipEvents();
 
     function renderSurfaceChips(el, surfaces, active, activeSurfaceNames) {
       if (!el) return;
@@ -1648,6 +2162,102 @@
         const ariaLabel = signalAriaLabel(abbr, value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
         return `<span class="signal-token" style="--signal:${level}" data-signal="${abbr}" data-signal-value="${level}" tabindex="0" role="button" aria-label="${ariaLabel}"><abbr>${abbr}</abbr>${formatDecimal(value)}</span>`;
       }).join('');
+    }
+    
+    function ensureSignalTooltip() {
+      let tooltip = document.getElementById('signal-tooltip');
+      if (tooltip) return tooltip;
+
+      tooltip = document.createElement('aside');
+      tooltip.id = 'signal-tooltip';
+      tooltip.className = 'signal-tooltip';
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(tooltip);
+      return tooltip;
+    }
+
+    function signalTooltipHTML(abbr, value) {
+      const meta = SIGNAL_META[abbr] || {
+        name: `Signal ${abbr}`,
+        summary: 'live control signal',
+        detail: 'This telemetry value is available as a live control source for coupled score behavior.',
+        use: `${abbr} = live signal value`,
+        modulates: ['surface'],
+      };
+
+      const label = escapeTooltipText(String(abbr || '?').toUpperCase());
+      const displayValue = formatDecimal(value);
+      const chips = (meta.modulates || ['surface'])
+        .map((item) => `<span>${escapeTooltipText(item)}</span>`)
+        .join('');
+
+      return `
+        <div class="signal-tooltip-stamp">
+          <span class="signal-tooltip-mark" aria-hidden="true"></span>
+          SIGNAL / ${label}
+          <b>${escapeTooltipText(displayValue)}</b>
+        </div>
+        <div class="signal-tooltip-title">${escapeTooltipText(meta.name)}</div>
+        <div class="signal-tooltip-summary">${escapeTooltipText(meta.summary)}</div>
+        <div class="signal-tooltip-detail">${escapeTooltipText(meta.detail)}</div>
+        <div class="signal-tooltip-use">${escapeTooltipText(meta.use)}</div>
+        <div class="signal-tooltip-modulates"><strong>modulates</strong><div>${chips}</div></div>
+      `;
+    }
+
+    function showSignalTooltip(target, clientX, clientY) {
+      const abbr = target && target.dataset ? target.dataset.signal : '';
+      if (!abbr) return;
+
+      const value = Math.max(0, Math.min(1, Number(target.dataset.signalValue) || 0));
+      const tooltip = ensureSignalTooltip();
+
+      tooltip.dataset.signal = abbr;
+      tooltip.innerHTML = signalTooltipHTML(abbr, value);
+      tooltip.setAttribute('aria-hidden', 'false');
+      tooltip.classList.add('visible');
+
+      target.setAttribute('aria-describedby', 'signal-tooltip');
+      positionSignalTooltip(tooltip, target, clientX, clientY);
+    }
+
+    function hideSignalTooltip(target) {
+      const tooltip = document.getElementById('signal-tooltip');
+      if (!tooltip) return;
+
+      tooltip.classList.remove('visible');
+      tooltip.setAttribute('aria-hidden', 'true');
+      if (target && target.removeAttribute) target.removeAttribute('aria-describedby');
+    }
+
+    function bindSignalTooltipEvents() {
+      if (!transportVizEl) return;
+
+      transportVizEl.addEventListener('mousemove', (event) => {
+        const target = event.target.closest('.signal-token[data-signal]');
+        if (!target || !transportVizEl.contains(target)) return;
+        showSignalTooltip(target, event.clientX, event.clientY);
+      });
+
+      transportVizEl.addEventListener('mouseleave', (event) => {
+        hideSignalTooltip(event.target);
+      });
+
+      transportVizEl.addEventListener('focusin', (event) => {
+        const target = event.target.closest('.signal-token[data-signal]');
+        if (!target || !transportVizEl.contains(target)) return;
+        const rect = target.getBoundingClientRect();
+        showSignalTooltip(target, rect.left + rect.width / 2, rect.top);
+      });
+
+      transportVizEl.addEventListener('focusout', (event) => {
+        const target = event.target.closest('.signal-token[data-signal]');
+        if (target) hideSignalTooltip(target);
+      });
+
+      window.addEventListener('scroll', () => hideSignalTooltip(document.activeElement), true);
+      window.addEventListener('resize', () => hideSignalTooltip(document.activeElement));
     }
 
     function primaryCoupledBlockState(t) {
@@ -2275,7 +2885,8 @@
     });
   }
 
-  bindInputPanel();
+    bindInputPanel();
+    bindFieldReport();
 
   // ---------------- status ticker ----------------
 
@@ -2299,6 +2910,9 @@
       onChange: () => {
         // Reserved for future autosave/diagnostics hooks. The CM linter
         // already runs on doc changes; we don't hard-evaluate here.
+        const text = editorAPI ? editorAPI.getValue() : '';
+        if (findExplicitPatchTitle(text)) loadedExampleLabel = '';
+        refreshPatchTitle();
       },
       onCommand: {
         play: evaluateAndRun,
