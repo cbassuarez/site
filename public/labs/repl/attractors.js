@@ -35,6 +35,7 @@
   const NASA_DEMO_KEY = 'DEMO_KEY';
 
   const cache = new Map();
+  const liveCache = new Map();
 
   const ZERO = freezeSignals({
     intensity: 0,
@@ -124,6 +125,37 @@
     };
   }
 
+  function liveKeyFor(spec) {
+    const raw = spec && spec.raw ? String(spec.raw).toLowerCase() : '';
+    const kind = spec && spec.kind ? String(spec.kind).toLowerCase() : raw;
+    if (raw === 'mic' || raw === 'interface' || raw === 'tab' || raw === 'input') return raw;
+    if (kind === 'mic' || kind === 'interface' || kind === 'tab' || kind === 'input') return kind;
+    return '';
+  }
+
+  function liveValueFor(spec) {
+    const key = liveKeyFor(spec);
+    if (!key) return null;
+    return liveCache.get(key) || null;
+  }
+
+  function setLive(label, signals) {
+    const key = String(label || '').trim().toLowerCase();
+    if (!key) return;
+    liveCache.set(key, freezeSignals({
+      ...(signals || {}),
+      source: 'live',
+      label: signals && signals.label ? signals.label : key,
+      updatedAt: signals && signals.updatedAt ? signals.updatedAt : new Date().toISOString(),
+    }));
+  }
+
+  function clearLive(label) {
+    const key = String(label || '').trim().toLowerCase();
+    if (!key) return;
+    liveCache.delete(key);
+  }
+
   function keyFor(spec) {
     return JSON.stringify({
       kind: spec.kind,
@@ -135,6 +167,9 @@
   function get(specLike) {
     const spec = parseAttractorSpec(specLike);
     if (!spec) return Promise.resolve(ZERO);
+
+    const live = liveValueFor(spec);
+    if (live) return Promise.resolve(live);
 
     const key = keyFor(spec);
     const hit = cache.get(key);
@@ -155,6 +190,9 @@
   function peek(specLike) {
     const spec = parseAttractorSpec(specLike);
     if (!spec) return ZERO;
+
+    const live = liveValueFor(spec);
+    if (live) return live;
 
     const hit = cache.get(keyFor(spec));
     if (!hit || !hit.value) {
@@ -202,7 +240,10 @@
       case 'tub':
       case 'room':
       case 'audience':
+      case 'input':
       case 'mic':
+      case 'interface':
+      case 'tab':
       case 'body':
       case 'memory':
       case 'habit':
@@ -523,6 +564,8 @@
     get,
     peek,
     warm,
+    setLive,
+    clearLive,
     parseAttractorSpec,
     normalizeSignals,
   };

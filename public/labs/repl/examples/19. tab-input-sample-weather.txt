@@ -1,0 +1,49 @@
+tempo 78
+meter 4/4
+
+// TAB INPUT SAMPLE WEATHER
+// Press play and choose a browser tab with audio.
+// The tab audio can be silent in the mix while still controlling the patch.
+//
+// Good sources: archival footage, web radio, field recordings, YouTube, livestreams.
+input tab
+gain      0
+monitor   off
+listen    on
+
+// Tab audio becomes weather for sample memory.
+// Dense/noisy tab audio produces grain/scar.
+// Sparse tab audio opens space.
+sample    snm-*&32   ~   tub-*&32   ~
+attractor tab
+choose    tab.brightness 0.85
+trigger   tab.rupture 0.50
+gain      tab.intensity 0.14 0.62
+grain     tab.noisiness 0.04 0.64
+scar      tab.rupture
+space     tab.silence 0.18 0.88
+rate      tab.periodicity 0.70 1.35
+body      paper
+
+// A string layer bends around the tab's instability.
+string    (*4 A*)   ~   C*!   ~   E*   ~
+attractor tab
+time      tab.intensity 0.16
+beat      tab.density 0.24
+leaf      tab.rupture 0.62
+gain      tab.intensity 0.10 0.42
+pan       tab.volatility -0.75 0.75
+blur      tab.flux 0.00 0.30
+space     tab.silence 0.30 0.92
+body      glass
+
+// OPTIONAL: hear the tab as processed audio.
+// Uncomment to route the tab into the mix.
+//
+// input tab
+// gain      0.35
+// monitor   on
+// listen    on
+// compress  tab.intensity 0.08 0.35
+// space     tab.silence 0.10 0.48
+// body      room

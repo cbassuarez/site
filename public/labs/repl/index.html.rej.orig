@@ -1,0 +1,325 @@
+@@ -555,6 +555,324 @@
+       font-style: italic;
+       padding: 0.4em 0;
+     }
++
++    /* Transport hierarchy corrective pass — legibility + compact telemetry. */
++    :root {
++      --cs-white: #ffffff;
++      --cs-paper: #fffefa;
++      --cs-ink: #070707;
++      --cs-line: #070707;
++      --cs-red: #d51f2a;
++      --cs-blue: #0057ff;
++      --cs-yellow: #ffd400;
++      --cs-green: #008f5a;
++    }
++
++    .controls {
++      display: flex !important;
++      flex-wrap: wrap !important;
++      align-items: center !important;
++      gap: 0.52rem !important;
++      overflow: visible !important;
++      padding: 0.62rem 0.72rem !important;
++      margin: 0.78rem 0 0.55rem !important;
++      background: var(--cs-white) !important;
++      border: 2px solid var(--cs-line) !important;
++      box-shadow: 5px 5px 0 var(--cs-line) !important;
++      line-height: 1 !important;
++    }
++
++    .controls::before {
++      content: "TRANSPORT" !important;
++      flex: 0 0 auto !important;
++      align-self: center !important;
++      display: inline-flex !important;
++      align-items: center !important;
++      justify-content: center !important;
++      min-height: 2.7rem !important;
++      margin: 0 0.42rem 0 0 !important;
++      padding: 0 0.82rem !important;
++      background: var(--cs-line) !important;
++      color: var(--cs-white) !important;
++      border: 2px solid var(--cs-line) !important;
++      box-shadow: 4px 4px 0 var(--cs-line) !important;
++      font-weight: 950 !important;
++      letter-spacing: 0.12em !important;
++      text-transform: uppercase !important;
++      white-space: nowrap !important;
++    }
++
++    .controls .bracket,
++    .controls .sep {
++      display: none !important;
++    }
++
++    .controls button,
++    .controls a,
++    .controls select,
++    .controls .example-picker-button {
++      position: relative !important;
++      box-sizing: border-box !important;
++      display: inline-flex !important;
++      align-items: center !important;
++      justify-content: center !important;
++      min-height: 2.34rem !important;
++      margin: 0 !important;
++      border: 2px solid var(--cs-line) !important;
++      border-radius: 0 !important;
++      background: var(--cs-white) !important;
++      color: var(--cs-ink) !important;
++      box-shadow: 4px 4px 0 var(--cs-line) !important;
++      padding: 0.34rem 0.68rem !important;
++      font: inherit !important;
++      font-weight: 950 !important;
++      letter-spacing: 0.08em !important;
++      line-height: 1 !important;
++      text-transform: uppercase !important;
++      text-decoration: none !important;
++      white-space: nowrap !important;
++      overflow: visible !important;
++    }
++
++    .controls button:hover,
++    .controls button:focus,
++    .controls a:hover,
++    .controls a:focus,
++    .controls select:focus,
++    .controls .example-picker-button:hover,
++    .controls .example-picker-button:focus {
++      outline: 2px solid var(--cs-line) !important;
++      outline-offset: 2px !important;
++      filter: contrast(1.08) !important;
++    }
++
++    .controls button:active,
++    .controls a:active,
++    .controls .example-picker-button:active {
++      transform: translate(2px, 2px) !important;
++      box-shadow: 2px 2px 0 var(--cs-line) !important;
++    }
++
++    #play {
++      min-width: 12.4rem !important;
++      padding: 0 !important;
++      color: transparent !important;
++      border-left-width: 2px !important;
++      background:
++        repeating-linear-gradient(135deg,
++          var(--cs-line) 0 0.62rem,
++          var(--cs-white) 0.62rem 1.24rem) !important;
++    }
++
++    #play::before {
++      content: "EVALUATE" !important;
++      display: inline-flex !important;
++      align-items: center !important;
++      justify-content: center !important;
++      min-height: 1.42rem !important;
++      padding: 0.2rem 0.72rem !important;
++      background: var(--cs-line) !important;
++      color: var(--cs-white) !important;
++      border: 2px solid var(--cs-line) !important;
++      box-shadow: 2px 2px 0 var(--cs-white) !important;
++      text-shadow: none !important;
++      font-weight: 950 !important;
++      letter-spacing: 0.1em !important;
++    }
++
++    #play:hover::before,
++    #play:focus::before {
++      background: var(--cs-blue) !important;
++      color: var(--cs-white) !important;
++      box-shadow: 2px 2px 0 var(--cs-line) !important;
++    }
++
++    #safe-play {
++      min-width: 6.8rem !important;
++      color: transparent !important;
++      border-left-width: 10px !important;
++      border-left-color: var(--cs-yellow) !important;
++      background: var(--cs-white) !important;
++    }
++
++    #safe-play::before {
++      content: "REPLAY" !important;
++      color: var(--cs-ink) !important;
++      background: var(--cs-white) !important;
++      padding: 0.08rem 0.32rem !important;
++      border-bottom: 4px solid var(--cs-yellow) !important;
++      font-weight: 950 !important;
++      letter-spacing: 0.1em !important;
++    }
++
++    #safe-play:hover,
++    #safe-play:focus {
++      background: var(--cs-yellow) !important;
++      color: transparent !important;
++    }
++
++    #safe-play:hover::before,
++    #safe-play:focus::before {
++      background: var(--cs-yellow) !important;
++      border-bottom-color: var(--cs-line) !important;
++    }
++
++    #stop {
++      min-width: 5.6rem !important;
++      background: var(--cs-red) !important;
++      color: var(--cs-white) !important;
++      border-left-width: 2px !important;
++    }
++
++    #share {
++      min-width: 5.8rem !important;
++    }
++
++    #input-toggle {
++      min-width: 6.2rem !important;
++      border-left-width: 10px !important;
++      border-left-color: var(--cs-green) !important;
++    }
++
++    #input-toggle[aria-expanded="true"] {
++      background: var(--cs-blue) !important;
++      color: var(--cs-white) !important;
++      border-left-color: var(--cs-green) !important;
++    }
++
++    #samples-toggle,
++    #reference-toggle {
++      border-left-width: 10px !important;
++      border-left-color: var(--cs-yellow) !important;
++    }
++
++    #docs-link,
++    .controls a[href*="docs"] {
++      min-width: 4.6rem !important;
++    }
++
++    .controls .example-picker {
++      min-width: clamp(16rem, 24vw, 28rem) !important;
++      flex: 0 1 clamp(16rem, 24vw, 28rem) !important;
++    }
++
++    .controls .example-picker-button {
++      width: 100% !important;
++      justify-content: flex-start !important;
++      min-width: 0 !important;
++      padding-right: 2.2rem !important;
++      background: var(--cs-white) !important;
++      color: var(--cs-ink) !important;
++      border-left-width: 10px !important;
++      border-left-color: var(--cs-blue) !important;
++      text-align: left !important;
++    }
++
++    .controls .example-picker-button::after {
++      content: "▾" !important;
++      position: absolute !important;
++      right: 0.62rem !important;
++      top: 50% !important;
++      transform: translateY(-55%) !important;
++      color: var(--cs-ink) !important;
++    }
++
++    .example-picker-list {
++      background: var(--cs-white) !important;
++      border: 2px solid var(--cs-line) !important;
++      box-shadow: 6px 6px 0 var(--cs-line) !important;
++      padding: 0.38rem !important;
++    }
++
++    .example-picker-option {
++      background: var(--cs-white) !important;
++      color: var(--cs-ink) !important;
++      border: 2px solid var(--cs-line) !important;
++      box-shadow: 2px 2px 0 var(--cs-line) !important;
++    }
++
++    .example-picker-option.ryb-red:hover,
++    .example-picker-option.ryb-red:focus {
++      background: var(--cs-red) !important;
++      color: var(--cs-white) !important;
++    }
++
++    .example-picker-option.ryb-yellow:hover,
++    .example-picker-option.ryb-yellow:focus {
++      background: var(--cs-yellow) !important;
++      color: var(--cs-ink) !important;
++    }
++
++    .example-picker-option.ryb-blue:hover,
++    .example-picker-option.ryb-blue:focus {
++      background: var(--cs-blue) !important;
++      color: var(--cs-white) !important;
++    }
++
++    .transport-viz {
++      align-self: start !important;
++      display: block !important;
++      height: auto !important;
++      min-height: 0 !important;
++      overflow: visible !important;
++    }
++
++    .transport-viz .block-rows {
++      display: block !important;
++      flex: 0 0 auto !important;
++      min-height: 0 !important;
++    }
++
++    .transport-viz .beat-row,
++    .transport-viz .coupling-row,
++    .transport-viz .block-row {
++      min-height: 0 !important;
++      align-items: start !important;
++      padding-top: 0.42rem !important;
++      padding-bottom: 0.42rem !important;
++    }
++
++    .transport-viz .beat-row:empty,
++    .transport-viz .coupling-row:empty,
++    .transport-viz .block-row:empty {
++      display: none !important;
++    }
++
++    .transport-viz .beat-label,
++    .transport-viz .block-label,
++    .transport-viz .coupling-label {
++      min-height: 0 !important;
++    }
++
++    .transport-viz .beat-meta,
++    .transport-viz .coupling-value,
++    .transport-viz .block-coupling {
++      margin: 0 !important;
++      line-height: 1.14 !important;
++    }
++
++    .transport-viz .beat-dots,
++    .transport-viz .slot-dots,
++    .transport-viz .surface-chips {
++      margin: 0 !important;
++    }
++
++    @media (max-width: 62rem) {
++      .controls::before {
++        width: 100% !important;
++        margin: 0 0 0.2rem 0 !important;
++      }
++
++      .controls .example-picker {
++        flex-basis: 100% !important;
++        min-width: 100% !important;
++      }
++
++      #play {
++        min-width: min(100%, 13rem) !important;
++      }
++    }
++
+   </style>
+ </head>
+ <body>

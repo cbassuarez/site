@@ -1,0 +1,57 @@
+tempo 84
+meter 4/4
+
+// LIVE INPUT PRIMER
+// Press play. A patch with `input mic` should request permission and arm the mic before transport starts.
+// This first block is analysis-only: it listens to the mic, but does not route mic audio to speakers.
+// Use this as the safest live-input starter patch.
+input mic
+gain      0
+monitor   off
+listen    on
+compress  0.30
+space     0.18
+body      room
+fade      in 3s
+
+// MIC DRIVES PARAMETERS
+// Loudness opens gain.
+// Spectral movement pans the layer.
+// Brightness changes tone.
+// Silence opens space.
+string    *!4   (*4 A*)   ~   C*!   ~
+attractor mic
+gain      mic.intensity 0.18 0.62
+pan       mic.volatility -0.70 0.70
+tone      mic.brightness 0.25 0.95
+space     mic.silence 0.20 0.78
+blur      mic.flux 0.00 0.24
+body      glass
+
+// MIC ATTRACTOR INTO SAMPLE ECOLOGY
+// Speak, clap, scrape, hum, or play an instrument into the mic.
+// Sharp attacks trigger the sample body.
+// Noisy input increases grain and scar.
+sample    snm-*&24   ~   tub-*&32   ~
+attractor mic
+trigger   mic.rupture 0.52
+gain      mic.intensity 0.14 0.56
+grain     mic.noisiness 0.05 0.42
+scar      mic.rupture
+space     mic.silence 0.18 0.72
+body      paper
+
+// OPTIONAL: MIC -> SPEAKER OUTPUT
+// Uncomment this duplicate input block if you want audible mic monitoring.
+// Careful: speaker monitoring can feed back if your mic hears the speakers.
+// Switch `input mic` to `input interface` or `input tab` and mess around :)
+//
+// input mic
+// gain      0.40
+// monitor   on
+// listen    on
+// pan       center
+// compress  mic.intensity 0.10 0.40
+// space     mic.silence 0.08 0.45
+// body      room
+// fade      in 2s

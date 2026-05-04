@@ -1,0 +1,18 @@
+tempo 88
+meter 4/4
+
+string   *!4   (*4 A*)   ~    C*!
+speed    (1 1 1/2 pi/4)
+decay    4
+pan      *~
+body     glass
+space    0.25
+fade     inout 12s hold 3s
+
+sample   snm-*&24;   ~   tub-*&32;   ~
+gain     0.55
+rate     (*&16 ~)
+pan      *~
+grain    0.22
+scar     memory
+fade     outin 8s hold 2s

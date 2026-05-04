@@ -1,0 +1,266 @@
+@@ -590,11 +590,11 @@
+ 
+   const replTheme = EditorView.theme({
+     '&': {
+-      backgroundColor: '#fffaf0',
++      backgroundColor: '#ffffff',
+       color: '#101114',
+       fontFamily: '"Courier New", Courier, monospace',
+       fontSize: '14px',
+-      '--cs-paper': '#fffaf0',
++      '--cs-paper': '#ffffff',
+       '--cs-panel': '#ffffff',
+       '--cs-ink': '#101114',
+       '--cs-muted': '#62666f',
+@@ -616,8 +616,9 @@
+       outline: 'none',
+     },
+     '.cm-scroller': {
+-      background:
+-        'radial-gradient(circle at 12% 18%, rgba(20, 99, 255, 0.085), transparent 24%), radial-gradient(circle at 88% 14%, rgba(226, 59, 46, 0.075), transparent 22%), radial-gradient(circle at 72% 94%, rgba(244, 196, 48, 0.16), transparent 26%), linear-gradient(180deg, #fffdf7, #fff8e8)',
++      backgroundColor: '#ffffff',
++      backgroundImage: 'linear-gradient(90deg, rgba(7,7,7,0.035) 1px, transparent 1px), linear-gradient(180deg, rgba(7,7,7,0.035) 1px, transparent 1px)',
++      backgroundSize: '2rem 2rem',
+     },
+     '.cm-content': {
+       caretColor: '#101114',
+@@ -631,7 +632,7 @@
+       position: 'relative',
+       padding: '0 7.5rem 0 3.25rem',
+       borderLeft: '3px solid transparent',
+-      borderRadius: '0 7px 7px 0',
++      borderRadius: '0',
+       transition: 'background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
+       counterIncrement: 'cs-line',
+     },
+@@ -647,41 +648,41 @@
+       pointerEvents: 'none',
+     },
+     '.cm-line.cs-current-block': {
+-      backgroundColor: 'rgba(16, 17, 20, 0.025)',
+-      borderLeftColor: 'rgba(16, 17, 20, 0.16)',
++      backgroundColor: 'transparent',
++      borderLeftColor: 'rgba(7,7,7,0.28)',
+     },
+     '.cm-line.cs-line-voice-string': {
+-      backgroundColor: 'rgba(244, 196, 48, 0.16)',
++      backgroundColor: 'transparent',
+       borderLeftColor: 'rgba(244, 196, 48, 0.82)',
+     },
+     '.cm-line.cs-line-voice-sample': {
+-      backgroundColor: 'rgba(226, 59, 46, 0.105)',
++      backgroundColor: 'transparent',
+       borderLeftColor: 'rgba(226, 59, 46, 0.82)',
+     },
+     '.cm-line.cs-line-voice-input': {
+-      backgroundColor: 'rgba(20, 99, 255, 0.105)',
++      backgroundColor: 'transparent',
+       borderLeftColor: 'rgba(20, 99, 255, 0.86)',
+-      boxShadow: 'inset 0 0 0 1px rgba(0,168,200,0.10)',
++      boxShadow: 'none',
+     },
+     '.cm-line.cs-line-live-control': {
+-      backgroundColor: 'rgba(0, 168, 200, 0.055)',
++      backgroundColor: 'transparent',
+       borderLeftColor: 'rgba(0, 168, 200, 0.42)',
+     },
+     '.cm-line.cs-line-routing': {
+-      backgroundColor: 'rgba(18, 128, 92, 0.052)',
++      backgroundColor: 'transparent',
+     },
+     '.cm-line.cs-active-line': {
+       animation: 'cs-line-pulse 780ms ease-out both',
+-      boxShadow: 'inset 0 0 0 1px rgba(16,17,20,0.08), 0 0 0 3px rgba(20,99,255,0.065)',
++      boxShadow: 'inset 5px 0 0 #0057ff, inset 0 -2px 0 #070707',
+     },
+     '.cm-line.cs-pulse-string': {
+-      boxShadow: 'inset 0 0 0 1px rgba(122,82,0,0.16), 0 0 0 3px rgba(244,196,48,0.16)',
++      boxShadow: 'inset 5px 0 0 #ffd400, inset 0 -2px 0 #070707',
+     },
+     '.cm-line.cs-pulse-sample': {
+-      boxShadow: 'inset 0 0 0 1px rgba(183,42,32,0.16), 0 0 0 3px rgba(226,59,46,0.14)',
++      boxShadow: 'inset 5px 0 0 #e3342f, inset 0 -2px 0 #070707',
+     },
+     '.cm-line.cs-pulse-input, .cm-line.cs-pulse-mod': {
+-      boxShadow: 'inset 0 0 0 1px rgba(20,99,255,0.16), 0 0 0 3px rgba(0,168,200,0.13)',
++      boxShadow: 'inset 5px 0 0 #0057ff, inset 0 -2px 0 #070707',
+     },
+     '.cm-line.cs-metered-line::after': {
+       content: '""',
+@@ -691,13 +692,13 @@
+       width: '5.2rem',
+       height: '0.42rem',
+       transform: 'translateY(-50%)',
+-      border: '1px solid rgba(16,17,20,0.42)',
+-      background: 'linear-gradient(90deg, rgba(20,99,255,var(--cs-meter-alpha)) var(--cs-meter), rgba(20,99,255,0.08) var(--cs-meter))',
+-      boxShadow: '3px 3px 0 rgba(244,196,48,0.28), -3px -3px 0 rgba(226,59,46,0.13)',
++      border: '2px solid #070707',
++      background: 'linear-gradient(90deg, #0057ff var(--cs-meter), #ffffff var(--cs-meter))',
++      boxShadow: '2px 2px 0 #070707',
+       pointerEvents: 'none',
+     },
+     '.cm-activeLine': {
+-      backgroundColor: 'rgba(244, 196, 48, 0.11)',
++      backgroundColor: 'rgba(0, 87, 255, 0.065)',
+     },
+     '.cm-cursor, .cm-dropCursor': {
+       borderLeftColor: '#101114',
+@@ -707,12 +708,12 @@
+       backgroundColor: 'rgba(20, 99, 255, 0.20)',
+     },
+     '.cm-selectionMatch': {
+-      backgroundColor: 'rgba(244, 196, 48, 0.28)',
++      backgroundColor: 'rgba(0, 87, 255, 0.18)',
+     },
+     '.cs-token': {
+       position: 'relative',
+       zIndex: '1',
+-      borderRadius: '4px',
++      borderRadius: '0',
+       textDecorationThickness: '2px',
+       textUnderlineOffset: '0.18em',
+       transition: 'color 120ms ease, background-color 120ms ease, box-shadow 120ms ease',
+@@ -722,24 +723,27 @@
+       letterSpacing: '0.012em',
+     },
+     '.cs-voice-string': {
+-      color: '#7a5200',
+-      backgroundColor: 'rgba(244,196,48,0.30)',
+-      boxShadow: '0 0 0 2px rgba(244,196,48,0.18)',
++      color: '#070707',
++      backgroundColor: 'transparent',
++      textDecoration: 'underline solid #ffd400',
++      boxShadow: 'inset 0 -3px 0 #ffd400',
+     },
+     '.cs-voice-sample, .cs-sample-token': {
+       color: '#b72a20',
+-      backgroundColor: 'rgba(226,59,46,0.12)',
++      backgroundColor: 'transparent',
++      textDecoration: 'underline solid #e3342f',
+     },
+     '.cs-voice-input': {
+       color: '#064ccc',
+-      backgroundColor: 'rgba(20,99,255,0.13)',
+-      textShadow: '0 0 14px rgba(0,168,200,0.28)',
+-      boxShadow: '0 0 0 2px rgba(0,168,200,0.12)',
++      backgroundColor: 'transparent',
++      textDecoration: 'underline solid #0057ff',
++      textShadow: 'none',
++      boxShadow: 'inset 0 -3px 0 rgba(0,168,200,0.65)',
+     },
+     '.cs-directive': {
+       color: '#101114',
+-      backgroundColor: 'rgba(244,196,48,0.25)',
+-      textDecoration: 'underline solid rgba(244,196,48,0.92)',
++      backgroundColor: 'transparent',
++      textDecoration: 'underline solid #070707',
+     },
+     '.cs-param, .cs-effect': {
+       color: '#20184f',
+@@ -748,7 +752,7 @@
+     '.cs-routing, .cs-attractor': {
+       color: '#0f6c4b',
+       fontWeight: '760',
+-      backgroundColor: 'rgba(18,128,92,0.08)',
++      backgroundColor: 'transparent',
+     },
+     '.cs-live-control': {
+       color: '#5a28df',
+@@ -758,15 +762,16 @@
+     '.cs-live-source': {
+       color: '#064ccc',
+       fontWeight: '760',
+-      backgroundColor: 'rgba(20,99,255,0.10)',
+-      textShadow: '0 0 13px rgba(0,168,200,0.24)',
++      backgroundColor: 'transparent',
++      textShadow: 'none',
++      textDecoration: 'underline solid #0057ff',
+     },
+     '.cs-live-ref': {
+       color: '#005bcb',
+       fontWeight: '780',
+-      background: 'linear-gradient(180deg, rgba(0,168,200,0.17), rgba(20,99,255,0.10))',
+-      boxShadow: 'inset 0 -2px 0 rgba(0,168,200,0.34)',
+-      textShadow: '0 0 15px rgba(0,168,200,0.22)',
++      background: 'transparent',
++      boxShadow: 'inset 0 -3px 0 rgba(0,168,200,0.68)',
++      textShadow: 'none',
+     },
+     '.cs-operator, .cs-bracket': {
+       color: '#6a3bc3',
+@@ -775,8 +780,8 @@
+     '.cs-number': {
+       color: '#101114',
+       fontWeight: '720',
+-      backgroundColor: 'rgba(244,196,48,0.17)',
+-      boxShadow: 'inset 0 -2px 0 rgba(20,99,255,0.16)',
++      backgroundColor: 'transparent',
++      boxShadow: 'inset 0 -2px 0 rgba(0,87,255,0.28)',
+     },
+     '.cs-pitch': {
+       color: '#7a5200',
+@@ -789,8 +794,8 @@
+     '.cs-comment': {
+       color: '#65594f',
+       fontStyle: 'italic',
+-      backgroundColor: 'rgba(244,196,48,0.105)',
+-      boxShadow: 'inset 3px 0 0 rgba(244,196,48,0.32)',
++      backgroundColor: 'transparent',
++      boxShadow: 'inset 4px 0 0 #ffd400',
+     },
+     '.cs-invalid': {
+       color: '#d7263d',
+@@ -801,12 +806,12 @@
+       animation: 'cs-token-pulse 780ms ease-out both',
+     },
+     '.cm-tooltip': {
+-      backgroundColor: '#fffaf0',
++      backgroundColor: '#ffffff',
+       border: '2px solid #101114',
+       color: '#101114',
+       fontFamily: '"Courier New", Courier, monospace',
+       fontSize: '13px',
+-      boxShadow: '5px 5px 0 rgba(20,99,255,0.20), -3px -3px 0 rgba(226,59,46,0.12)',
++      boxShadow: '5px 5px 0 #070707',
+     },
+     '.cm-tooltip.cm-tooltip-autocomplete': {
+       borderRadius: '0',
+@@ -816,7 +821,7 @@
+       fontFamily: '"Courier New", Courier, monospace',
+     },
+     '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+-      backgroundColor: 'rgba(20, 99, 255, 0.14)',
++      backgroundColor: '#0057ff',
+       color: '#101114',
+     },
+     '.cm-completionLabel': { color: '#101114', fontWeight: '700' },
+@@ -851,22 +856,22 @@
+       borderBottom: '2px dotted #f59e0b',
+     },
+     '.cm-panels': {
+-      backgroundColor: '#fffaf0',
++      backgroundColor: '#ffffff',
+       color: '#101114',
+       borderTop: '2px solid #101114',
+       fontFamily: '"Courier New", Courier, monospace',
+     },
+     '.cm-searchMatch': {
+-      backgroundColor: 'rgba(244, 196, 48, 0.30)',
++      backgroundColor: 'rgba(0, 87, 255, 0.18)',
+     },
+     '@keyframes cs-line-pulse': {
+-      '0%': { filter: 'saturate(1.7)', backgroundColor: 'rgba(20,99,255,0.18)' },
+-      '45%': { filter: 'saturate(1.22)', backgroundColor: 'rgba(244,196,48,0.18)' },
+-      '100%': { filter: 'saturate(1)', backgroundColor: 'inherit' },
++      '0%': { filter: 'none', backgroundColor: '#0057ff', color: '#ffffff' },
++      '45%': { filter: 'none', backgroundColor: '#ffd400', color: '#070707' },
++      '100%': { filter: 'none', backgroundColor: 'transparent', color: 'inherit' },
+     },
+     '@keyframes cs-token-pulse': {
+-      '0%': { boxShadow: '0 0 0 3px rgba(20,99,255,0.26), 0 0 18px rgba(0,168,200,0.24)' },
+-      '100%': { boxShadow: 'none' },
++      '0%': { backgroundColor: '#0057ff', color: '#ffffff', outline: '2px solid #070707', boxShadow: '2px 2px 0 #070707' },
++      '100%': { backgroundColor: 'transparent', color: 'inherit', outline: '0 solid transparent', boxShadow: 'none' },
+     },
+   }, { dark: false });
+ 

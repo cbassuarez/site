@@ -1,0 +1,37 @@
+tempo 72
+meter 4/4
+
+// SILENT MIC ATTRACTOR
+// The mic is not audible.
+// It only steers the synthetic and sample layers.
+//
+// This is the safest patch for testing: no speaker feedback risk.
+input mic
+gain      0
+monitor   off
+listen    on
+
+// Long, breathing string layer.
+// Hum into the mic for steadier periodicity.
+// Clap or speak sharply to rupture the leaf choices.
+string    A*   ~   (*4 C*)   ~   E*!   ~
+attractor mic
+gain      mic.intensity 0.12 0.58
+pan       mic.volatility -0.65 0.65
+time      mic.intensity 0.10
+leaf      mic.rupture 0.55
+space     mic.silence 0.32 0.90
+blur      mic.flux 0.02 0.32
+body      glass
+decay     5
+
+// The room speaks through samples without the room being heard.
+sample    snm-*&16   ~   tub-*&16   ~
+attractor mic
+choose    mic.noisiness 0.75
+trigger   mic.rupture 0.50
+gain      mic.density 0.10 0.52
+grain     mic.noisiness 0.04 0.45
+scar      mic.rupture
+space     mic.silence 0.25 0.80
+body      paper

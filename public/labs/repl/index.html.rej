@@ -1,0 +1,12 @@
+@@ -2284,9 +2389,9 @@
+         </div>
+ 
+         <div class="controls">
+-          <span class="bracket">[</span> <button id="play" type="button" title="Cmd-Enter: evaluate and restart; frozen random choices may reroll">evaluate</button> <span class="bracket">]</span>
++          <span class="bracket">[</span> <button id="play" type="button" title="Cmd-Enter: evaluate and restart; frozen random choices may reroll"><span class="transport-btn-label">evaluate</span><span class="transport-btn-shortcut" aria-hidden="true">⌘↵</span></button> <span class="bracket">]</span>
+           <span class="sep">·</span>
+-          <span class="bracket">[</span> <button id="safe-play" type="button" title="Cmd-Shift-Enter: replay transport without unlocking frozen random choices">replay</button> <span class="bracket">]</span>
++          <span class="bracket">[</span> <button id="safe-play" type="button" title="Cmd-Shift-Enter: replay transport without unlocking frozen random choices"><span class="transport-btn-label">replay</span><span class="transport-btn-shortcut" aria-hidden="true">⇧⌘↵</span></button> <span class="bracket">]</span>
+           <span class="sep">·</span>
+           <span class="bracket">[</span> <button id="stop" type="button" title="Esc: stop all currently sounding voices">stop</button> <span class="bracket">]</span>
+           <span class="sep">·</span>

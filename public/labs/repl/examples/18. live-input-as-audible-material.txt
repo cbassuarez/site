@@ -1,0 +1,37 @@
+tempo 90
+meter 4/4
+
+// AUDIBLE MIC MATERIAL
+// This patch routes the mic to speakers.
+// Use headphones or keep speaker volume low to avoid feedback.
+//
+// Try speaking, singing, tapping the mic body, or playing an instrument.
+input mic
+gain      0.35
+monitor   on
+listen    on
+compress  mic.intensity 0.12 0.42
+space     mic.silence 0.08 0.55
+blur      mic.flux 0.00 0.22
+body      room
+fade      in 2s
+
+// The audible input also controls this string body.
+string    *!4   A*   ~   (*3 C*)   ~
+attractor mic
+gain      mic.intensity 0.10 0.48
+pan       mic.volatility -0.9 0.9
+time      mic.density 0.14
+tone      mic.brightness 0.20 0.85
+space     0.25
+body      wood
+
+// Sharp mic attacks trigger sample ghosts.
+sample    snm-*&12   ~
+attractor mic
+trigger   mic.rupture 0.56
+gain      mic.rupture 0.08 0.48
+grain     mic.noisiness 0.08 0.52
+scar      mic.rupture
+rate      mic.periodicity 0.80 1.20
+pan       *~

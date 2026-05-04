@@ -32,6 +32,23 @@
       const missingSampleSeen = new Set();
       let onMissingCallback = null;
 
+      function emitEditorPulse(payload) {
+        const bus = root.ReplEditorPulse;
+        if (!bus || typeof bus.emit !== 'function') return;
+        try { bus.emit(payload || {}); } catch (_) {}
+      }
+
+      function blockLine(block) {
+        const n = block && Number(block.line);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+
+      function rowLine(block, name) {
+        const lines = block && block.paramLines;
+        const n = lines && Number(lines[name]);
+        return Number.isFinite(n) && n > 0 ? n : blockLine(block);
+      }
+
       const RANDOM_PITCH_CLASSES = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
       const RANDOM_PITCH_OCTAVES = [2, 3, 4, 5];
 
@@ -150,6 +167,7 @@
             bus.delay,
             bus.delayFeedback,
             bus.wetGain,
+            bus.fadeGain,
             bus.output,
           ];
 
@@ -168,7 +186,13 @@
 
         disconnectBlockAttractorBus(block);
 
+        if (typeof root.InputVoice !== 'undefined' && root.InputVoice.disconnectBlock) {
+          root.InputVoice.disconnectBlock(block);
+        }
+
         block._paramState = {};
+        block._liveModState = {};
+        block._triggerState = {};
         block._speedState = {};
         block._speedSlotIdx = 0;
         block._speedNextTime = null;
@@ -177,6 +201,8 @@
         block._lastDispatchedDuration = null;
         block._attractorSmoothed = null;
         block._organism = null;
+          block._fadeState = null;
+          block._lastFadeLevel = 1;
 
         if (Array.isArray(block.slots)) {
           for (const slot of block.slots) {
@@ -340,7 +366,34 @@
       }
 
       function hasBlockEffects(block) {
-        return Boolean(block && block.effects && Object.keys(block.effects).length > 0);
+        return Boolean(
+          block &&
+          block.effects &&
+          Object.keys(block.effects).some((name) => {
+            const effect = block.effects[name];
+            if (!effect) return false;
+
+            if (effect.kind === 'scalar') return effect.value != null;
+            if (effect.kind === 'vector') return Array.isArray(effect.values) && effect.values.length > 0;
+
+            return true;
+          })
+        );
+      }
+
+      function hasBlockFade(block) {
+        return Boolean(block && block.fade && block.fade.mode && block.fade.mode !== 'clear');
+      }
+
+      function hasBlockProcessing(block) {
+        return Boolean(
+          block &&
+          (
+            block.attractor ||
+            hasBlockEffects(block) ||
+            hasBlockFade(block)
+          )
+        );
       }
 
       function effectModeAmount(name, mode) {
@@ -424,6 +477,7 @@
       function numericSurfaceValue(v, name, fallback) {
         if (isEffectMode(v)) return effectModeAmount(name, v.mode);
         if (isParamGesture(v)) return numericParamValue(v, fallback);
+        if (isLiveMod(v)) return fallback;
 
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
@@ -432,6 +486,7 @@
       function surfaceEndValue(v, name, fallback) {
         if (isEffectMode(v)) return effectModeAmount(name, v.mode);
         if (isParamGesture(v)) return gestureEndValue(v, fallback);
+        if (isLiveMod(v)) return fallback;
 
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
@@ -582,6 +637,10 @@
             case 'tide': base = 0.28; break;
             case 'solar': base = 0.32; break;
             case 'archive': base = 0.22; break;
+            case 'input':
+            case 'mic':
+            case 'interface':
+            case 'tab': base = 0.36; break;
             case 'tub': base = 0.40; break;
             case 'weather': base = 0.26; break;
             case 'air': base = 0.24; break;
@@ -832,6 +891,13 @@
           mod.saturation += depth * (p * 0.22 + d * 0.12);
           mod.rateMul *= 1 + depth * jitter * v * 0.04;
           mod.delayFeedback += depth * d * 0.12;
+        } else if (kind === 'input' || kind === 'mic' || kind === 'interface' || kind === 'tab') {
+          mod.gainMul *= 1 + depth * (i * 0.10 - d * 0.05);
+          mod.panOffset += depth * (v * med * 0.16 + r * jitter * 0.18);
+          mod.wetGain += depth * (d * 0.14 + t * 0.10);
+          mod.delayFeedback += depth * d * 0.08;
+          mod.saturation += depth * r * 0.18;
+          mod.filterFreq = 900 + (1 - d * 0.55 + p * 0.45) * 8400;
         } else if (kind === 'orbit') {
           mod.panOffset += depth * slow * 0.55;
           mod.toneMul *= 1 + depth * 0.12;
@@ -869,7 +935,7 @@
       }
 
       function ensureAttractorBus(block) {
-        if (!block || (!block.attractor && !hasBlockEffects(block))) return null;
+          if (!hasBlockProcessing(block)) return null;
         if (block._attractorBus) return block._attractorBus;
 
         const input = audioCtx.createGain();
@@ -901,7 +967,8 @@
         const delay = audioCtx.createDelay(1.25);
         const delayFeedback = audioCtx.createGain();
         const wetGain = audioCtx.createGain();
-        const output = audioCtx.createGain();
+          const fadeGain = audioCtx.createGain();
+          const output = audioCtx.createGain();
 
         filter.type = 'lowpass';
         filter.frequency.value = 12000;
@@ -952,7 +1019,8 @@
         delay.delayTime.value = 0.18;
         delayFeedback.gain.value = 0.05;
         wetGain.gain.value = 0;
-        output.gain.value = 1;
+          fadeGain.gain.value = 1;
+          output.gain.value = 1;
 
         input.connect(preGain);
         preGain.connect(filter);
@@ -991,7 +1059,8 @@
         exciterShaper.connect(exciterGain);
         exciterGain.connect(output);
 
-        output.connect(masterBus);
+          output.connect(fadeGain);
+          fadeGain.connect(masterBus);
 
         block._attractorBus = {
           input,
@@ -1016,6 +1085,7 @@
           delay,
           delayFeedback,
           wetGain,
+            fadeGain,
           output,
           _lastSaturation: 0,
           _lastExciterCurve: 0,
@@ -1033,6 +1103,162 @@
         } catch (_) {
           try { param.value = value; } catch (__) {}
         }
+      }
+      
+      function smoothstep(x) {
+        const t = clamp(x, 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function fadeCommandKey(fade) {
+        if (!fade) return 'none';
+        return [
+          fade.mode || 'none',
+          Number(fade.durationSec) || 0,
+          Number(fade.highHoldSec) || 0,
+          Number(fade.lowHoldSec) || 0,
+        ].join(':');
+      }
+
+      function ensureFadeState(block, fade, time) {
+        if (!block) return null;
+
+        const key = fadeCommandKey(fade);
+        const now = Number.isFinite(time) ? time : audioCtx.currentTime;
+
+        if (!block._fadeState || block._fadeState.key !== key) {
+          let initialLevel = 1;
+
+          if (fade && fade.mode === 'in') initialLevel = 0;
+          if (fade && fade.mode === 'out') initialLevel = 1;
+          if (fade && fade.mode === 'inout') initialLevel = 0;
+          if (fade && fade.mode === 'outin') initialLevel = 1;
+
+          block._fadeState = {
+            key,
+            startTime: now,
+            level: initialLevel,
+            held: false,
+            latched: false,
+            completed: false,
+          };
+        }
+
+        return block._fadeState;
+      }
+
+      function cyclicFadeLevel(fade, elapsed) {
+        const d = Math.max(0.001, Number(fade.durationSec) || 0.001);
+        const high = Math.max(0, Number(fade.highHoldSec) || 0);
+        const low = Math.max(0, Number(fade.lowHoldSec) || 0);
+        const cycle = Math.max(0.001, d + high + d + low);
+        const pos = ((elapsed % cycle) + cycle) % cycle;
+
+        if (fade.mode === 'inout') {
+          // 0 → 1, hold high, 1 → 0, hold low.
+          if (pos < d) return smoothstep(pos / d);
+          if (pos < d + high) return 1;
+          if (pos < d + high + d) return 1 - smoothstep((pos - d - high) / d);
+          return 0;
+        }
+
+        if (fade.mode === 'outin') {
+          // 1 → 0, hold low, 0 → 1, hold high.
+          if (pos < d) return 1 - smoothstep(pos / d);
+          if (pos < d + low) return 0;
+          if (pos < d + low + d) return smoothstep((pos - d - low) / d);
+          return 1;
+        }
+
+        return 1;
+      }
+
+      function fadeLevelForBlock(block, time) {
+        const fade = block && block.fade;
+        if (!fade) {
+          if (block) block._lastFadeLevel = 1;
+          return 1;
+        }
+
+        const now = Number.isFinite(time) ? time : audioCtx.currentTime;
+        const state = ensureFadeState(block, fade, now);
+        if (!state) return 1;
+
+        if (fade.mode === 'clear') {
+          state.level = 1;
+          state.completed = true;
+          state.latched = false;
+          block._lastFadeLevel = 1;
+          return 1;
+        }
+
+        if (fade.mode === 'hold') {
+          const held = Number.isFinite(state.level)
+            ? state.level
+            : Number.isFinite(block._lastFadeLevel)
+              ? block._lastFadeLevel
+              : 1;
+
+          state.level = clamp(held, 0, 1);
+          state.held = true;
+          block._lastFadeLevel = state.level;
+          return state.level;
+        }
+
+        const elapsed = Math.max(0, now - state.startTime);
+        const d = Math.max(0.001, Number(fade.durationSec) || 0.001);
+
+        let level = 1;
+
+        if (fade.mode === 'in') {
+          const x = clamp(elapsed / d, 0, 1);
+          level = smoothstep(x);
+          state.completed = x >= 1;
+          state.latched = state.completed;
+          if (state.completed) level = 1;
+        } else if (fade.mode === 'out') {
+          const x = clamp(elapsed / d, 0, 1);
+          level = 1 - smoothstep(x);
+          state.completed = x >= 1;
+          state.latched = state.completed;
+          if (state.completed) level = 0;
+        } else if (fade.mode === 'inout' || fade.mode === 'outin') {
+          level = cyclicFadeLevel(fade, elapsed);
+          state.completed = false;
+          state.latched = false;
+        }
+
+        state.level = clamp(level, 0, 1);
+        block._lastFadeLevel = state.level;
+        return state.level;
+      }
+
+      function fadeStateForBlock(block, time) {
+        if (!block || !block.fade) return null;
+
+        const level = fadeLevelForBlock(block, time);
+        const state = block._fadeState || null;
+
+        return {
+          mode: block.fade.mode,
+          level,
+          completed: Boolean(state && state.completed),
+          latched: Boolean(state && state.latched),
+          held: Boolean(state && state.held),
+          durationSec: Number(block.fade.durationSec) || 0,
+          highHoldSec: Number(block.fade.highHoldSec) || 0,
+          lowHoldSec: Number(block.fade.lowHoldSec) || 0,
+        };
+      }
+
+      function updateFadeGainForBlock(block, time) {
+        if (!hasBlockFade(block)) return;
+
+        const bus = ensureAttractorBus(block);
+        if (!bus || !bus.fadeGain || !bus.fadeGain.gain) return;
+
+        const level = fadeLevelForBlock(block, time);
+        setAudioParam(bus.fadeGain.gain, level, time, 0.045);
       }
       
       function randomBetweenClamped(lo, hi) {
@@ -1080,8 +1306,7 @@
       }
 
       function updateAttractorBus(block, mod, effects, time) {
-        if (!block || (!block.attractor && !hasBlockEffects(block))) return masterBus;
-
+          if (!hasBlockProcessing(block)) return masterBus;
         const bus = ensureAttractorBus(block);
         if (!bus) return masterBus;
 
@@ -1305,12 +1530,17 @@
           bus._lastExciterCurve = exciteCurveAmount;
         }
 
+          if (bus.fadeGain && bus.fadeGain.gain) {
+            const fadeLevel = fadeLevelForBlock(block, time);
+            setAudioParam(bus.fadeGain.gain, fadeLevel, time, 0.045);
+          }
+          
         return bus.input;
       }
 
       function outputBusForBlock(block, time, mod, effects) {
-        if (!block || (!block.attractor && !hasBlockEffects(block))) return masterBus;
-        return updateAttractorBus(block, mod, effects, time);
+          if (!hasBlockProcessing(block)) return masterBus;
+          return updateAttractorBus(block, mod, effects, time);
       }
 
       function applyAttractorToParams(block, params, voice, time, duration, mod) {
@@ -1383,6 +1613,125 @@
 
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
+      }
+
+
+      function isLiveMod(v) {
+        return v && typeof v === 'object' && v.kind === 'live-mod';
+      }
+
+      function liveFeatureValue(signals, feature, fallback) {
+        if (!signals) return fallback;
+        const key = String(feature || 'intensity').toLowerCase();
+        let value;
+
+        switch (key) {
+          case 'rms':
+          case 'loudness':
+          case 'intensity':
+            value = signals.intensity;
+            break;
+          case 'flux':
+          case 'volatility':
+            value = signals.volatility;
+            break;
+          case 'pressure':
+            value = signals.pressure;
+            break;
+          case 'density':
+            value = signals.density;
+            break;
+          case 'periodicity':
+            value = signals.periodicity;
+            break;
+          case 'onset':
+          case 'rupture':
+            value = signals.rupture;
+            break;
+          case 'silence':
+          case 'age':
+            value = signals.age;
+            break;
+          case 'confidence':
+            value = signals.confidence;
+            break;
+          case 'brightness':
+          case 'centroid':
+            value = signals.brightness != null ? signals.brightness : signals.pressure;
+            break;
+          case 'noisiness':
+          case 'flatness':
+            value = signals.noisiness != null ? signals.noisiness : signals.volatility;
+            break;
+          case 'roughness':
+            value = signals.roughness != null ? signals.roughness : Math.max(signals.volatility || 0, signals.rupture || 0);
+            break;
+          default:
+            value = signals[key];
+            break;
+        }
+
+        const n = Number(value);
+        return Number.isFinite(n) ? clamp(n, 0, 1) : fallback;
+      }
+
+      function liveSignalsForSource(source) {
+        if (typeof root.ReplAttractors === 'undefined' || !root.ReplAttractors.peek) return null;
+        const raw = String(source || '').trim().toLowerCase();
+        if (!raw) return null;
+        return root.ReplAttractors.peek({ raw });
+      }
+
+      function liveSignalsForControl(control) {
+        if (!control || !control.source) return null;
+        return liveSignalsForSource(control.source);
+      }
+
+      function resolveLiveModValue(block, spec, fallback, time, name) {
+        if (!isLiveMod(spec)) return fallback;
+
+        const signals = liveSignalsForSource(spec.source);
+        const raw = liveFeatureValue(signals, spec.feature, 0);
+        const min = Number.isFinite(Number(spec.min)) ? Number(spec.min) : fallback;
+        const max = Number.isFinite(Number(spec.max)) ? Number(spec.max) : fallback;
+        const target = min + (max - min) * clamp(raw, 0, 1);
+
+        if (!block) return target;
+        if (!block._liveModState) block._liveModState = {};
+        const key = `${name || 'param'}:${spec.source}.${spec.feature}:${min}:${max}`;
+        const prev = block._liveModState[key];
+        const now = Number.isFinite(time) ? time : audioCtx.currentTime;
+        const prevTime = prev && Number.isFinite(prev.time) ? prev.time : now;
+        const dt = Math.max(0, Math.min(0.25, now - prevTime));
+        const feature = String(spec.feature || '').toLowerCase();
+        const attack = feature === 'rupture' || feature === 'onset' ? 0.45 : 0.18;
+        const release = feature === 'rupture' || feature === 'onset' ? 0.12 : 0.08;
+        const amount = !prev ? 1 : target > prev.value ? attack : release;
+        const scaled = clamp(amount + dt * 3, 0, 1);
+        const value = !prev ? target : lerp(prev.value, target, scaled);
+
+        block._liveModState[key] = { value, time: now };
+
+        emitEditorPulse({
+          kind: 'mod',
+          line: rowLine(block, name),
+          row: name || 'param',
+          token: spec.raw || `${spec.source}.${spec.feature}`,
+          source: spec.source,
+          feature: spec.feature,
+          intensity: raw,
+          meter: true,
+          voice: block && block.voice,
+        });
+
+        return value;
+      }
+
+      function liveControlValue(block, name, time, fallback) {
+        const control = block && block.controls ? block.controls[name] : null;
+        if (!control) return fallback;
+        const signals = liveSignalsForControl(control);
+        return liveFeatureValue(signals, control.feature, fallback);
       }
 
       function randomBetween(lo, hi) {
@@ -1729,6 +2078,12 @@
         const defaultValue = defaultForParam(name, fallback);
         const key = paramStateKey(name, valueIndex, scalar);
 
+        if (isLiveMod(atom)) {
+          const value = resolveLiveModValue(block, atom, defaultValue, time, name);
+          paramState.last = value;
+          return value;
+        }
+
         if (!isParamAtom(atom)) {
           paramState.last = atom;
           return atom;
@@ -1877,6 +2232,8 @@
           gain: paramForIndex(block, 'gain', eventIndex, 1, time),
           rate: paramForIndex(block, 'rate', eventIndex, 1, time),
           start: paramForIndex(block, 'start', eventIndex, 0, time),
+          monitor: paramForIndex(block, 'monitor', eventIndex, 1, time),
+          listen: paramForIndex(block, 'listen', eventIndex, 1, time),
         };
       }
 
@@ -1939,6 +2296,21 @@
             value *= clamp(speedMul, 0.9, 1.12);
         }
 
+        const timeControl = block && block.controls ? block.controls.time : null;
+        if (timeControl) {
+          const signal = liveControlValue(block, 'time', time, 0.5);
+          const amount = clamp(Number(timeControl.amount) || 0, 0, 1);
+          value *= clamp(1 + (signal - 0.5) * amount * 1.25, 0.55, 1.85);
+        }
+
+        const beatControl = block && block.controls ? block.controls.beat : null;
+        if (beatControl) {
+          const signal = liveControlValue(block, 'beat', time, 0.5);
+          const amount = clamp(Number(beatControl.amount) || 0, 0, 1);
+          const beatPulse = 0.65 + 0.35 * noiseCycle(block, time, 1.6 + signal * 6.5, 8.1);
+          value *= clamp(1 + (signal - 0.5) * amount * 1.6 * beatPulse, 0.5, 2.25);
+        }
+
         return clampSpeed(value);
       }
 
@@ -1984,7 +2356,7 @@
     // slot index. Returns:
     //   - { slotIndex, silent: false, inBlockIdx } if the phrase is firing
     //   - { slotIndex, silent: true } if 'every' has us in the silent portion
-    function resolveBlockPosition(block, topSlotIdx) {
+    function resolveBlockPosition(block, topSlotIdx, time) {
       if (block.every) {
         let periodSlots;
         if (block.every.unit === 'bars') {
@@ -1997,17 +2369,71 @@
         if (positionInPeriod >= block.slots.length) {
           return { slotIndex: topSlotIdx, silent: true };
         }
-        return { slotIndex: topSlotIdx, silent: false, inBlockIdx: positionInPeriod };
+        return { slotIndex: topSlotIdx, silent: false, inBlockIdx: liveLeafIndex(block, positionInPeriod, time) };
       }
       const inBlockIdx = ((topSlotIdx % block.slots.length) + block.slots.length) % block.slots.length;
-      return { slotIndex: topSlotIdx, silent: false, inBlockIdx };
+      return { slotIndex: topSlotIdx, silent: false, inBlockIdx: liveLeafIndex(block, inBlockIdx, time) };
     }
+
+      function liveLeafIndex(block, baseIndex, time) {
+        if (!block || !block.controls || !block.controls.leaf || !Array.isArray(block.slots) || block.slots.length <= 1) {
+          return baseIndex;
+        }
+
+        const control = block.controls.leaf;
+        const signals = liveSignalsForControl(control);
+        const value = liveFeatureValue(signals, control.feature, 0);
+        const amount = clamp(Number(control.amount) || 0, 0, 1);
+        if (amount <= 0 || value <= 0.02) return baseIndex;
+
+        const span = Math.max(1, block.slots.length - 1);
+        const seed = Number.isFinite(block._attractorSeed) ? block._attractorSeed : 0.37;
+        const wobble = noiseCycle(block, Number.isFinite(time) ? time : audioCtx.currentTime, 3.1 + value * 7.5, seed * 5.3);
+        const offset = Math.round((value * 0.75 + wobble * 0.25) * amount * span);
+        return ((baseIndex + offset) % block.slots.length + block.slots.length) % block.slots.length;
+      }
       
       function tokenIsGated(tok) {
         if (!tok) return false;
         if (tok.gated === true) return true;
         if (tok.kind === 'sample-selector' && tok.value && tok.value.gated === true) return true;
         return false;
+      }
+
+      function shouldFireLiveTrigger(block, time) {
+        const trig = block && block.controls ? block.controls.trigger : null;
+        if (!trig) return true;
+
+        const signals = liveSignalsForControl(trig);
+        const value = liveFeatureValue(signals, trig.feature, 0);
+        const threshold = clamp(Number(trig.threshold) || 0.55, 0, 1);
+
+        if (!block._triggerState) block._triggerState = {};
+        const key = `${trig.source}.${trig.feature}`;
+        const prev = block._triggerState[key] || { armed: true, lastFire: -Infinity };
+        const minGap = 0.055;
+        const armed = prev.armed || value < threshold * 0.62;
+        const now = Number.isFinite(time) ? time : audioCtx.currentTime;
+        const fire = armed && value >= threshold && now - prev.lastFire >= minGap;
+
+        block._triggerState[key] = {
+          armed: fire ? false : armed,
+          lastFire: fire ? now : prev.lastFire,
+        };
+
+        emitEditorPulse({
+          kind: fire ? 'trigger' : 'input',
+          line: rowLine(block, 'trigger'),
+          row: 'trigger',
+          token: key,
+          source: trig.source,
+          feature: trig.feature,
+          intensity: value,
+          meter: true,
+          voice: block && block.voice,
+        });
+
+        return fire;
       }
 
       function dispatchSlotTree(node, time, duration, ctx) {
@@ -2035,6 +2461,11 @@
             const panGestureDuration = gestureDurationForEvent('pan', params.pan, ctx.voice, params, gateDuration, duration);
             const rateGestureDuration = gestureDurationForEvent('rate', params.rate, ctx.voice, params, gateDuration, duration);
 
+            if (ctx.voice === 'input') {
+              syncInputBlock(ctx.block, eventBus, params, time);
+              return;
+            }
+
             if (ctx.voice === 'string') {
               if (typeof root.StringVoice === 'undefined') return;
 
@@ -2048,6 +2479,13 @@
               }
 
               if (!note || !Number.isFinite(note.freq)) return;
+
+                emitEditorPulse({
+                  kind: 'voice',
+                  line: blockLine(ctx.block),
+                  voice: 'string',
+                  intensity: Math.max(0.12, Math.min(1, numericParamValue(params.gain, 1))),
+                });
 
                 root.StringVoice.playString({
                   audioCtx,
@@ -2070,6 +2508,7 @@
 
             if (ctx.voice === 'sample') {
               if (typeof root.SampleVoice === 'undefined') return;
+              if (!shouldFireLiveTrigger(ctx.block, time)) return;
 
               let plan = null;
 
@@ -2082,6 +2521,13 @@
               if (!plan) return;
 
               const items = Array.isArray(plan) ? plan : [plan];
+
+              emitEditorPulse({
+                kind: 'sample',
+                line: blockLine(ctx.block),
+                voice: 'sample',
+                intensity: Math.max(0.16, Math.min(1, numericParamValue(params.gain, 1))),
+              });
 
             for (const item of items) {
               if (!item || !item.name) continue;
@@ -2173,21 +2619,53 @@
       function pickRandom(pool, block) {
         if (!pool || pool.length === 0) return null;
 
-        const a = blockAttractor(block);
-        if (!a) return pool[Math.floor(Math.random() * pool.length)];
+        const chooser = block && block.controls ? block.controls.choose : null;
+        const chosenSignals = chooser ? liveSignalsForControl(chooser) : null;
 
-        return attractorChoice(block, pool, (name, i, signals) => {
+        if (!chosenSignals) {
+          const a = blockAttractor(block);
+          if (!a) return pool[Math.floor(Math.random() * pool.length)];
+
+          return attractorChoice(block, pool, (name, i, signals) => {
+            const raw = String(name || '').toLowerCase();
+            let w = 1;
+
+            if (/tub|room|body|mic|voice|breath|water|glass|metal|noise|low|bass/.test(raw)) w += signals.density * 1.2;
+            if (/hit|click|snap|burst|crack|impact|short|perc|strike/.test(raw)) w += signals.rupture * 1.8 + signals.volatility;
+            if (/air|wind|hiss|bow|long|drone|pad|sustain/.test(raw)) w += signals.periodicity * 1.4 + signals.pressure * 0.5;
+            if (/solar|electric|buzz|hum|grid|machine|motor/.test(raw)) w += signals.pressure * 1.2 + signals.intensity * 0.7;
+            if (/quake|rock|earth|sub|rumble/.test(raw)) w += signals.rupture * 1.4 + signals.density;
+
+            return w;
+          });
+        }
+
+        const amount = clamp(Number(chooser.amount) || 0, 0, 1);
+        let total = 0;
+        const weights = pool.map((name, i) => {
           const raw = String(name || '').toLowerCase();
           let w = 1;
 
-          if (/tub|room|body|mic|voice|breath|water|glass|metal|noise|low|bass/.test(raw)) w += signals.density * 1.2;
-          if (/hit|click|snap|burst|crack|impact|short|perc|strike/.test(raw)) w += signals.rupture * 1.8 + signals.volatility;
-          if (/air|wind|hiss|bow|long|drone|pad|sustain/.test(raw)) w += signals.periodicity * 1.4 + signals.pressure * 0.5;
-          if (/solar|electric|buzz|hum|grid|machine|motor/.test(raw)) w += signals.pressure * 1.2 + signals.intensity * 0.7;
-          if (/quake|rock|earth|sub|rumble/.test(raw)) w += signals.rupture * 1.4 + signals.density;
+          if (/tub|room|body|mic|voice|breath|water|glass|metal|noise|low|bass/.test(raw)) w += chosenSignals.density * 1.2 * amount;
+          if (/hit|click|snap|burst|crack|impact|short|perc|strike/.test(raw)) w += (chosenSignals.rupture * 1.8 + chosenSignals.volatility) * amount;
+          if (/air|wind|hiss|bow|long|drone|pad|sustain/.test(raw)) w += (chosenSignals.periodicity * 1.4 + chosenSignals.pressure * 0.5) * amount;
+          if (/solar|electric|buzz|hum|grid|machine|motor/.test(raw)) w += (chosenSignals.pressure * 1.2 + chosenSignals.intensity * 0.7) * amount;
+          if (/quake|rock|earth|sub|rumble/.test(raw)) w += (chosenSignals.rupture * 1.4 + chosenSignals.density) * amount;
 
+          const feature = liveFeatureValue(chosenSignals, chooser.feature, 0.5);
+          w += amount * feature * ((i % 7) / 7);
+          w = Math.max(0.0001, w);
+          total += w;
           return w;
         });
+
+        let r = Math.random() * total;
+        for (let i = 0; i < pool.length; i++) {
+          r -= weights[i];
+          if (r <= 0) return pool[i];
+        }
+
+        return pool[pool.length - 1];
       }
 
       function pickPair(pool, block) {
@@ -2301,10 +2779,52 @@
         return equalPowerPair(node._gradLeft, node._gradRight, f);
       }
 
+      function syncInputBlock(block, eventBus, params, time) {
+        if (!block || block.voice !== 'input') return false;
+        if (typeof root.InputVoice === 'undefined' || !root.InputVoice.syncBlock) return false;
+
+        const kind = block.input && block.input.kind ? block.input.kind : 'mic';
+        const gain = numericParamValue(params && params.gain, 1);
+        const monitor = numericParamValue(params && params.monitor, gain);
+        const listen = numericParamValue(params && params.listen, 1);
+        const pan = numericParamValue(params && params.pan, 0);
+
+        if (listen <= 0 && block.attractor) {
+          // Keep monitor audible if requested, but prevent the input block from
+          // self-modulating when listen is explicitly disabled. Other blocks can
+          // still opt into attractor mic/interface/tab if the source is enabled.
+          block._inputListenMuted = true;
+        } else {
+          block._inputListenMuted = false;
+        }
+
+        emitEditorPulse({
+          kind: 'input',
+          line: blockLine(block),
+          row: 'input',
+          source: kind,
+          intensity: Math.max(0, Math.min(1, Math.max(gain, monitor, listen))),
+          meter: true,
+          voice: 'input',
+        });
+
+        return root.InputVoice.syncBlock({
+          block,
+          audioCtx,
+          destination: eventBus || masterBus,
+          kind,
+          gain,
+          monitor,
+          listen,
+          pan,
+          time,
+        });
+      }
+
       function dispatchTopSlot(block, slotIdx, slotAbsTime, slotDuration) {
         ensureLeafOffsets(block);
 
-        const pos = resolveBlockPosition(block, slotIdx);
+        const pos = resolveBlockPosition(block, slotIdx, slotAbsTime);
         if (pos.silent) return;
 
         const inBlockIdx = pos.inBlockIdx;
@@ -2330,11 +2850,24 @@
         const horizonAbs = nowAbs + SCHEDULE_AHEAD_S;
         const barSec = barSeconds(program);
 
-        for (const block of program.blocks) {
-          const baseSlotSec = barSec / block.slotsPerBar;
-          if (!Number.isFinite(baseSlotSec) || baseSlotSec <= 0) continue;
+          for (const block of program.blocks) {
+            const baseSlotSec = barSec / block.slotsPerBar;
+            if (!Number.isFinite(baseSlotSec) || baseSlotSec <= 0) continue;
 
-          ensureSpeedCursor(block);
+            ensureSpeedCursor(block);
+
+            // Fade is block presence, not event gain. Keep its fader moving even
+            // during sparse phrases or long sample tails where no new event fires.
+            updateFadeGainForBlock(block, nowAbs);
+
+            if (block.voice === 'input') {
+              const baseParams = resolveParamsForEvent(block, 0, nowAbs);
+              const effects = resolveEffectsForEvent(block, 0, nowAbs);
+              const attractorMod = numericParamValue(baseParams.listen, 1) <= 0 ? null : attractorModForBlock(block, nowAbs);
+              const params = applyAttractorToParams(block, baseParams, block.voice, nowAbs, baseSlotSec, attractorMod);
+              const eventBus = outputBusForBlock(block, nowAbs, attractorMod, effects);
+              syncInputBlock(block, eventBus, params, nowAbs);
+            }
 
           // If the cursor is somehow behind the transport origin, snap it forward.
           if (block._speedNextTime < originTime) {
@@ -2407,10 +2940,13 @@
             ? block._lastDispatchedDuration
             : (barSec / block.slotsPerBar);
           const subProgress = clamp((audioCtx.currentTime - lastTime) / lastDur, 0, 1);
-          const pos = resolveBlockPosition(block, slotIdx);
+          const pos = resolveBlockPosition(block, slotIdx, slotAbsTime);
             const attractor = block.attractor
               ? (attractorSignalsForBlock(block, audioCtx.currentTime) || blockAttractor(block))
               : null;
+          const inputState = block.voice === 'input' && typeof root.InputVoice !== 'undefined' && root.InputVoice.getState
+            ? root.InputVoice.getState()[block.input && block.input.kind ? block.input.kind : 'mic']
+            : null;
 
             return {
               blockIndex: i,
@@ -2423,8 +2959,12 @@
               inBlockIdx: pos.silent ? -1 : pos.inBlockIdx,
               voice: block.voice,
               every: block.every,
-              attractor: block.attractor,
-              attractorState: attractor,
+                attractor: block.attractor,
+                attractorState: attractor,
+                fade: block.fade,
+                fadeState: block.fade ? fadeStateForBlock(block, audioCtx.currentTime) : null,
+                input: block.input || null,
+                inputState,
             };
       });
       return { bar, beat, transport: elapsed, blockStates };

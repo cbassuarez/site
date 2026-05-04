@@ -1,0 +1,52 @@
+tempo 84
+meter 4/4
+
+// LIVE INPUT MODULATION DEMO
+// Press play. A patch with `input mic` should request permission and arm the mic before transport starts.
+// This first input block is silent: it listens/analyzes, but does not route mic audio to speakers.
+input mic
+gain      0
+monitor   off
+listen    on
+
+// MIC DRIVES TIME / BEAT / LEAF / VOLUME / EFFECTS
+// `time` and `beat` bend this block's local scheduling only; the global transport clock remains stable.
+// `leaf` lets mic rupture/onsets shove the phrase toward other leaves in the pattern.
+string    *!4   (*4 A*)   ~   C*!   ~
+attractor mic
+time      mic.intensity 0.18
+beat      mic.density 0.30
+leaf      mic.rupture 0.70
+gain      mic.intensity 0.22 0.72
+pan       mic.volatility -0.8 0.8
+tone      mic.brightness 0.25 0.95
+space     mic.silence 0.20 0.85
+blur      mic.flux 0.00 0.35
+body      glass
+
+// MIC DRIVES SAMPLE CHOICE / TRIGGERING / EFFECTS
+// `choose mic.brightness` biases wildcard selection.
+// `trigger mic.rupture` gates sample articulation to live attacks.
+sample    snm-*&24   ~   tub-*&32   ~
+attractor mic
+choose    mic.brightness 0.85
+trigger   mic.rupture 0.52
+gain      mic.intensity 0.16 0.64
+grain     mic.noisiness 0.06 0.58
+scar      mic.rupture
+rate      mic.periodicity 0.75 1.28
+space     mic.silence 0.18 0.75
+body      paper
+
+// OPTIONAL: MIC -> SPEAKER OUTPUT
+// Uncomment this block to hear the mic as material too.
+// Careful: speaker monitoring can feed back if your mic hears the speakers.
+// Switch `input mic` to `input interface` or `input tab` and mess around :)
+//
+// input mic
+// gain      0.40
+// monitor   on
+// listen    on
+// compress  mic.intensity 0.10 0.45
+// space     mic.silence 0.08 0.45
+// body      room

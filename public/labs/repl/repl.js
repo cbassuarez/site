@@ -1,11 +1,15 @@
-// REPL — wires the editor textarea to the DSL parser, scheduler, and voices.
-// Owns: hot-reload (Cmd-Enter), Esc-to-stop, status line, share button,
-// example loader, and URL-hash patch persistence.
+// REPL — wires the CodeMirror editor adapter to the DSL parser, scheduler,
+// and voices. Owns: hot-reload (Cmd-Enter), Esc-to-stop, status line, share
+// button, example loader, and URL-hash patch persistence.
+//
+// The editor is a CodeMirror 6 EditorView mounted into #editor by
+// repl-editor.js (createReplEditor). All reads/writes go through the
+// editorAPI adapter; this file never touches contentDOM directly.
 
 (function () {
   'use strict';
 
-  const editor = document.getElementById('editor');
+  const editorMount = document.getElementById('editor');
   const statusEl = document.getElementById('status');
     const playBtn = document.getElementById('play');
     const safePlayBtn = document.getElementById('safe-play');
@@ -16,16 +20,31 @@
   const beatDotsEl = document.getElementById('beat-dots');
   const blockRowsEl = document.getElementById('block-rows');
   const samplesToggleBtn = document.getElementById('samples-toggle');
+  const inputToggleBtn = document.getElementById('input-toggle');
+  const inputPanel = document.getElementById('input-panel');
+  const inputKindSelect = document.getElementById('input-kind');
+  const inputDeviceSelect = document.getElementById('input-device');
+  const inputEnableBtn = document.getElementById('input-enable');
+  const inputStopBtn = document.getElementById('input-stop');
+  const inputStatusEl = document.getElementById('input-status');
+  const inputMeterFill = document.getElementById('input-meter-fill');
   const samplesPanel = document.getElementById('samples-panel');
   const samplesGroupsEl = document.getElementById('samples-groups');
-  const samplesFilterInput = document.getElementById('samples-filter');
+    const samplesFilterInput = document.getElementById('samples-filter');
+    const replWorkspace = document.getElementById('repl-workspace');
+    const referenceToggleBtn = document.getElementById('reference-toggle');
+    const referencePanel = document.getElementById('reference-panel');
+    const referenceCloseBtn = document.getElementById('reference-close');
 
-  const SAMPLES_MANIFEST_URL = './samples/manifest.json';
-  const DEFAULT_EXAMPLE_URL = './examples/default.txt';
+    const SAMPLES_MANIFEST_URL = './samples/manifest.json';
+    const DEFAULT_EXAMPLE_URL = './examples/default.txt';
+    const REFERENCE_SEEN_KEY = 'replReferenceSeen';
 
   let scheduler = null;
   let lastGoodProgram = null;
   let statusTimer = null;
+    let editorAPI = null;
+    let shouldAutofocusEditor = true;
 
   // ---------------- status / errors ----------------
 
@@ -72,8 +91,8 @@
 
   // ---------------- evaluation ----------------
 
-    function evaluateAndRun() {
-      const text = editor.value;
+    async function evaluateAndRun() {
+      const text = editorAPI ? editorAPI.getValue() : '';
       const result = window.ReplDSL.parse(text);
 
       if (!result.ok) {
@@ -94,6 +113,9 @@
       if (!scheduler) bootScheduler();
       if (!scheduler) return;
 
+      const armed = await armInputsForProgram(result.program);
+      if (!armed) return;
+
       // Hard evaluate/play:
       // - stop current audio first
       // - install the newly parsed AST
@@ -109,13 +131,16 @@
       scheduler.start();
     }
 
-    function safePlay() {
+    async function safePlay() {
       if (!scheduler) bootScheduler();
 
       if (!scheduler || !lastGoodProgram) {
-        evaluateAndRun();
+        await evaluateAndRun();
         return;
       }
+
+      const armed = await armInputsForProgram(lastGoodProgram);
+      if (!armed) return;
 
       if (typeof scheduler.safeRestart === 'function') {
         scheduler.safeRestart();
@@ -141,6 +166,9 @@
       return;
     }
     window.StringVoice.resume();
+    if (window.InputVoice && window.InputVoice.setAudioContext) {
+      window.InputVoice.setAudioContext(audioCtx);
+    }
     const masterBus = window.StringVoice.getMasterBus();
     scheduler = window.ReplScheduler.create({ audioCtx, masterBus });
     scheduler.onMissingSample((name) => {
@@ -212,7 +240,8 @@
   }
 
   async function shareCurrent() {
-    const encoded = await encodeHash(editor.value);
+    const text = editorAPI ? editorAPI.getValue() : '';
+    const encoded = await encodeHash(text);
     const url = location.origin + location.pathname + (encoded ? '#' + encoded : '');
     history.replaceState(null, '', url);
     try {
@@ -230,7 +259,7 @@
     if (!location.hash || location.hash === '#') return false;
     const text = await decodeHash(location.hash);
     if (text) {
-      editor.value = text;
+      if (editorAPI) editorAPI.setValue(text);
       return true;
     }
     showWarning('couldn\'t load shared patch — falling back to default example');
@@ -242,58 +271,227 @@
       const r = await fetch(DEFAULT_EXAMPLE_URL);
       if (r.ok) {
         const t = await r.text();
-        editor.value = t;
+        if (editorAPI) editorAPI.setValue(t);
         return;
       }
     } catch (_) {}
-    editor.value = '// failed to load default example. start typing.\n\ntempo 110\n\nstring   A3   C4   E4   G4\nforce    f    mf   p    f\n';
+    if (editorAPI) {
+      editorAPI.setValue('// failed to load default example. start typing.\n\ntempo 110\n\nstring   A3   C4   E4   G4\nforce    f    mf   p    f\n');
+    }
   }
 
+    // ---------------- reference sidebar ----------------
+
+    function setReferenceOpen(open, opts) {
+      const options = opts || {};
+      const shouldOpen = Boolean(open);
+
+      if (referencePanel) {
+        referencePanel.hidden = !shouldOpen;
+      }
+
+      if (referenceToggleBtn) {
+        referenceToggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+      }
+
+      if (replWorkspace) {
+        replWorkspace.classList.toggle('reference-closed', !shouldOpen);
+      }
+
+      if (!shouldOpen && options.markSeen !== false) {
+        try { localStorage.setItem(REFERENCE_SEEN_KEY, '1'); } catch (_) {}
+      }
+    }
+
+    function toggleReference() {
+      const isOpen = referencePanel ? !referencePanel.hidden : false;
+      setReferenceOpen(!isOpen, { markSeen: isOpen });
+      if (editorAPI) editorAPI.focus();
+    }
+
+    function initReferencePanel() {
+      let seen = false;
+      try { seen = localStorage.getItem(REFERENCE_SEEN_KEY) === '1'; } catch (_) {}
+      setReferenceOpen(!seen, { markSeen: false });
+      shouldAutofocusEditor = seen;
+    }
+    
   // ---------------- editor keybindings ----------------
+  //
+  // Editor-local keymap (Cmd-Enter, Cmd-Shift-Enter, Esc, Tab, Cmd-/, Cmd-S,
+  // Cmd-K) lives in repl-editor.js. The button handlers below cover the
+  // pointer-driven path and refocus the editor afterwards.
 
-    editor.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && e.shiftKey) {
-        e.preventDefault();
-        safePlay();
-        return;
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        evaluateAndRun();
-        return;
-      }
-    if (e.key === 'Escape') {
-      e.preventDefault();
+    playBtn.addEventListener('click', async () => {
+      await evaluateAndRun();
+      if (editorAPI) editorAPI.focus();
+    });
+    if (safePlayBtn) {
+      safePlayBtn.addEventListener('click', async () => {
+        await safePlay();
+        if (editorAPI) editorAPI.focus();
+      });
+    }
+    stopBtn.addEventListener('click', () => {
       stop();
-      return;
+      if (editorAPI) editorAPI.focus();
+    });
+    shareBtn.addEventListener('click', async () => {
+      await shareCurrent();
+      if (editorAPI) editorAPI.focus();
+    });
+
+    if (referenceToggleBtn) {
+      referenceToggleBtn.addEventListener('click', toggleReference);
     }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      editor.value = editor.value.slice(0, start) + '  ' + editor.value.slice(end);
-      editor.selectionStart = editor.selectionEnd = start + 2;
-      return;
+
+    if (referenceCloseBtn) {
+      referenceCloseBtn.addEventListener('click', () => {
+        setReferenceOpen(false);
+        if (editorAPI) editorAPI.focus();
+      });
     }
+
+  // Document-level Esc safety net: if the user presses Esc anywhere inside
+  // the REPL shell, stop audio and refocus the editor. Scoped to the REPL
+  // so it doesn't interfere with other browser controls outside.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const replShell = document.querySelector('main.shell');
+    const t = e.target;
+    if (!replShell || !(t instanceof Node) || !replShell.contains(t)) return;
+    // If a CodeMirror keymap already handled Esc inside the editor, this
+    // path is harmless: stop() is idempotent and focus() is too.
+    stop();
+    if (editorAPI) editorAPI.focus();
   });
 
-    playBtn.addEventListener('click', evaluateAndRun);
-    if (safePlayBtn) safePlayBtn.addEventListener('click', safePlay);
-    stopBtn.addEventListener('click', stop);
-    shareBtn.addEventListener('click', shareCurrent);
+
+
+  function setupExamplePicker(selectEl) {
+    if (!selectEl || selectEl.dataset.customPicker === '1') return;
+    selectEl.dataset.customPicker = '1';
+    selectEl.classList.add('native-example-select');
+    selectEl.setAttribute('aria-hidden', 'true');
+    selectEl.tabIndex = -1;
+
+    const picker = document.createElement('span');
+    picker.className = 'example-picker';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'example-picker-button';
+    button.setAttribute('aria-haspopup', 'listbox');
+    button.setAttribute('aria-expanded', 'false');
+    button.innerHTML = '<span class="button-main">load example</span><span class="button-shortcut">choose patch</span>';
+
+    const list = document.createElement('ul');
+    list.className = 'example-picker-list';
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+
+    const colors = ['ryb-red', 'ryb-yellow', 'ryb-blue'];
+    Array.from(selectEl.options).forEach((opt) => {
+      if (!opt.value) return;
+      const item = document.createElement('li');
+      item.setAttribute('role', 'presentation');
+
+      const row = document.createElement('button');
+      row.type = 'button';
+      const optionIndex = list.children.length;
+      row.className = `example-picker-option ${colors[optionIndex % colors.length]}`;
+      row.setAttribute('role', 'option');
+      row.dataset.value = opt.value;
+      row.textContent = opt.textContent || opt.value;
+
+      row.addEventListener('click', () => {
+        selectEl.value = row.dataset.value || '';
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        closePicker();
+      });
+
+      item.appendChild(row);
+      list.appendChild(item);
+    });
+
+    function openPicker() {
+      list.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      const first = list.querySelector('.example-picker-option');
+      if (first) first.focus({ preventScroll: true });
+    }
+
+    function closePicker() {
+      list.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+    }
+
+    function togglePicker() {
+      if (list.hidden) openPicker();
+      else closePicker();
+    }
+
+    button.addEventListener('click', togglePicker);
+    button.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openPicker();
+      }
+    });
+
+    list.addEventListener('keydown', (e) => {
+      const rows = Array.from(list.querySelectorAll('.example-picker-option'));
+      const current = document.activeElement;
+      const idx = rows.indexOf(current);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closePicker();
+        button.focus();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        (rows[Math.min(rows.length - 1, idx + 1)] || rows[0] || button).focus();
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        (rows[Math.max(0, idx - 1)] || rows[rows.length - 1] || button).focus();
+      }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        if (rows[0]) rows[0].focus();
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        if (rows[rows.length - 1]) rows[rows.length - 1].focus();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!picker.contains(e.target)) closePicker();
+    });
+
+    selectEl.parentNode.insertBefore(picker, selectEl.nextSibling);
+    picker.appendChild(button);
+    picker.appendChild(list);
+  }
 
   // ---------------- examples loader ----------------
 
   if (exampleSelect) {
+    setupExamplePicker(exampleSelect);
     exampleSelect.addEventListener('change', async () => {
       const v = exampleSelect.value;
       if (!v) return;
       try {
         const r = await fetch(`./examples/${v}`);
-        if (r.ok) editor.value = await r.text();
+        if (r.ok) {
+          const text = await r.text();
+          if (editorAPI) editorAPI.setValue(text);
+        }
       } catch (_) {}
       exampleSelect.value = '';
+      if (editorAPI) editorAPI.focus();
     });
   }
 
@@ -364,11 +562,13 @@
 
       if (!block) return surfaces;
 
-      const params = block.params || {};
+        const params = block.params || {};
         const effects = block.effects || {};
-      const push = (name) => {
-        if (!surfaces.includes(name)) surfaces.push(name);
-      };
+        const push = (name) => {
+          if (!surfaces.includes(name)) surfaces.push(name);
+        };
+
+        if (block.fade && block.fade.mode && block.fade.mode !== 'clear') push('fade');
 
       if (block.speed && (hasParamControlStream(block.speed) || block.speed.kind === 'vector')) push('speed');
 
@@ -449,6 +649,7 @@
 
     function sourceClass(state) {
       if (!state) return '';
+      if (String(state.status || '') === 'error') return 'source-error';
       return String(state.source || '') === 'live' ? 'source-live' : 'source-fallback';
     }
 
@@ -473,9 +674,50 @@
 
       const name = block.attractor.raw || 'attractor';
       const sourceLabel = sourceLabelForBlock(block);
-      const status = formatSourceStatus(state);
+      const status = block.voice === 'input' ? formatInputBlockStatus(block) : formatSourceStatus(state);
 
       return [name, sourceLabel, status].filter(Boolean).join(' · ');
+    }
+    
+    function formatFadeLevel(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return '.00';
+      return Math.max(0, Math.min(1, n)).toFixed(2).replace(/^0/, '');
+    }
+
+    function fadeLabel(block, fadeState) {
+      if (!block || !block.fade || !block.fade.mode || block.fade.mode === 'clear') return '';
+
+      const mode = block.fade.mode;
+
+      if (!fadeState) {
+        if (mode === 'hold') return 'fade hold';
+        return `fade ${mode}`;
+      }
+
+      if (fadeState.held) {
+        return `fade hold · ${formatFadeLevel(fadeState.level)}`;
+      }
+
+      if (fadeState.completed && fadeState.latched) {
+        if (mode === 'in') return `fade in · complete`;
+        if (mode === 'out') return `fade out · latched`;
+      }
+
+      return `fade ${mode} · ${formatFadeLevel(fadeState.level)}`;
+    }
+
+    function blockStatusLabel(block, attractorState, fadeState) {
+      const parts = [];
+
+      if (block && block.attractor) {
+        parts.push(couplingLabel(block, attractorState));
+      }
+
+      const fade = fadeLabel(block, fadeState);
+      if (fade) parts.push(fade);
+
+      return parts.join(' · ');
     }
 
     function signalHTML(state) {
@@ -661,7 +903,7 @@
 
         const label = document.createElement('div');
         label.className = 'block-label';
-        label.textContent = `${block.voice}`;
+        label.textContent = block.voice === 'input' && block.input ? `input ${block.input.kind}` : `${block.voice}`;
 
         const slotsWrap = document.createElement('div');
         slotsWrap.className = 'slot-dots';
@@ -687,9 +929,8 @@
 
         const couplingEl = document.createElement('div');
         couplingEl.className = 'block-coupling';
-        const initialState = attractorStateForBlock(block);
-        couplingEl.textContent = block.attractor ? couplingLabel(block, initialState) : '';
-
+          const initialState = attractorStateForBlock(block);
+          couplingEl.textContent = blockStatusLabel(block, initialState, null);
         const surfacesEl = document.createElement('div');
         surfacesEl.className = 'surface-chips';
         renderSurfaceChips(surfacesEl, surfacesForBlock(block), false);
@@ -764,12 +1005,20 @@
 
         const attractorState = state.attractorState || attractorStateForBlock(block);
         if (blk.couplingEl) {
-          blk.couplingEl.textContent = block.attractor ? couplingLabel(block, attractorState) : '';
-          blk.couplingEl.className = 'block-coupling ' + sourceClass(attractorState);
+            blk.couplingEl.textContent = blockStatusLabel(block, attractorState, state.fadeState);
+            blk.couplingEl.className = 'block-coupling ' + sourceClass(attractorState);
         }
 
         if (blk.surfacesEl) {
-            renderSurfaceChips(blk.surfacesEl, surfacesForBlock(block), Boolean(block.attractor || (block.effects && Object.keys(block.effects).length)));
+            renderSurfaceChips(
+              blk.surfacesEl,
+              surfacesForBlock(block),
+              Boolean(
+                block.attractor ||
+                (block.effects && Object.keys(block.effects).length) ||
+                (block.fade && block.fade.mode && block.fade.mode !== 'clear')
+              )
+            );
         }
 
         if (blk.everyEl) {
@@ -798,6 +1047,176 @@
       requestAnimationFrame(vizFrame);
     }
     requestAnimationFrame(vizFrame);
+
+
+
+  // ---------------- live input panel ----------------
+
+  function inputKind() {
+    return inputKindSelect ? String(inputKindSelect.value || 'mic') : 'mic';
+  }
+
+  function formatInputBlockStatus(block) {
+    if (!window.InputVoice || !window.InputVoice.getState || !block || !block.input) return 'input unavailable';
+    const state = window.InputVoice.getState()[block.input.kind] || null;
+    if (!state) return `${block.input.kind} disconnected`;
+    if (state.status === 'live') return `${block.input.kind} live · ${state.label || 'audio input'}`;
+    if (state.status === 'requesting') return `${block.input.kind} requesting permission`;
+    if (state.status === 'error') return `${block.input.kind} error · ${state.error || 'permission failed'}`;
+    return `${block.input.kind} disconnected`;
+  }
+
+  function renderInputPanelState(snapshot) {
+    if (!inputStatusEl || !inputMeterFill) return;
+    const kind = inputKind();
+    const state = snapshot && snapshot[kind] ? snapshot[kind] : null;
+
+    if (!state) {
+      inputStatusEl.textContent = 'input unavailable';
+      inputStatusEl.className = 'input-status source-error';
+      inputMeterFill.style.width = '0%';
+      return;
+    }
+
+    const pieces = [kind, state.status];
+    if (state.label && state.status === 'live') pieces.push(state.label);
+    if (state.error && state.status === 'error') pieces.push(state.error);
+    inputStatusEl.textContent = pieces.join(' · ');
+    inputStatusEl.className = 'input-status ' + (state.status === 'live' ? 'source-live' : state.status === 'error' ? 'source-error' : 'source-fallback');
+    inputMeterFill.style.width = `${Math.round(Math.max(0, Math.min(1, Number(state.level) || 0)) * 100)}%`;
+  }
+
+
+  function inputKindsForProgram(program) {
+    const kinds = new Set();
+    const blocks = program && Array.isArray(program.blocks) ? program.blocks : [];
+    for (const block of blocks) {
+      if (!block || block.voice !== 'input' || !block.input || !block.input.kind) continue;
+      kinds.add(String(block.input.kind).toLowerCase());
+    }
+    return Array.from(kinds).filter(Boolean);
+  }
+
+  async function armInputsForProgram(program) {
+    const kinds = inputKindsForProgram(program);
+    if (!kinds.length) return true;
+
+    if (!window.InputVoice || !window.InputVoice.enable) {
+      showWarning('this patch uses input, but the live input module is unavailable');
+      return false;
+    }
+
+    if (!scheduler) bootScheduler();
+    const audioCtx = window.StringVoice && window.StringVoice.ensureAudio ? window.StringVoice.ensureAudio() : null;
+    if (!audioCtx) {
+      showWarning('this browser does not support Web Audio input');
+      return false;
+    }
+
+    if (inputPanel) inputPanel.hidden = false;
+    if (inputToggleBtn) inputToggleBtn.setAttribute('aria-expanded', 'true');
+
+    const state = window.InputVoice.getState ? window.InputVoice.getState() : {};
+    for (const kind of kinds) {
+      if (state[kind] && state[kind].status === 'live') continue;
+
+      if (inputKindSelect) {
+        inputKindSelect.value = kind;
+        if (inputDeviceSelect) inputDeviceSelect.disabled = kind === 'tab';
+        if (inputEnableBtn) inputEnableBtn.textContent = kind === 'tab' ? 'capture tab audio' : 'enable audio input';
+      }
+
+      const deviceId = inputDeviceSelect && kind !== 'tab' ? inputDeviceSelect.value : '';
+      try {
+        showWarning(kind === 'tab' ? 'choose a tab and enable audio to play this patch' : 'allow audio input to play this patch');
+        await window.InputVoice.enable(kind, { audioCtx, deviceId });
+        if (kind !== 'tab') await refreshInputDevices();
+        clearErrors();
+      } catch (err) {
+        showWarning(err && err.message ? err.message : `could not enable ${kind} input`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async function refreshInputDevices() {
+    if (!inputDeviceSelect || !window.InputVoice || !window.InputVoice.listDevices) return;
+    const current = inputDeviceSelect.value;
+    const devices = await window.InputVoice.listDevices();
+    inputDeviceSelect.innerHTML = '';
+
+    const def = document.createElement('option');
+    def.value = '';
+    def.textContent = 'default';
+    inputDeviceSelect.appendChild(def);
+
+    for (const device of devices) {
+      const opt = document.createElement('option');
+      opt.value = device.deviceId || '';
+      opt.textContent = device.label || 'audio input';
+      inputDeviceSelect.appendChild(opt);
+    }
+
+    if (current && Array.from(inputDeviceSelect.options).some((opt) => opt.value === current)) {
+      inputDeviceSelect.value = current;
+    }
+  }
+
+  async function enableSelectedInput() {
+    if (!window.InputVoice || !window.InputVoice.enable) {
+      showWarning('live input module is unavailable');
+      return;
+    }
+
+    if (!scheduler) bootScheduler();
+    const audioCtx = window.StringVoice && window.StringVoice.ensureAudio ? window.StringVoice.ensureAudio() : null;
+    const kind = inputKind();
+    const deviceId = inputDeviceSelect && kind !== 'tab' ? inputDeviceSelect.value : '';
+
+    try {
+      await window.InputVoice.enable(kind, { audioCtx, deviceId });
+      await refreshInputDevices();
+      clearErrors();
+    } catch (err) {
+      showWarning(err && err.message ? err.message : 'input permission failed');
+    }
+  }
+
+  function stopSelectedInput() {
+    if (!window.InputVoice || !window.InputVoice.stop) return;
+    window.InputVoice.stop(inputKind());
+  }
+
+  function bindInputPanel() {
+    if (!inputToggleBtn || !inputPanel) return;
+
+    inputToggleBtn.addEventListener('click', () => {
+      const next = inputPanel.hidden;
+      inputPanel.hidden = !next;
+      inputToggleBtn.setAttribute('aria-expanded', String(next));
+      if (next) refreshInputDevices();
+    });
+
+    if (inputKindSelect) {
+      inputKindSelect.addEventListener('change', () => {
+        const kind = inputKind();
+        if (inputDeviceSelect) inputDeviceSelect.disabled = kind === 'tab';
+        if (inputEnableBtn) inputEnableBtn.textContent = kind === 'tab' ? 'capture tab audio' : 'enable audio input';
+        renderInputPanelState(window.InputVoice && window.InputVoice.getState ? window.InputVoice.getState() : null);
+      });
+    }
+
+    if (inputEnableBtn) inputEnableBtn.addEventListener('click', enableSelectedInput);
+    if (inputStopBtn) inputStopBtn.addEventListener('click', stopSelectedInput);
+
+    if (window.InputVoice && window.InputVoice.onStateChange) {
+      window.InputVoice.onStateChange(renderInputPanelState);
+    }
+
+    refreshInputDevices();
+  }
 
   // ---------------- samples browse panel ----------------
 
@@ -848,26 +1267,9 @@
   }
 
   function insertAtCursor(text) {
-    if (!editor) return;
-    if (document.activeElement !== editor) editor.focus();
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const before = editor.value.slice(0, start);
-    const after = editor.value.slice(end);
-    // Add a leading space if the previous char isn't whitespace or a paren,
-    // and a trailing space if the next char isn't whitespace, paren, or eol.
-    const prevCh = before.slice(-1);
-    const nextCh = after.slice(0, 1);
-    const needLead = prevCh && !/\s|\(/.test(prevCh);
-    const needTrail = nextCh && !/\s|\)/.test(nextCh);
-    const lead = needLead ? ' ' : '';
-    const trail = needTrail ? ' ' : '';
-    const insert = lead + text + trail;
-    editor.value = before + insert + after;
-    const caret = start + insert.length;
-    editor.selectionStart = editor.selectionEnd = caret;
-    // Trigger input event so any future autosizers / observers update.
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    if (!editorAPI) return;
+    editorAPI.focus();
+    editorAPI.insertText(text);
   }
 
   function toggleSamplesPanel(forceState) {
@@ -921,20 +1323,61 @@
           renderSamplesPanel('');
         } else {
           toggleSamplesPanel(false);
-          editor?.focus();
+          if (editorAPI) editorAPI.focus();
         }
       }
     });
   }
+
+  bindInputPanel();
 
   // ---------------- status ticker ----------------
 
   statusTimer = setInterval(setStatusLine, 250);
   setStatusLine();
 
+  // ---------------- editor mount ----------------
+
+  function mountEditor() {
+    if (!editorMount) return;
+    if (typeof window.createReplEditor !== 'function') {
+      // Bundle missing — surface a quiet warning and leave the mount empty.
+      // The page is still useful (controls/docs); the user just can't type.
+      showWarning('editor failed to load (codemirror.bundle.js missing)');
+      return;
+    }
+
+    editorAPI = window.createReplEditor({
+      parent: editorMount,
+      initialText: '',
+      onChange: () => {
+        // Reserved for future autosave/diagnostics hooks. The CM linter
+        // already runs on doc changes; we don't hard-evaluate here.
+      },
+      onCommand: {
+        play: evaluateAndRun,
+        safePlay,
+        stop,
+        share: shareCurrent,
+      },
+      getSampleNames: () => (
+        window.SampleVoice && window.SampleVoice.list ? window.SampleVoice.list() : []
+      ),
+      getSampleGroups: () => (
+        window.SampleVoice && window.SampleVoice.groups ? window.SampleVoice.groups() : []
+      ),
+      parseForDiagnostics: (text) => (
+        window.ReplDSL && window.ReplDSL.parse ? window.ReplDSL.parse(text) : { ok: true }
+      ),
+    });
+  }
+
   // ---------------- bootstrap ----------------
 
-  (async function init() {
+    (async function init() {
+      initReferencePanel();
+      mountEditor();
+
     // Kick off sample manifest load in parallel; won't block first audio.
     if (window.SampleVoice) {
       window.SampleVoice.loadManifest(SAMPLES_MANIFEST_URL).catch(() => {});
@@ -943,7 +1386,8 @@
     if (!loaded) await loadDefaultExample();
     // Pre-render the transport panel from a parse of the loaded text so
     // the slot dots are visible before the user hits play.
-    const parsed = window.ReplDSL.parse(editor.value);
+    const initialText = editorAPI ? editorAPI.getValue() : '';
+    const parsed = window.ReplDSL.parse(initialText);
       if (parsed.ok) {
         lastGoodProgram = parsed.program;
         if (window.ReplAttractors && window.ReplAttractors.warm) {
@@ -951,5 +1395,6 @@
         }
         renderTransportShell(parsed.program);
       }
+        if (editorAPI && shouldAutofocusEditor) editorAPI.focus();
   })();
 })();

@@ -11,9 +11,27 @@
   'use strict';
 
     const VOICE_NAMES = new Set(['string', 'sample']);
+    const INPUT_SOURCE_NAMES = new Set(['mic', 'interface', 'tab']);
+    const INPUT_ROW_NAMES = new Set(['monitor', 'listen']);
     const PARAM_NAMES = new Set(['force', 'decay', 'crush', 'pan', 'gain', 'tone', 'harm', 'octave', 'every', 'rate', 'start', 'speed']);
+    const LIVE_CONTROL_NAMES = new Set(['time', 'beat', 'leaf', 'choose', 'trigger']);
+    const LIVE_SOURCE_NAMES = new Set(['mic', 'interface', 'tab', 'input']);
+    const LIVE_FEATURE_NAMES = new Set([
+      'intensity', 'rms', 'loudness',
+      'volatility', 'flux',
+      'pressure',
+      'density',
+      'periodicity',
+      'rupture', 'onset',
+      'age', 'silence',
+      'confidence',
+      'brightness', 'centroid',
+      'noisiness', 'flatness',
+      'roughness',
+    ]);
     const EFFECT_NAMES = new Set(['compress', 'space', 'resonance', 'comb', 'grain', 'chorus', 'excite', 'blur', 'scar', 'body']);
     const BLOCK_DIRECTIVES = new Set(['attractor', 'source']);
+    const FADE_DIRECTIVES = new Set(['fade']);
     const FILE_DIRECTIVES = new Set(['tempo', 'meter']);
 
     const EFFECT_MODE_NAMES = {
@@ -737,6 +755,130 @@
         message: `${name} '${raw}' — use 0..1, *, ~, _, *!, *&N, *~, or a supported named mode`,
       };
     }
+
+
+    function parseLiveRef(raw) {
+      const tok = String(raw || '').trim().toLowerCase();
+      if (!tok) return null;
+
+      const parts = tok.split('.').filter(Boolean);
+      const source = parts[0];
+      const feature = parts[1] || 'intensity';
+
+      if (!LIVE_SOURCE_NAMES.has(source)) return null;
+      if (!LIVE_FEATURE_NAMES.has(feature)) return null;
+
+      return { source, feature, raw: tok };
+    }
+
+    function rowDefaultRange(name) {
+      switch (name) {
+        case 'pan': return [-1, 1];
+        case 'gain': return [0, 1];
+        case 'force': return [0.2, 1];
+        case 'decay': return [0.4, 8];
+        case 'crush': return [0, 16];
+        case 'tone': return [0, 1];
+        case 'harm': return [1, 5];
+        case 'octave': return [-2, 2];
+        case 'rate': return [0.25, 4];
+        case 'start': return [0, 0.85];
+        case 'speed': return [0.5, 2];
+        case 'monitor': return [0, 1];
+        case 'listen': return [0, 1];
+        default: return [0, 1];
+      }
+    }
+
+    function parseLiveModLine(tokens, rowName, lineNumber) {
+      if (!Array.isArray(tokens) || tokens.length === 0) return null;
+      if (tokens.length !== 1 && tokens.length !== 3) return null;
+
+      const ref = parseLiveRef(tokens[0]);
+      if (!ref) return null;
+
+      let min;
+      let max;
+      if (tokens.length === 3) {
+        min = parseNumericExpression(tokens[1]);
+        max = parseNumericExpression(tokens[2]);
+        if (!Number.isFinite(min) || !Number.isFinite(max)) {
+          return {
+            ok: false,
+            error: { line: lineNumber, message: `${rowName} ${tokens[0]} needs numeric min and max values` },
+          };
+        }
+      } else {
+        [min, max] = rowDefaultRange(rowName);
+      }
+
+      return {
+        ok: true,
+        value: {
+          kind: 'live-mod',
+          source: ref.source,
+          feature: ref.feature,
+          min,
+          max,
+          raw: tokens.join(' '),
+        },
+      };
+    }
+
+    function parseLiveControlLine(name, tail, lineNumber) {
+      const tokens = tokenizeSlotLine(tail);
+      if (tokens.length === 0) {
+        return { ok: false, error: { line: lineNumber, message: `${name} needs a live source, e.g. ${name} mic.intensity` } };
+      }
+
+      if (name === 'choose') {
+        const ref = parseLiveRef(tokens[0]);
+        if (!ref) {
+          return { ok: false, error: { line: lineNumber, message: `choose needs a live source like mic, mic.brightness, input, interface, or tab` } };
+        }
+        if (tokens.length > 2) {
+          return { ok: false, error: { line: lineNumber, message: `choose takes 'choose mic' or 'choose mic.feature [amount]'` } };
+        }
+        const amount = tokens[1] == null ? 1 : parseNumericExpression(tokens[1]);
+        if (!Number.isFinite(amount)) {
+          return { ok: false, error: { line: lineNumber, message: `choose amount must be numeric` } };
+        }
+        return { ok: true, value: { kind: 'choose', source: ref.source, feature: ref.feature, amount: clamp(amount, 0, 1), raw: tokens.join(' ') } };
+      }
+
+      if (name === 'trigger') {
+        const ref = parseLiveRef(tokens[0]);
+        if (!ref) {
+          return { ok: false, error: { line: lineNumber, message: `trigger needs a live source feature like mic.rupture` } };
+        }
+        if (tokens.length > 2) {
+          return { ok: false, error: { line: lineNumber, message: `trigger takes 'trigger mic.rupture [threshold]'` } };
+        }
+        const threshold = tokens[1] == null ? 0.55 : parseNumericExpression(tokens[1]);
+        if (!Number.isFinite(threshold)) {
+          return { ok: false, error: { line: lineNumber, message: `trigger threshold must be numeric` } };
+        }
+        return { ok: true, value: { kind: 'trigger', source: ref.source, feature: ref.feature, threshold: clamp(threshold, 0, 1), raw: tokens.join(' ') } };
+      }
+
+      if (name === 'time' || name === 'beat' || name === 'leaf') {
+        const ref = parseLiveRef(tokens[0]);
+        if (!ref) {
+          return { ok: false, error: { line: lineNumber, message: `${name} needs a live source feature like mic.intensity, mic.density, or mic.rupture` } };
+        }
+        if (tokens.length > 2) {
+          return { ok: false, error: { line: lineNumber, message: `${name} takes '${name} mic.feature [amount]'` } };
+        }
+        const fallbackAmount = name === 'leaf' ? 0.7 : name === 'beat' ? 0.35 : 0.2;
+        const amount = tokens[1] == null ? fallbackAmount : parseNumericExpression(tokens[1]);
+        if (!Number.isFinite(amount)) {
+          return { ok: false, error: { line: lineNumber, message: `${name} amount must be numeric` } };
+        }
+        return { ok: true, value: { kind: name, source: ref.source, feature: ref.feature, amount: clamp(amount, 0, 1), raw: tokens.join(' ') } };
+      }
+
+      return { ok: false, error: { line: lineNumber, message: `unknown live control '${name}'` } };
+    }
     // Build a parameter/control stream from the same paren-aware token stream
     // used by voice rows. Groups do not create time by themselves; they only
     // make control rhythms readable. The result is flattened before storage so
@@ -875,6 +1017,45 @@
       };
     }
 
+    function parseInputSourceLine(tail, lineNumber) {
+      const args = tail.trim().split(/\s+/).filter(Boolean);
+      const raw = String(args[0] || '').toLowerCase();
+
+      if (!raw) {
+        return { ok: false, error: { line: lineNumber, message: `input needs a source: mic, interface, or tab` } };
+      }
+
+      if (!INPUT_SOURCE_NAMES.has(raw)) {
+        return { ok: false, error: { line: lineNumber, message: `input source must be mic, interface, or tab` } };
+      }
+
+      return {
+        ok: true,
+        value: {
+          kind: raw,
+          label: args.slice(1).join(' ') || raw,
+        },
+      };
+    }
+
+    function resolveInputRow(name, raw) {
+      const lower = String(raw || '').trim().toLowerCase();
+
+      if (name === 'listen') {
+        if (lower === 'on' || lower === 'yes' || lower === 'true' || lower === '1') return { ok: true, value: 1 };
+        if (lower === 'off' || lower === 'no' || lower === 'false' || lower === '0') return { ok: true, value: 0 };
+        return { ok: false, message: `listen must be on or off` };
+      }
+
+      if (name === 'monitor') {
+        if (lower === 'on' || lower === 'yes' || lower === 'true') return { ok: true, value: 1 };
+        if (lower === 'off' || lower === 'no' || lower === 'false') return { ok: true, value: 0 };
+        return resolveParam('gain', raw);
+      }
+
+      return { ok: false, message: `${name} is not an input row` };
+    }
+
     function parseSourceLine(tail, lineNumber) {
       const args = tail.trim().split(/\s+/).filter(Boolean);
       if (args.length < 2) {
@@ -899,6 +1080,135 @@
       };
     }
 
+    function parseFadeDuration(raw) {
+      const tok = String(raw || '').trim().toLowerCase();
+
+      if (!tok) return NaN;
+
+      // v1 supports seconds only:
+      //   30
+      //   30s
+      //   0.5s
+      //
+      // bars/beats are intentionally left for a later pass so the runtime
+      // does not need meter-aware fade conversion yet.
+      const m = tok.match(/^(\d+(?:\.\d+)?)(s|sec|secs|second|seconds)?$/);
+      if (!m) return NaN;
+
+      const seconds = Number(m[1]);
+      return Number.isFinite(seconds) && seconds > 0 ? seconds : NaN;
+    }
+
+    function parseFadeLine(tail, lineNumber) {
+      const args = tail.trim().split(/\s+/).filter(Boolean);
+      const mode = String(args[0] || '').toLowerCase();
+
+      if (!mode) {
+        return {
+          ok: false,
+          error: { line: lineNumber, message: `fade needs a mode: in, out, inout, outin, hold, or clear` },
+        };
+      }
+
+      if (mode === 'clear' || mode === 'hold') {
+        if (args.length > 1) {
+          return {
+            ok: false,
+            error: { line: lineNumber, message: `fade ${mode} does not take a duration` },
+          };
+        }
+
+        return {
+          ok: true,
+          value: {
+            mode,
+            durationSec: 0,
+            highHoldSec: 0,
+            lowHoldSec: 0,
+            line: lineNumber,
+          },
+        };
+      }
+
+      if (!['in', 'out', 'inout', 'outin'].includes(mode)) {
+        return {
+          ok: false,
+          error: { line: lineNumber, message: `unknown fade mode '${mode}' — use in, out, inout, outin, hold, or clear` },
+        };
+      }
+
+      const durationSec = parseFadeDuration(args[1]);
+      if (!Number.isFinite(durationSec)) {
+        return {
+          ok: false,
+          error: { line: lineNumber, message: `fade ${mode} needs a positive seconds duration, e.g. fade ${mode} 30s` },
+        };
+      }
+
+      let highHoldSec = 0;
+      let lowHoldSec = 0;
+
+      for (let i = 2; i < args.length; i++) {
+        const key = String(args[i] || '').toLowerCase();
+
+        if (key === 'hold') {
+          const hold = parseFadeDuration(args[i + 1]);
+          if (!Number.isFinite(hold)) {
+            return {
+              ok: false,
+              error: { line: lineNumber, message: `fade ${mode} hold needs a positive seconds duration, e.g. hold 10s` },
+            };
+          }
+          highHoldSec = hold;
+          lowHoldSec = hold;
+          i++;
+          continue;
+        }
+
+        if (key === 'high') {
+          const high = parseFadeDuration(args[i + 1]);
+          if (!Number.isFinite(high)) {
+            return {
+              ok: false,
+              error: { line: lineNumber, message: `fade ${mode} high needs a positive seconds duration, e.g. high 5s` },
+            };
+          }
+          highHoldSec = high;
+          i++;
+          continue;
+        }
+
+        if (key === 'low') {
+          const low = parseFadeDuration(args[i + 1]);
+          if (!Number.isFinite(low)) {
+            return {
+              ok: false,
+              error: { line: lineNumber, message: `fade ${mode} low needs a positive seconds duration, e.g. low 20s` },
+            };
+          }
+          lowHoldSec = low;
+          i++;
+          continue;
+        }
+
+        return {
+          ok: false,
+          error: { line: lineNumber, message: `unknown fade option '${args[i]}' — use hold, high, or low` },
+        };
+      }
+
+      return {
+        ok: true,
+        value: {
+          mode,
+          durationSec,
+          highHoldSec,
+          lowHoldSec,
+          line: lineNumber,
+        },
+      };
+    }
+    
     // -------------------- main parse --------------------
 
   function parse(text) {
@@ -956,6 +1266,38 @@
         continue;
       }
 
+      // ---- live input line ----
+      if (head === 'input') {
+        endBlock();
+
+        const parsedInput = parseInputSourceLine(tail, lineNumber);
+        if (!parsedInput.ok) {
+          errors.push(parsedInput.error);
+          continue;
+        }
+
+        currentBlock = {
+          voice: 'input',
+          input: parsedInput.value,
+          slots: [
+            { kind: 'leaf', token: { kind: 'input', value: parsedInput.value.kind } },
+          ],
+          slotsPerBar: 1,
+          bars: 1,
+          params: {},
+          effects: {},
+          speed: { kind: 'scalar', value: 1 },
+          attractor: { raw: parsedInput.value.kind, source: {} },
+          source: {},
+          fade: null,
+          paramLines: {},
+          controls: {},
+          every: null,
+          line: lineNumber,
+        };
+        continue;
+      }
+
       // ---- voice line ----
       if (VOICE_NAMES.has(head)) {
         endBlock();
@@ -987,7 +1329,9 @@
             speed: { kind: 'scalar', value: 1 },
             attractor: null,
             source: {},
+              fade: null,
             paramLines: {},
+            controls: {},
             every: null,
             line: lineNumber,
           };
@@ -1032,6 +1376,92 @@
           }
         }
         
+        // ---- live control rows ----
+        if (LIVE_CONTROL_NAMES.has(head)) {
+          if (!currentBlock) {
+            errors.push({ line: lineNumber, message: `live control '${head}' has no block above it — start a voice/input block first` });
+            continue;
+          }
+
+          const parsedControl = parseLiveControlLine(head, tail, lineNumber);
+          if (!parsedControl.ok) {
+            errors.push(parsedControl.error);
+            continue;
+          }
+
+          currentBlock.controls = currentBlock.controls || {};
+          currentBlock.controls[head] = parsedControl.value;
+          currentBlock.paramLines[head] = lineNumber;
+          continue;
+        }
+
+        // ---- input-only rows ----
+        if (INPUT_ROW_NAMES.has(head)) {
+          if (!currentBlock) {
+            errors.push({ line: lineNumber, message: `input row '${head}' has no block above it — start an input block first (input mic, input interface, or input tab)` });
+            continue;
+          }
+
+          if (currentBlock.voice !== 'input') {
+            errors.push({ line: lineNumber, message: `${head} is only valid inside input blocks` });
+            continue;
+          }
+
+          const valueTokens = tokenizeSlotLine(tail);
+          if (valueTokens.length === 0) {
+            errors.push({ line: lineNumber, message: `${head} needs on/off or a value` });
+            continue;
+          }
+
+          const liveMod = parseLiveModLine(valueTokens, head, lineNumber);
+          if (liveMod) {
+            if (!liveMod.ok) {
+              errors.push(liveMod.error);
+              continue;
+            }
+            currentBlock.params[head] = { kind: 'scalar', value: liveMod.value };
+            currentBlock.paramLines[head] = lineNumber;
+            continue;
+          }
+
+          const parsedInputRow = parseParamStream(valueTokens, head, lineNumber, resolveInputRow);
+          if (parsedInputRow.errors.length) {
+            for (const e of parsedInputRow.errors) errors.push(e);
+            continue;
+          }
+
+          const resolved = flattenParamNodes(parsedInputRow.nodes);
+          if (resolved.length === 0) {
+            errors.push({ line: lineNumber, message: `${head} needs on/off or a value` });
+            continue;
+          }
+
+          currentBlock.params[head] = resolved.length === 1
+            ? { kind: 'scalar', value: resolved[0] }
+            : { kind: 'vector', values: resolved };
+
+          currentBlock.paramLines[head] = lineNumber;
+          continue;
+        }
+
+        // ---- fade line ----
+        if (FADE_DIRECTIVES.has(head)) {
+          if (!currentBlock) {
+            errors.push({ line: lineNumber, message: `fade has no voice above it — start a voice block first (string ... or sample ...)` });
+            continue;
+          }
+
+          const parsed = parseFadeLine(tail, lineNumber);
+          if (!parsed.ok) {
+            errors.push(parsed.error);
+            continue;
+          }
+
+          currentBlock.fade = parsed.value;
+          currentBlock.paramLines.fade = lineNumber;
+          continue;
+        }
+        
         // ---- effect surface line ----
         if (EFFECT_NAMES.has(head)) {
           if (!currentBlock) {
@@ -1042,6 +1472,17 @@
           const valueTokens = tokenizeSlotLine(tail);
           if (valueTokens.length === 0) {
             errors.push({ line: lineNumber, message: `${head} needs at least one value` });
+            continue;
+          }
+
+          const liveMod = parseLiveModLine(valueTokens, head, lineNumber);
+          if (liveMod) {
+            if (!liveMod.ok) {
+              errors.push(liveMod.error);
+              continue;
+            }
+            currentBlock.effects[head] = { kind: 'scalar', value: liveMod.value };
+            currentBlock.paramLines[head] = lineNumber;
             continue;
           }
 
@@ -1106,6 +1547,22 @@
           continue;
         }
 
+        const liveMod = parseLiveModLine(valueTokens, head, lineNumber);
+        if (liveMod) {
+          if (!liveMod.ok) {
+            errors.push(liveMod.error);
+            continue;
+          }
+          const stream = { kind: 'scalar', value: liveMod.value };
+          if (head === 'speed') {
+            currentBlock.speed = stream;
+          } else {
+            currentBlock.params[head] = stream;
+          }
+          currentBlock.paramLines[head] = lineNumber;
+          continue;
+        }
+
         const parsedParams = parseParamStream(valueTokens, head, lineNumber);
         if (parsedParams.errors.length) {
           for (const e of parsedParams.errors) errors.push(e);
@@ -1135,7 +1592,7 @@
       // ---- unknown ----
       errors.push({
         line: lineNumber,
-          message: `don't recognize '${head}' — start a voice line (string ..., sample ...), set a parameter/effect row, or set an attractor/source`,
+          message: `don't recognize '${head}' — start a voice/input line (string ..., sample ..., input mic), set a parameter/effect/live control, or use a block directive like attractor, source, fade, or every`,
       });
     }
 
